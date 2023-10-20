@@ -2,12 +2,13 @@
 layout:     post
 title:      玩转JdbcTemplate
 subtitle:   spring对JDBC的操作也封装了一个jdbcTemplate工具
-date:       2021-06-07
-author:     zhaoeh
-header-img: img/post-bg-myself7.jpg
-catalog: true
-tags:
-    - DB/JDBC/事务
+categories: [DB/JDBC/事务]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. 什么是JdbcTemplate？

@@ -2,12 +2,13 @@
 layout:     post
 title:      Java String类
 subtitle:   String类应该是jdk中很常见的一种系统类
-date:       2021-01-23
-author:     zhaoeh
-header-img: img/post-bg-2015.jpg
-catalog: true
-tags:
-    - Java基础知识
+categories: [Java基础知识]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. String两种实例化方式

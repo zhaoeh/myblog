@@ -2,12 +2,13 @@
 layout:     post
 title:      spring的bean scope详解
 subtitle:   spring管理bean对象，bean是存在作用域的
-date:       2022-01-06
-author:     zhaoeh
-header-img: img/post-bg-myself9.jpg
-catalog: true
-tags:
-    - spring
+categories: [spring]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. 什么是bean scope？

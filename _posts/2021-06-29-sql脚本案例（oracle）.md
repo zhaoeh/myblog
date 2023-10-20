@@ -2,12 +2,13 @@
 layout:     post
 title:      SQL脚本案例（oracle）
 subtitle:   oracle中的sql脚本案例
-date:       2021-06-29
-author:     zhaoeh
-header-img: img/post-bg-myself7.jpg
-catalog: true
-tags:
-    - SQL
+categories: [SQL]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. 老核心

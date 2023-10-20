@@ -2,12 +2,13 @@
 layout:     post
 title:      xml方式描述spring的bean
 subtitle:   我们先学习传统的xml方式描述spring的bean
-date:       2022-01-04
-author:     zhaoeh
-header-img: img/post-bg-myself9.jpg
-catalog: true
-tags:
-    - spring
+categories: [spring]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. xml中bean定义详解

@@ -57,12 +57,12 @@ highlight_theme: github
 # ---------------- #
 #      Author      #
 # ---------------- #
-author: Zhuang Ma
-organization: 
+author: Marshall
+organization: 自由组织
 organization_url: 
-github_username: mzlogin
-location: Wuhan, China
-email: chumpma@gmail.com
+github_username: Marshall
+location: Xi'an, China
+email:
 
 # ---------------- #
 #    Navigation    #
@@ -182,7 +182,7 @@ simple_jekyll_search:
     # 是否支持全文搜索
     fulltext: true
     # 最多显示多少条搜索结果
-    limit: 10
+    limit: 100
 
 # ---------------- #
 #      Google      #

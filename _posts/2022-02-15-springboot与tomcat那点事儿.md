@@ -2,12 +2,13 @@
 layout:     post
 title:      springboot与tomcat那点事儿
 subtitle:   spring是如何内嵌tomcat的呢？
-date:       2022-02-15
-author:     zhaoeh
-header-img: img/post-bg-myself9.jpg
-catalog: true
-tags:
-    - spring
+categories: [spring]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. springboot创建的微服务工程为何直接可以被打成jar包？

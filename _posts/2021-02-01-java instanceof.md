@@ -2,12 +2,13 @@
 layout:     post
 title:      java instanceof关键字
 subtitle:   java的instanceof关键字用来判断类型所属
-date:       2021-02-01
-author:     zhaoeh
-header-img: img/post-bg-swift.jpg
-catalog: true
-tags:
-    - Java初级进阶
+categories: [Java初级进阶]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. instanceof详解

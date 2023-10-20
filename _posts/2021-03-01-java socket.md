@@ -2,12 +2,13 @@
 layout:     post
 title:      Java网络编程
 subtitle:   Socket是java网络编程的基础
-date:       2021-03-01
-author:     zhaoeh
-header-img: img/post-bg-myself2.jpg
-catalog: true
-tags:
-    - Java中级知识
+categories: [Java中级知识]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. Socket原理

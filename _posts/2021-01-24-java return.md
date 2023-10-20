@@ -2,12 +2,13 @@
 layout:     post
 title:      Java return关键字
 subtitle:   return用于结束当前线程的调用，返回到被调用处
-date:       2021-01-24
-author:     zhaoeh
-header-img: img/post-bg-2015.jpg
-catalog: true
-tags:
-    - Java基础知识
+categories: [Java基础知识]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. 返回调用方需要的值

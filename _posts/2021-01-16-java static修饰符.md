@@ -2,12 +2,13 @@
 layout:     post
 title:      java 修饰符 static
 subtitle:   static静态修饰符
-date:       2021-01-16
-author:     zhaoeh
-header-img: img/post-bg-2015.jpg
-catalog: true
-tags:
-    - Java基础知识
+categories: [Java基础知识]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. static的含义

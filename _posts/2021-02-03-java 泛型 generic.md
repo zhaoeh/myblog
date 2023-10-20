@@ -2,12 +2,13 @@
 layout:     post
 title:      java 中的泛型
 subtitle:   generic表示java中的泛型，泛型实际上很难
-date:       2021-02-03
-author:     zhaoeh
-header-img: img/post-bg-swift.jpg
-catalog: true
-tags:
-    - Java初级进阶
+categories: [Java初级进阶]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 参考链接：  

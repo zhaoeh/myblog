@@ -2,12 +2,13 @@
 layout:     post
 title:      mybatis和原生spring整合
 subtitle:   mybatis集成到原生spring中，很多自己的特性都通过spring替代了
-date:       2021-11-10
-author:     zhaoeh
-header-img: img/post-bg-rwd.jpg
-catalog: true
-tags:
-    - mybatis
+categories: [mybatis]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. 配置mybatis全局配置文件

@@ -2,12 +2,13 @@
 layout:     post
 title:      通用mapper开发DAO
 subtitle:   mybatis的通用mapper实际上是对mybatis注解开发的升级版本
-date:       2021-11-09
-author:     zhaoeh
-header-img: img/post-bg-rwd.jpg
-catalog: true
-tags:
-    - mybatis
+categories: [mybatis]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. 

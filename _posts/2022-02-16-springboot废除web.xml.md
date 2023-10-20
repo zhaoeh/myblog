@@ -2,12 +2,13 @@
 layout:     post
 title:      springboot怎么没有web.xml呢？
 subtitle:   为何在springboot中我没从来没有见过web.xml?
-date:       2022-02-16
-author:     zhaoeh
-header-img: img/post-bg-myself9.jpg
-catalog: true
-tags:
-    - spring
+categories: [spring]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. web.xml

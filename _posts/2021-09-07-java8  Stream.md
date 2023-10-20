@@ -2,12 +2,13 @@
 layout:     post
 title:      java8 Stream
 subtitle:   Stream是java8为集合框架新增的一个流式操作
-date:       2021-09-07
-author:     zhaoeh
-header-img: img/post-bg-re-vs-ng2.jpg
-catalog: true
-tags:
-    - java8
+categories: [JAVA8]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. java8 Stream api

@@ -2,12 +2,13 @@
 layout:     post
 title:      mybatis代理方式开发DAO
 subtitle:   mybatis代理方式开发的DAO接口不用自己提供实现类，但需要遵守一定的规范
-date:       2021-11-06
-author:     zhaoeh
-header-img: img/post-bg-rwd.jpg
-catalog: true
-tags:
-    - mybatis
+categories: [mybatis]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. 什么是mybatis代理开发？

@@ -2,12 +2,13 @@
 layout:     post
 title:      java中常见的key-value
 subtitle:   java中经常会遇到一些key-value
-date:       2021-01-27
-author:     zhaoeh
-header-img: img/post-bg-2015.jpg
-catalog: true
-tags:
-    - Java基础知识
+categories: [Java基础知识]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. 常见的key-value格式

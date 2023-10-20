@@ -2,12 +2,13 @@
 layout:     post
 title:      玩一玩Java注解
 subtitle:   各种框架都使用了java注解，我们研究一下它的原理
-date:       2021-04-14
-author:     zhaoeh
-header-img: img/post-bg-myself6.jpg
-catalog: true
-tags:
-    - Java高级知识
+categories: [Java高级知识]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
     
 # 玩转java注解  

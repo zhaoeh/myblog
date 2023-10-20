@@ -2,12 +2,13 @@
 layout:     post
 title:      springboot如何快速读取配置项？
 subtitle:   汇总springboot读取外部配置项的几种方式
-date:       2022-03-02
-author:     zhaoeh
-header-img: img/post-bg-re-vs-ng2.jpg
-catalog: true
-tags:
-    - spring
+categories: [spring]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. springboot工程如何读取配置文件的配置项到实体对象中呢？

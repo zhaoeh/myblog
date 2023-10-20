@@ -2,12 +2,13 @@
 layout:     post
 title:      mybatis原始方式实现DAO
 subtitle:   原始方式实现DAO意味着mybatis除了编写mapper接口，还应该实现mapper接口
-date:       2021-11-05
-author:     zhaoeh
-header-img: img/post-bg-rwd.jpg
-catalog: true
-tags:
-    - mybatis
+categories: [mybatis]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. 原始方式实现DAO-基础操作

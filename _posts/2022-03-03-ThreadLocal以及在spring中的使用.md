@@ -2,12 +2,13 @@
 layout:     post
 title:      什么是ThreadLocal？
 subtitle:   spring中是如何使用ThreadLocal的？其他框架有使用到吗？
-date:       2022-03-03
-author:     zhaoeh
-header-img: img/post-bg-re-vs-ng2.jpg
-catalog: true
-tags:
-    - spring
+categories: [spring]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. 使用ThreadLocal的源码参考

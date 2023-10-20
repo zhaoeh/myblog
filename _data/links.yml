@@ -1,91 +1,47 @@
-- name: 码志
-  url: http://mazhuang.org
+- name: Marshall趙
+  url: https://zhaoeh.github.io/myblog
   src: life
 
-- name: Connie 酱
-  url: https://connie99.github.io
+- name: 路人甲Java
+  url: https://gitee.com/javacode2018
   src: life
 
-- name: 只宁静不致远
-  url: http://zxning.github.io
+- name: 路人甲Java充电社
+  url: http://www.itsoku.com/
   src: life
 
-- name: Blog Something
-  url: http://chenxiaoyoyo.github.io
+- name: BAT的乌托邦
+  url: https://cloud.tencent.com/developer/column/80381
   src: life
 
-- name: 日新亭
-  url: http://www.fengerzh.com/
+- name: Java学习笔记
+  url: https://java.isture.com/
   src: life
 
-- name: wanandroid
-  url: http://www.wanandroid.com/
+- name: 程序人生
+  url: https://juejin.cn/user/1697301686663549/posts
   src: life
 
-- name: ZZY补完计划
-  url: https://zzycreate.github.io/
+- name: 趔趄的猿
+  url: https://blog.lqdev.cn/
   src: life
 
-- name: 村农
-  url: http://www.why-dong.com/
+- name: Marshall趙gitee主页
+  url: https://gitee.com/zhaoehcode
   src: life
 
-- name: 求生之路
-  url: http://blog.xiaolaoni.xin/
-  src: life
-
-- name: 董小姐的草原
-  url: https://candy961.github.io/
-  src: life
-
-- name: 王玉超
-  url: https://yuchao.wang/
+- name: XuZhong 大神博客
+  url: https://xuzhongcn.github.io/
   src: www
 
-- name: 水寒的博客
-  url: https://dp2px.com
+- name: 码志（博客模板参考）
+  url: https://mazhuang.org/
   src: www
 
-- name: 孙不服的博客
-  url: https://sunbufu.github.io/
+- name: Marshall趙（gitee博客）
+  url: https://zhaoehcode.gitee.io/
   src: www
 
-- name: HwiLu's 博客
-  url: https://hwilu.github.io/
-  src: www
-
-- name: 有次博客
-  url: http://you.ci/
-  src: www
-
-- name: 呓城之城
-  url: http://yicheng.zdyrs.com/
-  src: www
-
-- name: 秦大圣的博客
-  url: https://qinjisheng.top/
-  src: www
-
-- name: 极客玩家大白
-  url: https://geekplayers.com/
-  src: www
-
-- name: 见字如面
-  url: https://hiwannz.com
-  src: www
-
-- name: 梦境迷离
-  url: https://dreamylost.cn
-  src: www
-
-- name: river's blog
-  url: https://www.river106.cn
-  src: www
-
-- name: lanruixiang
-  url: https://lanruixiang.github.io/
-  src: www
-
-- name: lch2010
-  url: https://lch2010.github.io/
+- name: 在线json格式化
+  url: https://www.bejson.com/
   src: www

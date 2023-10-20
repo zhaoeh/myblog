@@ -2,12 +2,13 @@
 layout:     post
 title:      java8 Lambda表达式
 subtitle:   Lambda表达式方便的为函数式接口创建对象
-date:       2021-09-04
-author:     zhaoeh
-header-img: img/post-bg-re-vs-ng2.jpg
-catalog: true
-tags:
-    - java8
+categories: [JAVA8]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. 什么是Lambda表达式？

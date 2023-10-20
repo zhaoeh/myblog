@@ -2,12 +2,13 @@
 layout:     post
 title:      彻底掌握spring中的事件监听器
 subtitle:   从springboot出发完整分析spring容器中的事件监听模型
-date:       2022-02-10
-author:     zhaoeh
-header-img: img/post-bg-myself9.jpg
-catalog: true
-tags:
-    - spring
+categories: [spring]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. 监听器

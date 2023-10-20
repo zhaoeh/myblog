@@ -2,12 +2,13 @@
 layout:     post
 title:      java8 集合操作
 subtitle:   jdk团队内部对集合框架大量应用了java8的函数式接口
-date:       2021-09-06
-author:     zhaoeh
-header-img: img/post-bg-re-vs-ng2.jpg
-catalog: true
-tags:
-    - java8
+categories: [JAVA8]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. java8对jdk内部做了哪些扩展？

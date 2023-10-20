@@ -2,12 +2,13 @@
 layout:     post
 title:      springboot启动流程简单分析
 subtitle:   对springboot的启动流程源码做简单的分析
-date:       2022-02-01
-author:     zhaoeh
-header-img: img/post-bg-myself9.jpg
-catalog: true
-tags:
-    - spring
+categories: [spring]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. springboot主要流程分析

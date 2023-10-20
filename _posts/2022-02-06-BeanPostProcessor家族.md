@@ -2,12 +2,13 @@
 layout:     post
 title:      BeanPostProcessor接口家族体系
 subtitle:   spring架构中最重要的钩子就是BeanPostProcessor
-date:       2022-02-06
-author:     zhaoeh
-header-img: img/post-bg-myself9.jpg
-catalog: true
-tags:
-    - spring
+categories: [spring]
+mermaid: false
+sequence: false
+flow: false
+mathjax: false
+mindmap: false
+mindmap2: false
 ---
 
 # 1. BeanPostProcessor家族系列
