@@ -1,0 +1,1124 @@
+---
+layout:     post
+title:      SQL脚本案例（oracle）
+subtitle:   oracle中的sql脚本案例
+date:       2021-06-29
+author:     zhaoeh
+header-img: img/post-bg-myself7.jpg
+catalog: true
+tags:
+    - SQL
+---
+
+# 1. 老核心
+## 1.1 SYS_DATA_DICTIONARY长度修改
+oracle，更改指定字段长度，为表增加主键：   
+```sql
+ -- 扩展表SYS_DATA_DICTIONARY的DD_VALUE字段长度为4000，用于维护wps和快图的签名信息SIGNATURE
+ -- 注意，应首先执行该脚本
+ ALTER TABLE SYS_DATA_DICTIONARY MODIFY DD_VALUE Varchar2(4000);
+ --  为表 SYS_DATA_DICTIONARY 增加主键，注意表空间可能需要更改
+ alter table SYS_DATA_DICTIONARY
+   add constraint SYS_DATA_DICTIONARY_KEY primary key (ID)
+   using index
+   tablespace ICMP_TBS
+   pctfree 10
+   initrans 2
+   maxtrans 255
+   storage
+   (
+     initial 64K
+     next 1M
+     minextents 1
+     maxextents unlimited
+   );
+```
+
+## 1.2 表备份
+```sql
+create table xxx as select * from yyy;  -- 进行同表结构之间的数据备份
+```
+案例：
+```sql
+ -- 20181107上线所改动的表进行备份
+ CREATE TABLE SYS_DATA_DICTIONARY_20181107 AS SELECT * FROM SYS_DATA_DICTIONARY;
+ CREATE TABLE SYS_MENU_20181107 AS SELECT * FROM SYS_MENU;
+```
+
+## 1.3 表情包EMOTICON
+创建新表:
+```sql
+-- 创建表情包表 EMOTICON ，注意表空间可能需要更改
+create table EMOTICON
+(
+  USER_CODE  VARCHAR2(20),
+  USER_NAME  VARCHAR2(100),
+  EMOTICON_ID     VARCHAR2(20),
+  CREATE_DATE  VARCHAR2(20),
+  EMOTICON_NAME    VARCHAR2(20),
+  EMOTICON_TYPE    VARCHAR2(20),
+  EMOTICON_FLAG    VARCHAR2(20),
+  ADDRESSES   VARCHAR2(255 CHAR),
+  FILETYPE      VARCHAR2(2 CHAR),
+  COMMENTS     VARCHAR2(100)
+)
+tablespace ICMP_TBS
+  pctfree 10
+  initrans 1
+  maxtrans 255
+  storage
+  (
+    initial 64
+    next 1
+    minextents 1
+    maxextents unlimited
+  );
+-- Add comments to the table
+comment on table EMOTICON
+  is '云办公表情图片信息表';
+-- Add comments to the columns
+comment on column EMOTICON.USER_CODE
+  is '上传者ID';
+comment on column EMOTICON.USER_NAME
+  is '上传者姓名';
+comment on column EMOTICON.EMOTICON_ID
+  is '表情包ID';
+comment on column EMOTICON.CREATE_DATE
+  is '创建日期';
+comment on column EMOTICON.EMOTICON_NAME
+  is '表情包名称';
+comment on column EMOTICON.EMOTICON_TYPE
+  is '表情包文件类型';
+comment on column EMOTICON.EMOTICON_FLAG
+  is '表情包心情标签';
+comment on column EMOTICON.ADDRESSES
+  is '表情包文件路径';
+comment on column EMOTICON.FILETYPE
+  is '资料类型';
+comment on column EMOTICON.COMMENTS
+  is '备注说明';
+alter table EMOTICON
+add constraint PK_EMOTICON primary key (USER_CODE,FILETYPE);
+```
+
+## 1.4 增量更新_VERSION_APP_COMPOSE
+创建表，通过comment on为表字段增量添加字段注释:
+```sql
+-- Create table
+create table VERSION_APP_COMPOSE
+(
+  ID           VARCHAR2(32) not null,
+  FROM_VERSION VARCHAR2(32),
+  TO_VERSION   VARCHAR2(32),
+  PACKAGE_NAME VARCHAR2(255),
+  URL          VARCHAR2(255),
+  SYSTEM_TYPE  VARCHAR2(2),
+  CREATE_TIME  DATE
+)
+tablespace ICMP_TBS
+  pctfree 10
+  initrans 1
+  maxtrans 255
+  storage
+  (
+    initial 16
+    next 8
+    minextents 1
+    maxextents unlimited
+  );
+-- Add comments to the columns
+comment on column VERSION_APP_COMPOSE.ID
+  is '主键';
+comment on column VERSION_APP_COMPOSE.FROM_VERSION
+  is '传入版本号';
+comment on column VERSION_APP_COMPOSE.TO_VERSION
+  is '最新版本号';
+comment on column VERSION_APP_COMPOSE.PACKAGE_NAME
+  is '生成安装包名称';
+comment on column VERSION_APP_COMPOSE.URL
+  is '下载地址';
+comment on column VERSION_APP_COMPOSE.SYSTEM_TYPE
+  is '系统类型 0云办公 1数据通';
+comment on column VERSION_APP_COMPOSE.CREATE_TIME
+  is '添加时间';
+```
+
+## 1.5 增量更新_VERSION_APP
+创建表，通过comment on为表字段增量添加字段注释:
+```sql
+-- Create table
+create table VERSION_APP
+(
+  ID           VARCHAR2(32) not null,
+  VERSION      VARCHAR2(32),
+  VERSION_STR  VARCHAR2(32),
+  PACKAGE_NAME VARCHAR2(32),
+  PACKAGE_TYPE VARCHAR2(2),
+  DESCRIPTION  VARCHAR2(256),
+  URL          VARCHAR2(255),
+  SYSTEM_TYPE  VARCHAR2(2),
+  IS_COMPOSE   VARCHAR2(2),
+  CREATE_TIME  DATE
+)
+tablespace ICMP_TBS
+  pctfree 10
+  initrans 1
+  maxtrans 255
+  storage
+  (
+    initial 16
+    next 8
+    minextents 1
+    maxextents unlimited
+  );
+-- Add comments to the columns
+comment on column VERSION_APP.ID
+  is '主键';
+comment on column VERSION_APP.VERSION
+  is '版本号';
+comment on column VERSION_APP.VERSION_STR
+  is '版本号字符串格式';
+comment on column VERSION_APP.PACKAGE_NAME
+  is '安装包名称';
+comment on column VERSION_APP.PACKAGE_TYPE
+  is '安装包类型 0增量包 1全量包';
+comment on column VERSION_APP.DESCRIPTION
+  is '更新内容';
+comment on column VERSION_APP.URL
+  is '下载地址';
+comment on column VERSION_APP.SYSTEM_TYPE
+  is '系统类型 0云办公 1数据通';
+comment on column VERSION_APP.IS_COMPOSE
+  is '是否合并 0否 1是';
+comment on column VERSION_APP.CREATE_TIME
+  is '添加时间';
+```
+
+## 1.6 SYS_MENU数据字典数据维护
+insert into 向目标表插入数据:
+```sql
+-- 增量更新 版本管理菜单；可选方式：1.执行下面脚本 2.后台界面手动维护。 	注意：该脚本执行后，需要登录后台管理系统为该菜单授权！
+insert into SYS_MENU (ID, PARENT_ID, MENU_PATH, EN_MENU_NAME, MENU_NAME, REMARK, CREATE_USER_ID, CREATE_TIME, ORDER_NUMBER, IS_DELETE, STATE)
+values ('9e83a61f667b820f01667b90bc2c0050', 'ff808081285981aa01285984fde90002', '/datamatrix/versionManager_list.do', 'version manage', '版本管理', '', '8a4583c3379d08e101379d0e3dfe0002', '2018-10-16 14:29:34', 0, '', '');
+```
+
+## 1.7 数据字典数据维护
+insert into向目标表插入数据:
+```sql
+-- 数据字典 SYS_DATA_DICTIONARY 表中数据增量维护
+-- 维护增量更新开关 （新增）
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('9e8383dd6618d4560166231e7c3a0156', '402881e73706ba52013706bfabd6000a', '增量更新开关', '增量更新开关', '增量更新开关', '8a4583c3379d08e101379d0e3dfe0002', '2018-09-29 10:18:12', '', '', '数据通和云办公前端app增量更新开关', '', 'hasChild', '');
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('9e8383dd6618d4560166231ee2410157', '9e8383dd6618d4560166231e7c3a0156', 'IS_INCRE_UPDATE', 'IS_INCRE_UPDATE', 'false', '8a4583c3379d08e101379d0e3dfe0002', '2018-09-29 10:18:38', '', '', '配置增量更新开关,true表示打开增量更新，false表示关闭(不区分大小写)', '', 'noChild', '');
+-- 维护快图和wps参数，维护前先修改 SYS_DATA_DICTIONARY 的 DD_VALUE 长度为4000 （新增）
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('9e8361216624a60201662811f8210008', '9e8361216624a6020166280df2ed0000', 'APK_KTLL_VALUE', 'APK_KTLL_VALUE', 'KTLL4.5.2.apk', '8a4583c3379d08e101379d0e3dfe0002', '2018-09-30 09:22:38', '', '', '快图apk值', '', 'noChild', '');
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('9e8361216624a60201662811a5e10007', '9e8361216624a6020166280df2ed0000', 'APK_KTLL_NAME', 'APK_KTLL_NAME', '快图浏览', '8a4583c3379d08e101379d0e3dfe0002', '2018-09-30 09:22:17', '', '', '快图apk名称', '', 'noChild', '');
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('9e8361216624a602016628114f840006', '9e8361216624a6020166280df2ed0000', 'APK_WPS_VALUE', 'APK_WPS_VALUE', 'WPS_Office10.0.3.apk', '8a4583c3379d08e101379d0e3dfe0002', '2018-09-30 09:21:55', '', '', 'WPS apk值', '', 'noChild', '');
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('9e8361216624a60201662811030f0005', '9e8361216624a6020166280df2ed0000', 'APK_WPS_NAME', 'APK_WPS_NAME', 'WPS Office', '8a4583c3379d08e101379d0e3dfe0002', '2018-09-30 09:21:35', '', '', 'WPS apk名称', '', 'noChild', '');
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('9e8361216624a602016628109a020004', '9e8361216624a6020166280df2ed0000', 'SIGNATURE', 'SIGNATURE', '308203633082024ba00302010202043ff851a5300d06092a864886f70d01010b05003061310b300906035504061302434e310f300d06035504080c06e59b9be5b79d310f300d06035504070c06e68890e983bd310e300c060355040a13056364726362310e300c060355040b130563647263623110300e0603550403130770656e677275693020170d3136313231323037353135305a180f32313136313131383037353135305a3061310b300906035504061302434e310f300d06035504080c06e59b9be5b79d310f300d06035504070c06e68890e983bd310e300c060355040a13056364726362310e300c060355040b130563647263623110300e0603550403130770656e6772756930820122300d06092a864886f70d01010105000382010f003082010a02820101008e6dba5d25f30a6bfad81844c9dea71326256a47ca203ce1912a9c711a5a9b5d21d515e522cef1dddaa60d88c54ecf24ec81bdd217a5ab26fe0ecf8d55652ef629ba56a7f910afe9e171ed62c132cabf03cf0c144b96743a9d959dcfa98a756e1501329ce0236ad1cf5e9658dd04c5e15ba0845be56937dabd0a9062b39e83410473dbc11154ecee46a51eff4f8d2fcd32e957257f216f24d1ce777c7b53c032d719a4de8533598d112356444efddb0051bf4b7cfe4231ebcfca0cfa48feb2ab4b06822d5b00de071d435b408aa9efc57cff8b3cfc', '8a4583c3379d08e101379d0e3dfe0002', '2018-09-30 09:21:08', '', '', '签名', '', 'noChild', '');
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('9e8361216624a6020166280f3bda0002', '9e8361216624a6020166280df2ed0000', 'PACKAGE_KTLL_VPN', 'PACKAGE_KTLL_VPN', 'com.alensw.PicFolder', '8a4583c3379d08e101379d0e3dfe0002', '2018-09-30 09:19:38', '', '', '快图浏览 android应用包名', '', 'noChild', '');
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('9e8361216624a6020166280eba120001', '9e8361216624a6020166280df2ed0000', 'PACKAGE_WPS_VPN', 'PACKAGE_WPS_VPN', 'cn.wps.moffice_eng_secure', '8a4583c3379d08e101379d0e3dfe0002', '2018-09-30 09:19:05', '', '', 'WPS Offices android应用包名', '', 'noChild', '');
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('9e8361216624a6020166280df2ed0000', '402881e73706ba52013706bfabd6000a', 'WPS参数维护', 'WPS_SETTING', 'wps', '8a4583c3379d08e101379d0e3dfe0002', '2018-09-30 09:18:14', '', '', 'wps与快图参数维护', '', 'hasChild', '');
+```
+
+## 1.8 后台ftp明文密码(不执行)
+insert into向目标表插入数据:
+```sql
+-- 后台FTP服务器密码维护；注意：生产已有数据，需访问后台系统手动维护参数，才可实现密码加密逻辑
+-- OA 系统的ftp用户名和密码（明文）
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('948091a45c7697f7015cc845f1a60003', '948091a45c7697f7015cc84555f10002', 'OA_USERNAME', 'OA_USERNAME', 'oaapp', '8a4583c3379d08e101379d0e3dfe0002', '2017-06-21 09:30:45', '', '', '使用SFTP方式下载OA系统的附件。此参数是ftp的用户名', '', 'hasChild', '');
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('948091a45c7697f7015cc84745760005', '948091a45c7697f7015cc84555f10002', 'OA_PWD', 'OA_PWD', 'Oaapp_2017kjb@', '8a4583c3379d08e101379d0e3dfe0002', '2017-06-21 09:32:12', '', '', '使用SFTP方式下载OA系统的附件。此参数是ftp的密码', '', 'noChild', '');
+-- PURCHASE 采购系统的ftp用户名和密码（明文）
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('948091a45c7697f7015cc84790600006', '948091a45c7697f7015cc84555f10002', 'PURCHASE_USERNAME', 'PURCHASE_USERNAME', 'pms', '8a4583c3379d08e101379d0e3dfe0002', '2017-06-21 09:32:32', '', '', '使用SFTP方式下载采购系统的附件。此参数是ftp的用户名', '', 'noChild', '');
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('948091a45c7697f7015cc847d79e0007', '948091a45c7697f7015cc84555f10002', 'PURCHASE_PWD', 'PURCHASE_PWD', 'Pms0218!a', '8a4583c3379d08e101379d0e3dfe0002', '2017-06-21 09:32:50', '', '', '使用SFTP方式下载采购系统的附件。此参数是ftp的密码', '', 'noChild', '');
+-- POSITION 头寸系统的ftp用户名和密码（明文）
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('948091a55fbf6775015fbf77ebae0000', '948091a45c7697f7015cc84555f10002', 'POSITION_USERNAME', 'POSITION_USERNAME', 'fifp', '8a4583c3379d08e101379d0e3dfe0002', '2017-11-15 19:37:08', '', '', '使用SFTP方式下载头寸系统的附件。此参数是ftp的用户名', '', 'noChild', '');
+insert into SYS_DATA_DICTIONARY (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('948091a55fbf6775015fbf783d370001', '948091a45c7697f7015cc84555f10002', 'POSITION_PWD', 'POSITION_PWD', 'ZJtc@2017', '8a4583c3379d08e101379d0e3dfe0002', '2017-11-15 19:37:29', '', '', 'SFTP方式下载头寸系统的附件。此参数是ftp的密码', '', 'noChild', '');
+```
+
+## 1.9 回滚修改字段长度
+```sql
+alter table xxx modify yyy -- 修改字段长度
+```
+案例：
+```sql
+ALTER TABLE SYS_DATA_DICTIONARY MODIFY DD_VALUE Varchar2(255);
+```
+
+# 2. 企业微信
+## 2.1 创建表并增加约束
+创建表结构，并为指定字段增加check约束:
+```sql
+CREATE TABLE ACCESSTOKEN (
+    ID VARCHAR2(32 BYTE) NOT NULL ,
+    APPID VARCHAR2(32 BYTE) NULL ,
+    TOKEN VARCHAR2(255 BYTE) NULL ,
+    EXPIRESIN VARCHAR2(255 BYTE) NULL ,
+    TOKENTIME VARCHAR2(255 BYTE) NULL
+)
+ALTER TABLE ACCESSTOKEN ADD CHECK (ID IS NOT NULL);
+```
+
+## 2.2 创建表并增加约束
+创建表结构并增加注释和check约束:
+```sql
+ CREATE TABLE WEIXIN_DEPT (
+     ID VARCHAR2(255 BYTE) NOT NULL ,
+     NAME VARCHAR2(255 BYTE) NOT NULL ,
+     PARENTID VARCHAR2(255 BYTE) NULL ,
+     ORDERNUM VARCHAR2(255 BYTE) NULL
+ )
+ COMMENT ON COLUMN WEIXIN_DEPT.ID IS '微信部门ID';
+ COMMENT ON COLUMN WEIXIN_DEPT.NAME IS '微信部门名称';
+ COMMENT ON COLUMN WEIXIN_DEPT.PARENTID IS '父亲部门id。根部门为1';
+ COMMENT ON COLUMN WEIXIN_DEPT.ORDERNUM IS '在父部门中的次序值。order值大的排序靠前。值范围是[0, 2^32)';
+ ALTER TABLE WEIXIN_DEPT ADD CHECK (ID IS NOT NULL);
+ ALTER TABLE WEIXIN_DEPT ADD CHECK (NAME IS NOT NULL);
+```
+
+## 2.3 创建表并增加约束
+创建表结构并增加注释和check约束:
+```sql
+CREATE TABLE WEIXIN_USER (
+    ID VARCHAR2(255 BYTE) NOT NULL ,
+    USERNAME VARCHAR2(255 BYTE) NULL ,
+    USERACCOUNT VARCHAR2(255 BYTE) NULL ,
+    DEPTID VARCHAR2(255 BYTE) NULL ,
+    MOBILENO VARCHAR2(32 BYTE) NULL ,
+    EMAIL VARCHAR2(255 BYTE) NULL ,
+    STATUS VARCHAR2(255 BYTE) NULL ,
+    SEX VARCHAR2(32 BYTE) NULL
+)
+COMMENT ON COLUMN WEIXIN_USER.ID IS '员工ID';
+COMMENT ON COLUMN WEIXIN_USER.USERNAME IS '员工姓名';
+COMMENT ON COLUMN WEIXIN_USER.USERACCOUNT IS '员工账号';
+COMMENT ON COLUMN WEIXIN_USER.DEPTID IS '部门id';
+COMMENT ON COLUMN WEIXIN_USER.MOBILENO IS '移动电话';
+COMMENT ON COLUMN WEIXIN_USER.EMAIL IS '邮箱';
+COMMENT ON COLUMN WEIXIN_USER.STATUS IS '0：在职，1：离职';
+ALTER TABLE WEIXIN_USER ADD CHECK (ID IS NOT NULL);
+```
+
+## 2.4 复制表数据
+通过子查询向目标表中插入数据:
+```sql
+insert into weixin_user
+  (id, username, useraccount, deptid, mobileno, email, status, sex)
+  SELECT s.ID,
+         s.USER_NAME    userName,
+         s.EN_USER_NAME useraccount,
+         s.DEPE_ID      depeId,
+         s.MPHONE       mobileno,
+         s.MAILBOX      email,
+         s.STATUS       status,
+         s.sex          sex
+    FROM SYS_USER s;
+```
+
+# 3. 对表的常见操作
+## 3.1 quartz官方包自带的oracle的11张表
+quartz 框架利用数据库实现分布式，下面是quartz官方包自带的oracle的11张表的相关语句。   
+```sql
+-- A hint submitted by a user: Oracle DB MUST be created as "shared" and the
+-- job_queue_processes parameter  must be greater than 2
+-- However, these settings are pretty much standard after any
+-- Oracle install, so most users need not worry about this.
+--
+-- Many other users (including the primary author of Quartz) have had success
+-- runing in dedicated mode, so only consider the above as a hint ;-)
+delete from qrtz_fired_triggers;
+delete from qrtz_simple_triggers;
+delete from qrtz_simprop_triggers;
+delete from qrtz_cron_triggers;
+delete from qrtz_blob_triggers;
+delete from qrtz_triggers;
+delete from qrtz_job_details;
+delete from qrtz_calendars;
+delete from qrtz_paused_trigger_grps;
+delete from qrtz_locks;
+delete from qrtz_scheduler_state;
+drop table qrtz_calendars;
+drop table qrtz_fired_triggers;
+drop table qrtz_blob_triggers;
+drop table qrtz_cron_triggers;
+drop table qrtz_simple_triggers;
+drop table qrtz_simprop_triggers;
+drop table qrtz_triggers;
+drop table qrtz_job_details;
+drop table qrtz_paused_trigger_grps;
+drop table qrtz_locks;
+drop table qrtz_scheduler_state;
+CREATE TABLE qrtz_job_details
+  (
+    SCHED_NAME VARCHAR2(120) NOT NULL,
+    JOB_NAME  VARCHAR2(200) NOT NULL,
+    JOB_GROUP VARCHAR2(200) NOT NULL,
+    DESCRIPTION VARCHAR2(250) NULL,
+    JOB_CLASS_NAME   VARCHAR2(250) NOT NULL,
+    IS_DURABLE VARCHAR2(1) NOT NULL,
+    IS_NONCONCURRENT VARCHAR2(1) NOT NULL,
+    IS_UPDATE_DATA VARCHAR2(1) NOT NULL,
+    REQUESTS_RECOVERY VARCHAR2(1) NOT NULL,
+    JOB_DATA BLOB NULL,
+    CONSTRAINT QRTZ_JOB_DETAILS_PK PRIMARY KEY (SCHED_NAME,JOB_NAME,JOB_GROUP)
+);
+CREATE TABLE qrtz_triggers
+  (
+    SCHED_NAME VARCHAR2(120) NOT NULL,
+    TRIGGER_NAME VARCHAR2(200) NOT NULL,
+    TRIGGER_GROUP VARCHAR2(200) NOT NULL,
+    JOB_NAME  VARCHAR2(200) NOT NULL,
+    JOB_GROUP VARCHAR2(200) NOT NULL,
+    DESCRIPTION VARCHAR2(250) NULL,
+    NEXT_FIRE_TIME NUMBER(13) NULL,
+    PREV_FIRE_TIME NUMBER(13) NULL,
+    PRIORITY NUMBER(13) NULL,
+    TRIGGER_STATE VARCHAR2(16) NOT NULL,
+    TRIGGER_TYPE VARCHAR2(8) NOT NULL,
+    START_TIME NUMBER(13) NOT NULL,
+    END_TIME NUMBER(13) NULL,
+    CALENDAR_NAME VARCHAR2(200) NULL,
+    MISFIRE_INSTR NUMBER(2) NULL,
+    JOB_DATA BLOB NULL,
+    CONSTRAINT QRTZ_TRIGGERS_PK PRIMARY KEY (SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP),
+    CONSTRAINT QRTZ_TRIGGER_TO_JOBS_FK FOREIGN KEY (SCHED_NAME,JOB_NAME,JOB_GROUP)
+      REFERENCES QRTZ_JOB_DETAILS(SCHED_NAME,JOB_NAME,JOB_GROUP)
+);
+CREATE TABLE qrtz_simple_triggers
+  (
+    SCHED_NAME VARCHAR2(120) NOT NULL,
+    TRIGGER_NAME VARCHAR2(200) NOT NULL,
+    TRIGGER_GROUP VARCHAR2(200) NOT NULL,
+    REPEAT_COUNT NUMBER(7) NOT NULL,
+    REPEAT_INTERVAL NUMBER(12) NOT NULL,
+    TIMES_TRIGGERED NUMBER(10) NOT NULL,
+    CONSTRAINT QRTZ_SIMPLE_TRIG_PK PRIMARY KEY (SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP),
+    CONSTRAINT QRTZ_SIMPLE_TRIG_TO_TRIG_FK FOREIGN KEY (SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP)
+    REFERENCES QRTZ_TRIGGERS(SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP)
+);
+CREATE TABLE qrtz_cron_triggers
+  (
+    SCHED_NAME VARCHAR2(120) NOT NULL,
+    TRIGGER_NAME VARCHAR2(200) NOT NULL,
+    TRIGGER_GROUP VARCHAR2(200) NOT NULL,
+    CRON_EXPRESSION VARCHAR2(120) NOT NULL,
+    TIME_ZONE_ID VARCHAR2(80),
+    CONSTRAINT QRTZ_CRON_TRIG_PK PRIMARY KEY (SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP),
+    CONSTRAINT QRTZ_CRON_TRIG_TO_TRIG_FK FOREIGN KEY (SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP)
+      REFERENCES QRTZ_TRIGGERS(SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP)
+);
+CREATE TABLE qrtz_simprop_triggers
+  (
+    SCHED_NAME VARCHAR2(120) NOT NULL,
+    TRIGGER_NAME VARCHAR2(200) NOT NULL,
+    TRIGGER_GROUP VARCHAR2(200) NOT NULL,
+    STR_PROP_1 VARCHAR2(512) NULL,
+    STR_PROP_2 VARCHAR2(512) NULL,
+    STR_PROP_3 VARCHAR2(512) NULL,
+    INT_PROP_1 NUMBER(10) NULL,
+    INT_PROP_2 NUMBER(10) NULL,
+    LONG_PROP_1 NUMBER(13) NULL,
+    LONG_PROP_2 NUMBER(13) NULL,
+    DEC_PROP_1 NUMERIC(13,4) NULL,
+    DEC_PROP_2 NUMERIC(13,4) NULL,
+    BOOL_PROP_1 VARCHAR2(1) NULL,
+    BOOL_PROP_2 VARCHAR2(1) NULL,
+    CONSTRAINT QRTZ_SIMPROP_TRIG_PK PRIMARY KEY (SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP),
+    CONSTRAINT QRTZ_SIMPROP_TRIG_TO_TRIG_FK FOREIGN KEY (SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP)
+      REFERENCES QRTZ_TRIGGERS(SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP)
+);
+CREATE TABLE qrtz_blob_triggers
+  (
+    SCHED_NAME VARCHAR2(120) NOT NULL,
+    TRIGGER_NAME VARCHAR2(200) NOT NULL,
+    TRIGGER_GROUP VARCHAR2(200) NOT NULL,
+    BLOB_DATA BLOB NULL,
+    CONSTRAINT QRTZ_BLOB_TRIG_PK PRIMARY KEY (SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP),
+    CONSTRAINT QRTZ_BLOB_TRIG_TO_TRIG_FK FOREIGN KEY (SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP)
+        REFERENCES QRTZ_TRIGGERS(SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP)
+);
+CREATE TABLE qrtz_calendars
+  (
+    SCHED_NAME VARCHAR2(120) NOT NULL,
+    CALENDAR_NAME  VARCHAR2(200) NOT NULL,
+    CALENDAR BLOB NOT NULL,
+    CONSTRAINT QRTZ_CALENDARS_PK PRIMARY KEY (SCHED_NAME,CALENDAR_NAME)
+);
+CREATE TABLE qrtz_paused_trigger_grps
+  (
+    SCHED_NAME VARCHAR2(120) NOT NULL,
+    TRIGGER_GROUP  VARCHAR2(200) NOT NULL,
+    CONSTRAINT QRTZ_PAUSED_TRIG_GRPS_PK PRIMARY KEY (SCHED_NAME,TRIGGER_GROUP)
+);
+CREATE TABLE qrtz_fired_triggers
+  (
+    SCHED_NAME VARCHAR2(120) NOT NULL,
+    ENTRY_ID VARCHAR2(95) NOT NULL,
+    TRIGGER_NAME VARCHAR2(200) NOT NULL,
+    TRIGGER_GROUP VARCHAR2(200) NOT NULL,
+    INSTANCE_NAME VARCHAR2(200) NOT NULL,
+    FIRED_TIME NUMBER(13) NOT NULL,
+    SCHED_TIME NUMBER(13) NOT NULL,
+    PRIORITY NUMBER(13) NOT NULL,
+    STATE VARCHAR2(16) NOT NULL,
+    JOB_NAME VARCHAR2(200) NULL,
+    JOB_GROUP VARCHAR2(200) NULL,
+    IS_NONCONCURRENT VARCHAR2(1) NULL,
+    REQUESTS_RECOVERY VARCHAR2(1) NULL,
+    CONSTRAINT QRTZ_FIRED_TRIGGER_PK PRIMARY KEY (SCHED_NAME,ENTRY_ID)
+);
+CREATE TABLE qrtz_scheduler_state
+  (
+    SCHED_NAME VARCHAR2(120) NOT NULL,
+    INSTANCE_NAME VARCHAR2(200) NOT NULL,
+    LAST_CHECKIN_TIME NUMBER(13) NOT NULL,
+    CHECKIN_INTERVAL NUMBER(13) NOT NULL,
+    CONSTRAINT QRTZ_SCHEDULER_STATE_PK PRIMARY KEY (SCHED_NAME,INSTANCE_NAME)
+);
+CREATE TABLE qrtz_locks
+  (
+    SCHED_NAME VARCHAR2(120) NOT NULL,
+    LOCK_NAME  VARCHAR2(40) NOT NULL,
+    CONSTRAINT QRTZ_LOCKS_PK PRIMARY KEY (SCHED_NAME,LOCK_NAME)
+);
+create index idx_qrtz_j_req_recovery on qrtz_job_details(SCHED_NAME,REQUESTS_RECOVERY);
+create index idx_qrtz_j_grp on qrtz_job_details(SCHED_NAME,JOB_GROUP);
+create index idx_qrtz_t_j on qrtz_triggers(SCHED_NAME,JOB_NAME,JOB_GROUP);
+create index idx_qrtz_t_jg on qrtz_triggers(SCHED_NAME,JOB_GROUP);
+create index idx_qrtz_t_c on qrtz_triggers(SCHED_NAME,CALENDAR_NAME);
+create index idx_qrtz_t_g on qrtz_triggers(SCHED_NAME,TRIGGER_GROUP);
+create index idx_qrtz_t_state on qrtz_triggers(SCHED_NAME,TRIGGER_STATE);
+create index idx_qrtz_t_n_state on qrtz_triggers(SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP,TRIGGER_STATE);
+create index idx_qrtz_t_n_g_state on qrtz_triggers(SCHED_NAME,TRIGGER_GROUP,TRIGGER_STATE);
+create index idx_qrtz_t_next_fire_time on qrtz_triggers(SCHED_NAME,NEXT_FIRE_TIME);
+create index idx_qrtz_t_nft_st on qrtz_triggers(SCHED_NAME,TRIGGER_STATE,NEXT_FIRE_TIME);
+create index idx_qrtz_t_nft_misfire on qrtz_triggers(SCHED_NAME,MISFIRE_INSTR,NEXT_FIRE_TIME);
+create index idx_qrtz_t_nft_st_misfire on qrtz_triggers(SCHED_NAME,MISFIRE_INSTR,NEXT_FIRE_TIME,TRIGGER_STATE);
+create index idx_qrtz_t_nft_st_misfire_grp on qrtz_triggers(SCHED_NAME,MISFIRE_INSTR,NEXT_FIRE_TIME,TRIGGER_GROUP,TRIGGER_STATE);
+create index idx_qrtz_ft_trig_inst_name on qrtz_fired_triggers(SCHED_NAME,INSTANCE_NAME);
+create index idx_qrtz_ft_inst_job_req_rcvry on qrtz_fired_triggers(SCHED_NAME,INSTANCE_NAME,REQUESTS_RECOVERY);
+create index idx_qrtz_ft_j_g on qrtz_fired_triggers(SCHED_NAME,JOB_NAME,JOB_GROUP);
+create index idx_qrtz_ft_jg on qrtz_fired_triggers(SCHED_NAME,JOB_GROUP);
+create index idx_qrtz_ft_t_g on qrtz_fired_triggers(SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP);
+create index idx_qrtz_ft_tg on qrtz_fired_triggers(SCHED_NAME,TRIGGER_GROUP);
+```
+
+## 3.2 创建表并初始化数据
+创建表，初始化数据，提交事务:
+```sql
+-- Create table 发票小助手
+create table INVOICE_KPXX
+(
+  ID            VARCHAR2(20) primary key,
+  CITY          VARCHAR2(200),
+  TAXPAYER_NAME VARCHAR2(200),
+  TAXPAYER_NO   VARCHAR2(200),
+  ADDR          VARCHAR2(200),
+  PHONE         VARCHAR2(20),
+  OPENING_BANK  VARCHAR2(200),
+  ACCOUNT_NUM   VARCHAR2(200)
+);
+-- Add comments to the columns
+comment on column INVOICE_KPXX.ID
+  is '主键ID';
+comment on column INVOICE_KPXX.CITY
+  is '城市';
+comment on column INVOICE_KPXX.TAXPAYER_NAME
+  is '名称';
+comment on column INVOICE_KPXX.TAXPAYER_NO
+  is '纳税人识别号';
+comment on column INVOICE_KPXX.ADDR
+  is '地址';
+comment on column INVOICE_KPXX.PHONE
+  is '电话';
+comment on column INVOICE_KPXX.OPENING_BANK
+  is '开户银行';
+comment on column INVOICE_KPXX.ACCOUNT_NUM
+  is '账号';
+insert into INVOICE_KPXX (ID, CITY, TAXPAYER_NAME, TAXPAYER_NO, ADDR, PHONE, OPENING_BANK, ACCOUNT_NUM)
+values ('1500351669460', '成都', '成都农村商业银行股份有限公司', '91510100698878500P', '成都市武侯区科华中路88号', '028-85068631', '成都农村商业银行股份有限公司营业部', '0210000001464188060001');
+insert into INVOICE_KPXX (ID, CITY, TAXPAYER_NAME, TAXPAYER_NO, ADDR, PHONE, OPENING_BANK, ACCOUNT_NUM)
+values ('1500351778965', '达州', '成都农村商业银行股份有限公司达州分行', '91511700597532439Q', '达州市通川区朝阳西路356-364号', '0818-2280302', '成都农村商业银行股份有限公司达州分行', '024100000123450000013');
+insert into INVOICE_KPXX (ID, CITY, TAXPAYER_NAME, TAXPAYER_NO, ADDR, PHONE, OPENING_BANK, ACCOUNT_NUM)
+values ('1500351984173', '广安', '成都农村商业银行股份有限公司广安分行', '91511600326961864W', '四川省广安市广安区金安大道138号1幢', '0826-2729131', '成都农村商业银行股份有限公司广安分行', '0244000001464110020001');
+insert into INVOICE_KPXX (ID, CITY, TAXPAYER_NAME, TAXPAYER_NO, ADDR, PHONE, OPENING_BANK, ACCOUNT_NUM)
+values ('1500352081458', '眉山', '成都农村商业银行股份有限公司眉山分行', '91511402MA62J6TC2H', '眉山市东坡大道南一段69号10栋', '028-38039015', '成都农村商业银行股份有限公司眉山分行', '0245000001464110020001');
+insert into INVOICE_KPXX (ID, CITY, TAXPAYER_NAME, TAXPAYER_NO, ADDR, PHONE, OPENING_BANK, ACCOUNT_NUM)
+values ('1500351854420', '遂宁', '成都农村商业银行股份有限公司遂宁分行', '915109000560885589', '遂宁市船山区西山北路619号', '0825-5813368', '成都农村商业银行股份有限公司遂宁分行', '0242000001464199000001');
+insert into INVOICE_KPXX (ID, CITY, TAXPAYER_NAME, TAXPAYER_NO, ADDR, PHONE, OPENING_BANK, ACCOUNT_NUM)
+values ('1500344738868', '宜宾', '成都农村商业银行股份有限公司宜宾分行', '91511500MA62A8L77J', '四川省宜宾市翠柏大道东段170号8幢1层7号', '0831-7186805', '成都农村商业银行股份有限公司宜宾分行', '0246000001464110020001');
+insert into INVOICE_KPXX (ID, CITY, TAXPAYER_NAME, TAXPAYER_NO, ADDR, PHONE, OPENING_BANK, ACCOUNT_NUM)
+values ('1500351917214', '资阳', '成都农村商业银行股份有限公司资阳分行', '91512002078852553K', '四川省资阳市雁江区车城大道二段天缘购物休闲广场C栋', '028-26316017', '成都农村商业银行股份有限公司资阳分行', '024300000120010000026');
+commit;
+```
+
+## 3.3 创建表并初始化数据
+常见的表数据:
+```sql
+delete from WEB_EMP_MOBILE where ISVALID='0';
+CREATE TABLE MSG_PUSH_INFO
+(
+    ID             	VARCHAR2(255) NULL,
+    TITLE          	VARCHAR2(500) NULL,
+    CONTENT        	VARCHAR2(1000) NULL,
+    BUSINESS_INFO   VARCHAR2(4000) NULL,
+    MODULE_NAME     VARCHAR2(100) NULL,
+    MSG_TYPE        NUMBER(3,0) NULL,
+    NODE_TYPE       NUMBER(10,0) NULL,
+    NODE_NAME       VARCHAR2(1000) NULL,
+    NODE_ID         VARCHAR2(100) NULL,
+    CREATE_TIME    	CHAR(19) NULL,
+    MODIFY_TIME    	CHAR(19) NULL,
+    SEND_RESULT    	VARCHAR2(100) NULL,
+    SEND_RESULT_MSG	VARCHAR2(4000) NULL,
+    DEF1           	VARCHAR2(500) NULL,
+    DEF2           	VARCHAR2(500) NULL,
+    DEF3           	VARCHAR2(500) NULL,
+    DEF4           	VARCHAR2(500) NULL,
+    DEF5           	VARCHAR2(500) NULL
+);
+COMMENT ON TABLE MSG_PUSH_INFO IS 'APP消息推送表';
+COMMENT ON COLUMN MSG_PUSH_INFO.ID IS '主键id';
+COMMENT ON COLUMN MSG_PUSH_INFO.TITLE IS '消息标题';
+COMMENT ON COLUMN MSG_PUSH_INFO.CONTENT IS '消息内容';
+COMMENT ON COLUMN MSG_PUSH_INFO.MODULE_NAME IS '消息所属模块';
+COMMENT ON COLUMN MSG_PUSH_INFO.MSG_TYPE IS '消息类型  0:Single;1:List;2:APP';
+COMMENT ON COLUMN MSG_PUSH_INFO.NODE_TYPE IS '消息节点类型';
+COMMENT ON COLUMN MSG_PUSH_INFO.NODE_NAME IS '消息节点名称';
+COMMENT ON COLUMN MSG_PUSH_INFO.NODE_ID IS '消息节点ID';
+COMMENT ON COLUMN MSG_PUSH_INFO.BUSINESS_INFO IS '消息BUSINESS_INFO';
+COMMENT ON COLUMN MSG_PUSH_INFO.CREATE_TIME IS '创建时间';
+COMMENT ON COLUMN MSG_PUSH_INFO.MODIFY_TIME IS '修改时间';
+COMMENT ON COLUMN MSG_PUSH_INFO.SEND_RESULT IS '发送结果 ok->成功 ;其它->失败';
+COMMENT ON COLUMN MSG_PUSH_INFO.SEND_RESULT_MSG IS '发送结果详情信息';
+COMMENT ON COLUMN MSG_PUSH_INFO.DEF1 IS '预留字段1';
+COMMENT ON COLUMN MSG_PUSH_INFO.DEF2 IS '预留字段2';
+COMMENT ON COLUMN MSG_PUSH_INFO.DEF3 IS '预留字段3';
+COMMENT ON COLUMN MSG_PUSH_INFO.DEF4 IS '预留字段4';
+COMMENT ON COLUMN MSG_PUSH_INFO.DEF5 IS '预留字段5';
+CREATE TABLE MSG_PUSH_DETAIL
+(
+    ID             	VARCHAR2(255) NULL,
+    MSG_PUSH_INFO_ID VARCHAR2(255) NULL,
+    WEB_EMP_MOBILE_ID VARCHAR2(50) NULL,
+    PSNCODE        	VARCHAR2(100) NULL,
+    CREATE_TIME    	CHAR(19) NULL,
+    MODIFY_TIME    	CHAR(19) NULL,
+    SEND_TYPE    	VARCHAR2(100) NULL,
+    SEND_RESULT    	VARCHAR2(100) NULL,
+    SEND_RESULT_MSG	VARCHAR2(4000) NULL,
+    READ_FLAG      	CHAR(1) NULL,
+    SEND_COUNT     	NUMBER(10,0) NULL,
+    DEF1           	VARCHAR2(500) NULL,
+    DEF2           	VARCHAR2(500) NULL,
+    DEF3           	VARCHAR2(500) NULL,
+    DEF4           	VARCHAR2(500) NULL,
+    DEF5           	VARCHAR2(500) NULL
+);
+COMMENT ON TABLE MSG_PUSH_DETAIL IS 'APP消息推送详情表';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.ID IS '主键id';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.MSG_PUSH_INFO_ID IS '关联消息外键';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.WEB_EMP_MOBILE_ID IS '关联设备外键';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.PSNCODE IS ' 消息接受者员工号';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.CREATE_TIME IS '创建时间';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.MODIFY_TIME IS '修改时间';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.SEND_TYPE IS '发送方式  Single;Batch;List;App';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.SEND_RESULT IS '发送结果 ok->成功 ;其它->失败';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.SEND_RESULT_MSG IS '发送结果详情信息';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.READ_FLAG IS '客户端读取标志   Y->已读取;N->未读';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.SEND_COUNT IS '发送次数';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.DEF1 IS '预留字段1';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.DEF2 IS '预留字段2';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.DEF3 IS '预留字段3';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.DEF4 IS '预留字段4';
+COMMENT ON COLUMN MSG_PUSH_DETAIL.DEF5 IS '预留字段5';
+CREATE TABLE MSG_PUSH_INFO_HIS
+(
+    ID             	VARCHAR2(255) NULL,
+    TITLE          	VARCHAR2(500) NULL,
+    CONTENT        	VARCHAR2(1000) NULL,
+    BUSINESS_INFO   VARCHAR2(4000) NULL,
+    MODULE_NAME     VARCHAR2(100) NULL,
+    MSG_TYPE        NUMBER(3,0) NULL,
+    NODE_TYPE       NUMBER(10,0) NULL,
+    NODE_NAME       VARCHAR2(1000) NULL,
+    NODE_ID         VARCHAR2(100) NULL,
+    CREATE_TIME    	CHAR(19) NULL,
+    MODIFY_TIME    	CHAR(19) NULL,
+    SEND_RESULT    	VARCHAR2(100) NULL,
+    SEND_RESULT_MSG	VARCHAR2(4000) NULL,
+    DEF1           	VARCHAR2(500) NULL,
+    DEF2           	VARCHAR2(500) NULL,
+    DEF3           	VARCHAR2(500) NULL,
+    DEF4           	VARCHAR2(500) NULL,
+    DEF5           	VARCHAR2(500) NULL
+);
+COMMENT ON TABLE MSG_PUSH_INFO_HIS IS 'APP消息推送历史表';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.ID IS '主键id';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.TITLE IS '消息标题';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.CONTENT IS '消息内容';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.MODULE_NAME IS '消息所属模块';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.MSG_TYPE IS '消息类型  0:Single;1:List;2:APP';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.NODE_TYPE IS '消息节点类型';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.NODE_NAME IS '消息节点名称';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.NODE_ID IS '消息节点ID';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.BUSINESS_INFO IS '消息BUSINESS_INFO';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.CREATE_TIME IS '创建时间';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.MODIFY_TIME IS '修改时间';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.SEND_RESULT IS '发送结果 ok->成功 ;其它->失败';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.SEND_RESULT_MSG IS '发送结果详情信息';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.DEF1 IS '预留字段1';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.DEF2 IS '预留字段2';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.DEF3 IS '预留字段3';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.DEF4 IS '预留字段4';
+COMMENT ON COLUMN MSG_PUSH_INFO_HIS.DEF5 IS '预留字段5';
+CREATE TABLE MSG_PUSH_DETAIL_HIS
+(
+    ID             	VARCHAR2(255) NULL,
+    MSG_PUSH_INFO_ID VARCHAR2(255) NULL,
+    WEB_EMP_MOBILE_ID VARCHAR2(50) NULL,
+    PSNCODE        	VARCHAR2(100) NULL,
+    CREATE_TIME    	CHAR(19) NULL,
+    MODIFY_TIME    	CHAR(19) NULL,
+    SEND_TYPE    	VARCHAR2(100) NULL,
+    SEND_RESULT    	VARCHAR2(100) NULL,
+    SEND_RESULT_MSG	VARCHAR2(4000) NULL,
+    READ_FLAG      	CHAR(1) NULL,
+    SEND_COUNT     	NUMBER(10,0) NULL,
+    DEF1           	VARCHAR2(500) NULL,
+    DEF2           	VARCHAR2(500) NULL,
+    DEF3           	VARCHAR2(500) NULL,
+    DEF4           	VARCHAR2(500) NULL,
+    DEF5           	VARCHAR2(500) NULL
+);
+COMMENT ON TABLE MSG_PUSH_DETAIL_HIS IS 'APP消息推送历史详情表';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.ID IS '主键id';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.MSG_PUSH_INFO_ID IS '关联历史消息外键';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.WEB_EMP_MOBILE_ID IS '关联设备外键';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.PSNCODE IS ' 消息接受者员工号';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.CREATE_TIME IS '创建时间';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.MODIFY_TIME IS '修改时间';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.SEND_TYPE IS '发送方式  Single;Batch;List;App';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.SEND_RESULT IS '发送结果 ok->成功 ;其它->失败';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.SEND_RESULT_MSG IS '发送结果详情信息';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.READ_FLAG IS '客户端读取标志   Y->已读取;N->未读';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.SEND_COUNT IS '发送次数';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.DEF1 IS '预留字段1';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.DEF2 IS '预留字段2';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.DEF3 IS '预留字段3';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.DEF4 IS '预留字段4';
+COMMENT ON COLUMN MSG_PUSH_DETAIL_HIS.DEF5 IS '预留字段5';
+alter table WEB_EMP_MOBILE add MSG_COUNT NUMBER(10,0) default 0;
+COMMENT ON COLUMN WEB_EMP_MOBILE.MSG_COUNT IS '当前设备消息未读数';
+alter table WEB_EMP_MOBILE add LOGIN_COUNT NUMBER(10,0) default 0;
+COMMENT ON COLUMN WEB_EMP_MOBILE.LOGIN_COUNT IS '当前设备登陆次数';
+```
+
+## 3.4 消息推送
+消息推送:
+```sql
+--通知公告
+alter table NOTIFY add (YBGSENDCOUNT NUMBER default 0,YBGSENDDATE DATE default sysdate);
+update NOTIFY set YBGSENDCOUNT =1;
+--流程
+alter table flow_workflowinfo add (YBGSENDCOUNT NUMBER default 0,YBGSENDDATE DATE default sysdate);
+--将现有数据改成已发送
+update flow_workflowinfo set YBGSENDCOUNT =1;
+--添加办理
+alter table assist_send add (YBGSENDCOUNT NUMBER default 0,YBGSENDDATE DATE default sysdate);
+update assist_send set YBGSENDCOUNT =1;
+--待阅
+alter table doc_send_16 add (YBGSENDCOUNT NUMBER default 0,YBGSENDDATE DATE default sysdate);
+update doc_send_16 set YBGSENDCOUNT =1;
+alter table doc_send_17 add (YBGSENDCOUNT NUMBER default 0,YBGSENDDATE DATE default sysdate);
+update doc_send_17 set YBGSENDCOUNT =1;
+--明年的待阅
+alter table doc_send_18 add (YBGSENDCOUNT NUMBER default 0,YBGSENDDATE DATE default sysdate);
+--回复意见
+alter table return_info add (YBGSENDCOUNT NUMBER default 0,YBGSENDDATE DATE default sysdate);
+update return_info set YBGSENDCOUNT =1;
+--修改触发器FLOW_WORKFLOWINFO_PUSH 增加:NEW.YBGSENDCOUNT := 0;:NEW.YBGSENDDATE  := SYSDATE;
+```
+
+## 3.5 会议室推送标识表建表SQL
+会议室推送标识表建表SQL:
+```sql
+--会议室推送标识表--
+CREATE TABLE MEETING_RESERVE_PUSH_FLAG
+   (	ID VARCHAR2(40) DEFAULT SYS_GUID() NOT NULL ENABLE,
+    MEETING_RESERVE_ID VARCHAR2(40) NOT NULL ENABLE,
+    MEETING_STATUS VARCHAR2(20) NOT NULL ENABLE,
+    UPDATE_TIME DATE DEFAULT Sysdate,
+    TITLE VARCHAR2(100)
+   );
+   COMMENT ON COLUMN MEETING_RESERVE_PUSH_FLAG.ID IS '数据ID';
+   COMMENT ON COLUMN MEETING_RESERVE_PUSH_FLAG.MEETING_RESERVE_ID IS '对应会议室预订信息ID';
+   COMMENT ON COLUMN MEETING_RESERVE_PUSH_FLAG.MEETING_STATUS IS '会议室预订状态';
+   COMMENT ON COLUMN MEETING_RESERVE_PUSH_FLAG.UPDATE_TIME IS '数据更新时间';
+   COMMENT ON COLUMN MEETING_RESERVE_PUSH_FLAG.TITLE IS '预定标题';
+alter table MEETING_RESERVE modify (MEETING_PERSON VARCHAR2(10));
+```
+
+## 3.6 消息免打扰建表SQL
+消息免打扰建表SQL:
+```sql
+--免打扰建表SQL--
+CREATE TABLE "MSG_FREE_SET"
+   (	"ID" VARCHAR2(32) NOT NULL ENABLE,
+    "WEB_EMP_MOBILE_ID" VARCHAR2(32),
+    "MODULE_NAME" VARCHAR2(100),
+    "SET_VALUE" CHAR(1),
+    "CREATE_TIME" CHAR(19),
+    "MODIFY_TIME" CHAR(19)
+   );
+COMMENT ON COLUMN "MSG_FREE_SET"."ID" IS 'ID';
+COMMENT ON COLUMN "MSG_FREE_SET"."WEB_EMP_MOBILE_ID" IS 'WEB_EMP_MOBILE_ID';
+COMMENT ON COLUMN "MSG_FREE_SET"."MODULE_NAME" IS '模块名称';
+COMMENT ON COLUMN "MSG_FREE_SET"."SET_VALUE" IS '免打扰';
+COMMENT ON COLUMN "MSG_FREE_SET"."CREATE_TIME" IS '创建时间';
+COMMENT ON COLUMN "MSG_FREE_SET"."MODIFY_TIME" IS '修改时间';
+```
+
+## 3.7 议题推送SQL
+议题推送SQL:
+```sql
+--议题OA_DISCUSS表增加状态标识字段--
+ alter table oa_discuss add UN_PUBLISH_PUSH number default 0
+      add PUBLISHED_PUSH number default 0
+      add ZRWY_PUSH_FLAG number default 0
+      add ROLLBACK_PUSH number default 0
+      add OVERVOTE_PUSH number default 0;
+--更新以前数据标识为已推送--
+update oa_discuss set UN_PUBLISH_PUSH=1,PUBLISHED_PUSH=1,ZRWY_PUSH_FLAG=1,ROLLBACK_PUSH=1,OVERVOTE_PUSH=1;
+--发展委员会议题OA_DEVELOP_DISCUSS增加推送标识字段--
+alter table oa_develop_discuss add UN_PUBLISHED_PUSH number default 0
+      add ROLLBACK_PUSH number default 0;
+--更新以前数据标识为已推送--
+update oa_develop_discuss set UN_PUBLISHED_PUSH=1,ROLLBACK_PUSH=1;
+```
+
+## 3.8 系统消息
+系统消息:
+```sql
+-- Create table 系统消息主表
+create table MSG_USER
+(
+  ID          VARCHAR2(32) default SYS_GUID() not null,
+  MSG_TITL    VARCHAR2(100),
+  MSG_CONT    CLOB,
+  RETURN_MSG  VARCHAR2(100),
+  USER_AUTH   VARCHAR2(10),
+  USER_CREATE VARCHAR2(10),
+  MSG_STATUS  VARCHAR2(2),
+  IS_AUTH     CHAR(1),
+  CREATE_DATE CHAR(19),
+  UPDATE_DATE CHAR(19),
+  AUTH_DATE   CHAR(19),
+  SENT_DATE   CHAR(19),
+  SEND_RESULT VARCHAR2(50)
+);
+-- Add comments to the columns
+comment on column MSG_USER.ID
+  is '消息id';
+comment on column MSG_USER.MSG_TITL
+  is '消息标题';
+comment on column MSG_USER.MSG_CONT
+  is '消息内容';
+comment on column MSG_USER.RETURN_MSG
+  is '消息退回意见';
+comment on column MSG_USER.USER_AUTH
+  is '消息审批人';
+comment on column MSG_USER.USER_CREATE
+  is '消息新建人';
+comment on column MSG_USER.MSG_STATUS
+  is '消息状态';
+comment on column MSG_USER.IS_AUTH
+  is '消息是否需要审批';
+comment on column MSG_USER.CREATE_DATE
+  is '消息新建时间';
+comment on column MSG_USER.UPDATE_DATE
+  is '消息修改时间';
+comment on column MSG_USER.AUTH_DATE
+  is '消息审批时间';
+comment on column MSG_USER.SENT_DATE
+  is '消息发送时间';
+comment on column MSG_USER.SEND_RESULT
+  is '消息发送结果';
+-- Create table 系统消息发送人员表
+create table MSG_USER_SENTO
+(
+  ID          VARCHAR2(32) default SYS_GUID() not null,
+  MSG_USER_ID VARCHAR2(32),
+  USER_CD     VARCHAR2(10),
+  IS_ALL      CHAR(1)
+);
+-- Add comments to the columns
+comment on column MSG_USER_SENTO.MSG_USER_ID
+  is 'msg_user 表的id字段';
+comment on column MSG_USER_SENTO.USER_CD
+  is '消息发送对象id';
+comment on column MSG_USER_SENTO.IS_ALL
+  is '是否全员发送消息';
+``` 
+
+## 3.9 新闻栏排序
+新闻栏排序:
+```sql
+--表NEWS_INFO增加排序字段--
+ALTER TABLE NEWS_INFO ADD ORDER_NO NUMBER DEFAULT 0;
+COMMENT ON COLUMN NEWS_INFO.ORDER_NO IS '排序号';
+```
+
+## 3.10 会签意见和新闻栏推送
+会签意见和新闻栏推送:
+```sql
+--1、OA系统会签保存后推送添加办理人-触发器
+CREATE OR REPLACE TRIGGER ASSIST_SEND_PUSH
+  BEFORE  UPDATE OF SEE_FLAG ON ASSIST_SEND
+  FOR EACH ROW
+DECLARE
+  /**
+  集团使用本触发器原用于推送消息到某个web应用，目前农商行暂不需要，因此进行调整。
+  现修改为用于修改 ASSIST_SEND表的sendcount字段，改为0，用于定时任务推送微信和邮件
+  消息 sunguiquan 2015-3-23。
+  **/
+  MAILTXT  VARCHAR(400);
+  RECMAIL  VARCHAR(100);
+  V_ERRMSG VARCHAR(300); --错误信息
+BEGIN
+  --发送push
+  --flow_push_proc(:new.title,:new.writeuserid,'JT');
+  IF :NEW.SEE_FLAG <> :OLD.SEE_FLAG THEN
+  --:NEW.SENDCOUNT     := 0; --初始值为0，表示没有发送过微信，需要进行发送
+  --:NEW.SENDDATE      := SYSDATE;
+  --:NEW.MAILSENDCOUNT := 0; --初始值为0，表示没有发送过邮件，需要进行发送
+  --:NEW.MAILSENDDATE  := SYSDATE;
+  :NEW.YBGSENDCOUNT := 0;
+  :NEW.YBGSENDDATE  := SYSDATE;
+  /*
+  --发送邮件
+  MAILTXT := '您OA中新增一条待办事项，请登录OA系统及时处理。标题为：' || :NEW.SEND_TITLE;
+  --根据userid 查询收件人的邮箱
+  SELECT USER_EMAIL
+    INTO RECMAIL
+    FROM FLOW_USER U
+   WHERE U.USERID = :NEW.IN_USER_ID;
+  PROCSENDEMAIL(MAILTXT,
+                'OA NOTICE:' || :NEW.SEND_TITLE,
+                'newoa_admin@cdrcb.com',
+                RECMAIL,
+                '20.0.18.20',
+                25,
+                0,
+                'newoa_admin',
+                'newoa_admin',
+                '',
+                'bit 7');
+  --暂不管是否发送邮件成功，都将发送次数置为1
+  :NEW.MAILSENDCOUNT := 1;
+  :NEW.MAILSENDDATE  := SYSDATE;
+*/
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN
+    --DBMS_OUTPUT.PUT_LINE('执行错误:' || SQLCODE || '---' || SQLERRM);
+    V_ERRMSG := SUBSTR(SQLERRM, 1, 200);
+    INSERT INTO DATALOG
+      (ID, TAB_NAME, CRE_DATE, STATE, NOTE, END_DATE)
+      SELECT TO_CHAR(CURRENT_TIMESTAMP, 'yyyymmddhh24missff6'),
+             'ASSIST_SEND',
+             TO_CHAR(SYSDATE, 'yyyy-mm-dd hh24:mi:ss'),
+             '1',
+             'sendmail fail:' || :NEW.IN_USER_ID || ',title:' ||
+             :NEW.SEND_TITLE || ',reason:' || V_ERRMSG,
+             TO_CHAR(SYSDATE, 'yyyy-mm-dd hh24:mi:ss')
+        FROM DUAL;
+END ASSIST_SEND_PUSH;
+--2、OA系统会签保存后推送添加办理人-清理数据
+update assist_send set ybgsendcount=1 where see_flag =1;
+--3.ICMP新闻栏推送增加字段，清理数据
+alter table news_info add (sendcount NUMBER default 0,SENDDATE DATE default sysdate);
+update news_info set sendcount =1;
+
+```
+
+## 3.11 资金头寸sftp用户名密码配置
+资金头寸sftp用户名密码配置:
+```sql
+insert into sys_data_dictionary
+  (ID,
+   PARENT_ID,
+   DD_NAME,
+   EN_DD_NAME,
+   DD_VALUE,
+   CREATE_USER_ID,
+   CREATE_TIME,
+   IS_DELETE,
+   STATE,
+   REMARK,
+   UNDEFINED1,
+   UNDEFINED2,
+   UNDEFINED3)
+values
+  ('5CFBA890221604ADE0530100007FD7C4',
+   '9e8383dd5cbe123a015cbe4891bc0010',
+   'POSITION_USERNAME',
+   'POSITION_USERNAME',
+   'brs',
+   '8a4583c3379d08e101379d0e3dfe0002',
+   '2017-11-02 15:24:00',
+   '',
+   '',
+   '使用SFTP方式下载头寸系统的附件。此参数是ftp的用户名',
+   '',
+   'noChild',
+   '');
+insert into sys_data_dictionary
+  (ID,
+   PARENT_ID,
+   DD_NAME,
+   EN_DD_NAME,
+   DD_VALUE,
+   CREATE_USER_ID,
+   CREATE_TIME,
+   IS_DELETE,
+   STATE,
+   REMARK,
+   UNDEFINED1,
+   UNDEFINED2,
+   UNDEFINED3)
+values
+  ('5CFBA890221504ADE0530100007FD7C4',
+   '9e8383dd5cbe123a015cbe4891bc0010',
+   'POSITION_PWD',
+   'POSITION_PWD',
+   'brs',
+   '8a4583c3379d08e101379d0e3dfe0002',
+   '2017-11-02 15:24:00',
+   '',
+   '',
+   '使用SFTP方式下载头寸系统的附件。此参数是ftp的密码',
+   '',
+   'noChild',
+   '');
+```
+
+## 3.12 新年定时任务
+新年定时任务:
+```sql
+delete from sys_data_dictionary where id = '402881ef61083f920161084e648a0001';
+delete from sys_data_dictionary where id = '402881ef61083f920161084dd0050000';
+delete from sys_data_dictionary where id = '402881ef610836090161083d0f680002';
+delete from sys_data_dictionary where id = '402881ef610836090161083a2cba0001';
+delete from sys_data_dictionary where id = '402881ef61083609016108397c470000';
+insert into sys_data_dictionary (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('402881ef61083f920161084e648a0001', '402881ef61083609016108397c470000', 'END_TIME_2018', 'END_TIME_2018', '2018-02-27 23:59:59', '8a4583c3379d08e101379d0e3dfe0002', '2018-01-18 16:06:50', '', '', '', '', 'noChild', '');
+insert into sys_data_dictionary (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('402881ef61083f920161084dd0050000', '402881ef61083609016108397c470000', 'START_TIME_2018', 'START_TIME_2018', '2018-01-13 23:59:59', '8a4583c3379d08e101379d0e3dfe0002', '2018-01-18 16:06:12', '', '', '', '', 'noChild', '');
+insert into sys_data_dictionary (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('402881ef610836090161083d0f680002', '402881ef61083609016108397c470000', 'NEW_YEAR_2018_GREETING_CONTENT', 'NEW_YEAR_2018_GREETING_CONTENT', '祝大家新一年万事如意，心想事成，工作顺利，家庭美满，生活幸福', '8a4583c3379d08e101379d0e3dfe0002', '2018-01-18 15:47:54', '', '', '', '', 'noChild', '');
+insert into sys_data_dictionary (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('402881ef610836090161083a2cba0001', '402881ef61083609016108397c470000', 'NEW_YEAR_2018_GREETING_TITLE', 'NEW_YEAR_2018_GREETING_TITLE', '各位同事新年快乐', '8a4583c3379d08e101379d0e3dfe0002', '2018-01-18 15:44:45', '', '', '', '', 'noChild', '');
+insert into sys_data_dictionary (ID, PARENT_ID, DD_NAME, EN_DD_NAME, DD_VALUE, CREATE_USER_ID, CREATE_TIME, IS_DELETE, STATE, REMARK, UNDEFINED1, UNDEFINED2, UNDEFINED3)
+values ('402881ef61083609016108397c470000', '402881e73706ba52013706bfabd6000a', '2018年新年', '2018 New Year', '', '8a4583c3379d08e101379d0e3dfe0002', '2018-01-18 15:44:00', '', '', '', '', 'hasChild', '');
+```
+
+## 3.13 预算申请预算科目表
+预算申请预算科目表:
+```sql
+--预算科目信息表
+create table BUDGET_PROJECT
+(
+  SUBJECT_CODE VARCHAR2(50),
+  SUBJECT_NAME VARCHAR2(50)
+);
+insert into budget_project (SUBJECT_CODE, SUBJECT_NAME)
+values ('88010902', '营销/宣传相关费用/招待费');
+insert into budget_project (SUBJECT_CODE, SUBJECT_NAME)
+values ('88010918', '机构运营费用/邮递费');
+insert into budget_project (SUBJECT_CODE, SUBJECT_NAME)
+values ('88011102', '机构运营费用/公证费用');
+insert into budget_project (SUBJECT_CODE, SUBJECT_NAME)
+values ('88011112', '机构运营费用/发电机燃油');
+```
+
+## 3.14 新闻栏点赞数
+新闻栏点赞数:
+```sql
+--表NEWS_INFO增加点赞数字段--
+ALTER TABLE NEWS_INFO ADD COMMEND_COUNT INTEGER DEFAULT 0;
+COMMENT ON COLUMN NEWS_INFO.COMMEND_COUNT IS '点赞数';
+``` 
+
+## 3.15 打卡功能优化
+打卡功能优化：   
+```sql
+--考勤网点表（ODS同步）
+CREATE TABLE TA_KQ_POS (
+    PK_KQ_POS	CHAR(20) NOT NULL,
+    POS      	VARCHAR2(200) NOT NULL,
+    LONGITUDE	NUMBER(20,6) NULL,
+    LATITUDE 	NUMBER(20,6) NULL,
+    DISTANCE 	NUMBER(10,0) NULL,
+    PSN      	VARCHAR2(100) NULL,
+    TS       	CHAR(19) DEFAULT to_char(sysdate,'yyyy-mm-dd hh24:mi:ss') NULL,
+    DR       	NUMBER(10,0) DEFAULT 0 NULL,
+    SYSFLAG  	CHAR(1) NULL,
+    CONSTRAINT PK_TA_KQ_POS PRIMARY KEY(PK_KQ_POS)
+    NOT DEFERRABLE
+     VALIDATE
+);
+--考勤区域网点关系表（ODS同步）
+CREATE TABLE TA_KQ_POS_AREA (
+    PK_KQ_POS_AREA	CHAR(20) NOT NULL,
+    PK_KQ_POS     	CHAR(20) NOT NULL,
+    AREANAME      	VARCHAR2(200) NULL,
+    TS            	CHAR(19) DEFAULT to_char(sysdate,'yyyy-mm-dd hh24:mi:ss') NULL,
+    DR            	NUMBER(10,0) DEFAULT 0 NULL,
+    CONSTRAINT PK_TA_KQ_POS_AREA PRIMARY KEY(PK_KQ_POS_AREA)
+    NOT DEFERRABLE
+     VALIDATE
+);
+--考勤人员区域关系表（ODS同步）
+CREATE TABLE TA_KQ_PSN_AREA (
+    PK_KQ_PSN_AREA	CHAR(20) NOT NULL,
+    PSNCODE       	VARCHAR2(100) NOT NULL,
+    AREANAME      	VARCHAR2(200) NULL,
+    TS            	CHAR(19) DEFAULT to_char(sysdate,'yyyy-mm-dd hh24:mi:ss') NULL,
+    DR            	NUMBER(10,0) DEFAULT 0 NULL,
+    SYSFLAG       	CHAR(1) NULL,
+    CONSTRAINT PK_TA_KQ_PSN_AREA PRIMARY KEY(PK_KQ_PSN_AREA)
+    NOT DEFERRABLE
+     VALIDATE
+);
+--打卡数据表（定时同步至EHR）
+CREATE TABLE TA_KQ_SIGN_DATA (
+    id             	VARCHAR2(255) NOT NULL,
+    moodtype          	char(1) NULL,
+    kqfs        	VARCHAR2(20) NULL,
+    calendartime  	char(20) NULL,
+    kqdd    	VARCHAR2(200) NULL,
+    psncode      	VARCHAR2(100) NULL,
+    filename        VARCHAR2(100) NULL,
+    sendflag      	char(1) NULL ,
+    CONSTRAINT TA_KQ_SIGN_DATA_ID PRIMARY KEY(ID),
+    CONSTRAINT TA_KQ_SIGN_DATA_U1 UNIQUE(psncode,calendartime)
+    NOT DEFERRABLE
+     VALIDATE
+);
+```
