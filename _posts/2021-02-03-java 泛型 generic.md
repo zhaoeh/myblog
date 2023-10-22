@@ -15,28 +15,160 @@ mindmap2: false
 [理解java中的泛型](https://blog.csdn.net/u011240877/article/details/53545041)  
 [java中的泛型](https://blog.csdn.net/sunxianghuang/article/details/51982979)  
 
-# 1. 泛型
-## 1.1 什么是泛型？
+# 1 泛型的引入
+为什么Jdk1.5需要引入泛型？   
+我们通过一个案例来说明一下。   
+现在有一个需求：设计一个可以表示坐标点的类，坐标由X和Y组成，坐标的表示方法有以下三种：   
+```youtrack
+1.整数表示：x = 10,y = 30;
+2.小数表示：x = 10.9,y = 20.7;
+3.字符串表示：x = "东经180度"，y = "北纬120度";
+
+```
+设计思路：   
+这样的需求，很明显需要首先创建一个表示坐标点的类Point，此类中的两个属性分别用x和y表示x坐标和y坐标，但是x和y中所保存的数据类型会有三种（int、float、String），而要想使用一个类型同时接收这3个类型数据，则只能使用Object，因为Object类可以接受任何类型的数据，都会自动发生向上转型操作，这样3种数据类型可以按照如下方式进行类型转换：   
+```youtrack
+数字（int）->自动装箱成Integer->向上转型使用Object接收；
+小数（float）->自动装箱成Float->向上转型使用Object接收；
+字符串（String）->向上转型使用Object接收；
+```
+
+编写一个坐标类：
+```java
+package zeh.myjavase.code25generic.demo01;
+
+class Point {
+    // 表示x坐标
+    private Object x;
+    // 表示y坐标
+    private Object y;
+
+    public Object getX() {
+        return x;
+    }
+
+    public void setX(Object x) {
+        this.x = x;
+    }
+
+    public Object getY() {
+        return y;
+    }
+
+    public void setY(Object y) {
+        this.y = y;
+    }
+}
+```
+测试一：   
+Point类的x和y使用Object类进行类型接收，则在输入的时候可以输入任何类型。   
+直接传入整数，则自动装箱为Integer类型，然后传入给Object，此时发生向上转型，Integer->Object。      
+获取时，因此返回的类型是Object，但Object的实际类型是传入时的Integer，因此需要强制向下转型为Integer。   
+```java
+    @Test
+    public void test1() {
+        Point p = new Point();
+
+        // 利用自动装箱：int->Integer->Object
+        p.setX(10);
+        // 利用自动装箱：int->Integer->Object
+        p.setY(20);
+
+        // 取出的时候先向下转型为Integer，再自动拆箱；向下转型前已经向上转型了。
+        int x = (Integer) p.getX();
+        // 取出的时候先向下转型为Integer，再自动拆箱；向下转型前已经向上转型了。
+        int y = (Integer) p.getY();
+
+        System.out.println("整数表示，x坐标为：" + x);
+        System.out.println("整数表示，y坐标为：" + y);
+    }
+```
+测试二：   
+设置小数表示坐标；将自动装箱后向上转型。   
+```java
+    @Test
+    public void test2() {
+        Point p = new Point();
+        // 利用自动装箱：float->Float->Object
+        p.setX(11.8f);
+        // 利用自动装箱：float->Float->Object
+        p.setY(20.9f);
+
+        // 注意即便同一个块中类型不同，但是变量仍旧不能同名。
+        // 取出的时候先向下转型为Float，再自动拆箱；向下转型前已经向上转型了。
+        float x2 = (Float) p.getX();
+        // 取出的时候先向下转型为Float，再自动拆箱；向下转型前已经向上转型了。
+        float y2 = (Float) p.getY();
+
+        System.out.println("小数表示，x坐标为：" + x2);
+        System.out.println("小数表示，y坐标为：" + y2);
+    }
+```
+测试三：  
+设置字符串表示坐标，直接向上转型。   
+```java
+    @Test
+    public void test3() {
+        Point p = new Point();
+        p.setX("东经180度");
+        p.setY("北纬120度");
+        // 取出的时候直接向下转型；向下转型前已经向上转型了。
+        String x3 = (String) p.getX();
+        // 取出的时候直接向下转型；向下转型前已经向上转型了。
+        String y3 = (String) p.getY();
+        System.out.println("字符串表示，x坐标为：" + x3);
+        System.out.println("字符串表示，y坐标为：" + y3);
+    }
+```
+测试四：   
+x设置为int类型，y设置为String类型。   
+在这个测试中，直接使用Object类型接收所有类型的弊端将暴露。   
+不使用泛型预指定类型范围，直接使用Object类接收任意类型，其缺点初露端倪：   
+一旦客户端误操作，将导致类转换异常，而这个异常是运行时异常（非检查异常），所以编译不会报错，只有程序运行后才会暴露出来。   
+原因深究：任何类型都可以向上转型为Object类型；Object类型可以向下转型为任何子类类型；虽然说在向下转型的时候必须向上转型，但是这个向上转型必须是正确的向上转型，如果是错误的向上转型，是不会编译报错的，这样就会导致在进行向下转型时报类转换异常。   
+```java
+    @Test
+    public void test4() {
+        Point p = new Point();
+        try {
+            p.setX(10);
+            p.setY("北纬120度");
+            // 取出的时候先向下转型为Integer，再自动拆箱；向下转型前已经向上转型了。
+            int x4 = (Integer) p.getX();
+            // 取出的时候先向下转型为Integer，再自动拆箱，其实y存储的是String；
+            // 向下转型前已经向上转型了，我们期望的向上转型时Integer转为Object，但由于误操作，传入了String，实际上发生的向上转型时String转为Object。
+            // 既然向上转型是String转为Object，那向下转型也只能是Object转为String，如果转为其他类型，肯定报类转换异常。   
+            int y4 = (Integer) p.getY();
+            System.out.println("整数表示，x坐标为：" + x4);
+            System.out.println("整数表示，y坐标为：" + y4);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+```   
+
+# 2. 泛型
+## 2.1 什么是泛型？
 当定义一个Class类、定义一个Interface接口、或者定义一个方法Method时，对于这些类、接口和方法中需要使用到的变量不去明确声明其变量的数据类型，而是采用泛型去声明其类型。  
-泛型就是一种泛指的数据类型，用<T>来表示。其中的T可以是任何你习惯使用的字母。  
+泛型就是一种泛指的数据类型，用<T>来表示。其中的T可以是任何你习惯使用的字母，如果需要指定多个泛型，则<>中指定多个自定义字母，用逗号分隔。     
 其本质就是定义一种通用的数据类型，用一种参数变量来表示某种通用的类型，即参数化类型；用一个变量来表示类型。  
 用泛型声明的类、接口或者方法，想要使用这些类、接口和方法时，建议在使用时明确地指定其中泛型变量的真实类型，否则编译器将自动擦除泛型使用Object替换。  
-<b>“泛型” 意味着编写的代码可以被不同类型的对象所重用。</b>  
+<b><font color="#FF0000">  “泛型” 意味着编写的代码可以被不同类型的对象所重用。即一段使用泛型定义的代码块（类或者方法），可以通过传入任意类型的参数和返回任意类型的结果，来屏蔽掉参数类型和返回值类型，从而复用这个代码块！ </font></b>  
 
-# 1.2 泛型的作用
+# 2.2 泛型的作用
 <font color="#FF0000"> 口诀：一保护，两避免。 </font>  
 
 保护数据安全性，避免客户端误操作、避免类转换异常。  
 jdk1.5之后提供的泛型，目的是提供<b>编译时类型检查</b>，尤其是消除了集合类使用时的ClassCastException。  
 
-## 1.3 泛型的安全警告
-对于使用泛型声明的接口、类和方法，在实例化对象时如果未指定泛型对应的具体的数据类型，将会出现安全警告信息。  
+## 2.3 泛型的安全警告
+对于使用泛型声明的接口、类，在实例化对象时如果未指定泛型对应的具体的数据类型，将会出现安全警告信息。   
 此时泛型将被擦除，使用Object类型接收。  
-擦除后和直接使用Object接收没有任何区别，所以使用了泛型就一定要指定具体的泛型类型。  
+擦除后和直接使用Object接收没有任何区别，所以定义了泛型，在使用时就一定要指定具体的泛型类型。  
 如果擦除泛型后使用Object类型进行接收，则客户端误操作后会报类转换异常。  
-但是如果显式指定了泛型类型的具体类型，则在设置内容时一旦类型不符则编译报错，即通过提前暴露的机制避免了在运行时发生类转换异常。  
+但是如果显式指定了泛型类型的具体类型，则在设置内容时一旦类型不符则编译报错，即通过提前暴露的机制避免了在运行时发生类转换异常。     
 
-## 1.4 泛型只在编译阶段有效
+## 2.4 泛型只在编译阶段有效
 泛型的出现就是为了避免类型转换异常，在java编译器对源码进行编译时就进行校验，一旦存在类型转换异常则编译器报错。  
 在深入学习泛型前，必须首先指出，java中引入的泛型，只是在源码中声明的，以方便java编译器对泛型的设置进行检查，一旦不符合规范则编译器报错。  
 jdk1.5之后为了加入泛型，java编译器也做了很多的改造适配工作。  
@@ -102,7 +234,7 @@ public class TestMyGeneric
 在获取泛型返回值时，也直接将Object类型和动态设置进去的真实类型进行了强转。  
 <b>因此，java中的泛型实际上是伪泛型，其底层利用编译器对类型之间进行各种强转来实现。 </b>    
 
-## 1.5 java中的类型以及泛型中相关概念
+## 2.5 java中的类型以及泛型中相关概念
 java中所有的类型只有5种：  
 1.  泛型（参数化）类型：java中使用接口ParameterizedType表示。  
 2.  泛型数组类型：java中使用接口GenericArrayType表示。  
@@ -150,20 +282,17 @@ java中所有的类型只有5种：
     List<?> list[];
     ```
     
-# 2. 泛型变量类型的声明
-## 2.1 声明泛型
-java中用于声明泛型变量的地方总共有3处：接口、类、方法。  
-接口名称后使用<>声明泛型变量。  
-类名称后使用<>声明泛型。  
-方法返回值前使用<>声明泛型。  
+# 3. 泛型变量类型的声明
+## 3.1 声明泛型
+java中用于声明泛型变量的地方总共有3处：<b>接口、类、方法</b>。   
+
+在接口中声明泛型，叫做泛型接口：接口名称后使用<>声明泛型变量。  
+在类中声明泛型，叫做泛型类：类名称后使用<>声明泛型。  
+在方法中声明泛型，叫做泛型方法：方法返回值前使用<>声明泛型。  
 
 <font color="#FF0000"> 口诀：接口类方法，泛型声明处 </font>  
 
-在类中声明泛型，叫做泛型类。  
-在接口中声明泛型，叫做泛型接口。  
-在方法中声明泛型，叫做泛型方法。  
-
-## 2.2 泛型接口
+## 3.2 泛型接口
 ```
 [接口修饰符] interface 接口名称<泛型类型名称>{
 }
@@ -174,7 +303,7 @@ public interface IGeneric<T> {
 }
 ```
 
-## 2.3 泛型类
+## 3.3 泛型类
 ```
 [类修饰符] class 类名称<泛型类型名称>{
 }
@@ -185,30 +314,32 @@ public interface IGeneric<T> {
  }
 ```
 
-## 2.4 泛型方法（包括泛型构造方法）
-1.  泛型构造方法 
-    ```
-    [方法修饰符] <泛型类型名称> 构造方法名称(){
-    }
-    ```
-    示例如下：  
-    ```java
-    public <S> MyGeneric(S ss){
-    }
-    ```
-2.  泛型方法
-    ```
-    [方法修饰符] <泛型类型名称> 返回值类型 方法名称(){
-    }
-    ```
-    示例如下：  
-    ```java
-    public <K> K getName(K s){
-        return s;
-    }
-    ```
+## 3.4 泛型方法（包括泛型构造方法）
+泛型方法可以复用泛型类上声明的泛型，也可以自定义方法内部使用的泛型。
 
-# 3. 泛型成员
+### 3.4.1 泛型构造方法 
+```youtrack
+[方法修饰符] <泛型类型名称> 构造方法名称(){
+}
+```
+示例如下：  
+```java
+public <S> MyGeneric(S ss){
+}
+```
+### 3.4.2 泛型方法
+```youtrack
+[方法修饰符] <泛型类型名称> 返回值类型 方法名称(){
+}
+```
+示例如下：
+```java
+public <K> K getName(K s){
+    return s;
+}
+```  
+
+# 4. 泛型成员
 泛型成员是在泛型类的基础之上指定的，成员本身不能声明泛型，只能使用已经声明的泛型类型。  
 如下案例：  
 ```java
@@ -238,13 +369,293 @@ public class MyGeneric<T> {
     }
 }
 ```
+看一个案例：
+```java
+package zeh.myjavase.code25generic.demo04;
 
-# 4. 泛型的具体类型指定
+// 在class上声明泛型，这个类就是泛型类
+class PointDemo04<T> {
+    // 泛型变量必须在泛型类的基础上声明，本质还是通过泛型类声明，而与具体的泛型变量无关。
+    private T x;
+    // 泛型变量必须在泛型类的基础上声明，本质还是通过泛型类声明，而与具体的泛型变量无关。
+    private T y;
+
+    // 泛型构造方法可以复用泛型类上声明的泛型，也可以自定义方法内部使用的泛型
+    // T是复用泛型类上声明的泛型，S是泛型方法内部声明的泛型
+    public <S> PointDemo04(T x, T y, S w) {
+        this.setX(x);
+        this.setY(y);
+        System.out.println(w);
+    }
+
+    public T getX() {
+        return x;
+    }
+
+    // 泛型方法也可以复用泛型类上声明的泛型
+    public void setX(T x) {
+        this.x = x;
+    }
+
+    public T getY() {
+        return y;
+    }
+
+    public void setY(T y) {
+        this.y = y;
+    }
+
+}
+```
+测试：
+```java
+package zeh.myjavase.code25generic.demo04;
+
+// 泛型构造方法的学习
+public class StudyGenericConstructorRun {
+    public static void main(String[] args) {
+        // 调用泛型构造方法构建泛型类对象，前两个参数是复用了泛型类上声明的类型，第三个参数是泛型构造方法自己声明的泛型
+        PointDemo04<Integer> p = new PointDemo04<Integer>(10, 20,"MyString");
+        int x = p.getX();
+        int y = p.getY();
+        System.out.println("x坐标：" + x + ";y坐标：" + y);
+    }
+}
+
+```
+再看一个案例：
+```java
+package zeh.myjavase.code25generic.demo05;
+
+// 声明泛型类，指定多个泛型类型
+class PointDemo05<K, V> {
+    // 使用K泛型声明泛型变量，泛型变量必须复用泛型类上声明的泛型
+    private K key;
+    // 使用V泛型声明泛型变量
+    private V value;
+
+    // 使用K泛型和V泛型声明泛型构造方法
+    public PointDemo05(K key, V value) {
+        this.setKey(key);
+        this.setValue(value);
+    }
+
+    public K getKey() {// 使用K泛型声明泛型方法
+        return key;
+    }
+
+    public void setKey(K key) {// 使用K泛型声明泛型方法
+        this.key = key;
+    }
+
+    public V getValue() {// 使用V泛型声明泛型方法
+        return value;
+    }
+
+    public void setValue(V value) {// 使用V泛型声明泛型方法
+        this.value = value;
+    }
+
+    @Override
+    public String toString() {
+        return "key = " + this.getKey() + ";value = " + this.getValue();
+    }
+
+}
+```
+测试：
+```java
+package zeh.myjavase.code25generic.demo05;
+
+public class StudyGenericMoreRun {
+    public static void main(String[] args) {
+        // 实例化泛型类的时候指定多个泛型类型，如果不指定，则泛型会被擦除，使用Object接收；
+        // 如果指定泛型类型，则在设置内容时一旦类型不符则编译报错。
+        PointDemo05<String, Integer> p = new PointDemo05<String, Integer>("赵二虎", 22);
+        System.out.println(p);
+
+    }
+}
+
+```
+# 5. 泛型的具体类型指定
 前面在接口、类和方法上面声明了泛型，实际上相当于定义了一个泛型变量，这个泛型变量是需要在真正使用时指定其具体的类型的。  
-1.  实例化泛型类对象时指定泛型变量的具体类型（对于基本类型必须指定其对应的包装类型）。  
-2.  在子类实现接口或者继承父类（抽象类）时，指定父类泛型变量的具体类型。  
+## 5.1 指定泛型类的具体类型
+对泛型类而言，在实例化泛型类对象或者通过子类继承父类时明确指定泛型变量的具体类型（对于基本类型必须指定其对应的包装类型）。     
+如果不指定，则编译器默认会擦除泛型，使用Object接收。   
 
-# 5. 泛型对象在引用传递中的限制
+使用泛型代替Object：   
+```java
+package zeh.myjavase.code25generic.demo03;
+
+// 声明一个泛型类（在class上声明泛型，这个类就是泛型类）：使用泛型替换Object。
+// 泛型就是泛指的类型，定义的时候不知道，但是实例化的时候必须指定具体类型，不指定就安全警告并擦除泛型，使用Object接收。
+class PointDemo03<T> {
+
+    private T x;
+    private T y;
+
+    public T getX() {
+        return x;
+    }
+
+    public void setX(T x) {
+        this.x = x;
+    }
+
+    public T getY() {
+        return y;
+    }
+
+    public void setY(T y) {
+        this.y = y;
+    }
+
+}
+```
+测试1：   
+实例化泛型类时候必须指定泛型具体类型，指定后意味着泛型类中的类型就是具体类型，使用泛型后可以直接由外部进行具体类型的指定，这样就可以保护数据安全性，避免客户端误操作，避免类转换异常（因为如果设置的内容和泛型指定的类型不一致则编译器会报出编译错误）。   
+注意：对于泛型指定时的基本类型的指定必须是其对应的包装类，因为JDK1.5之后实现了自动装箱和自动拆箱，所以操作不复杂。   
+```java
+    @Test
+    public void test1() {
+        PointDemo03<Integer> p = new PointDemo03<Integer>();
+        // 因为指定了泛型类的具体类型是Integer，所以只能设置整数，直接自动装箱为Integer类型。设置其他类型将编译报错。
+        p.setX(10);
+        // 因为指定了泛型类的具体类型是Integer，所以只能设置整数，直接自动装箱为Integer类型。设置其他类型将编译报错。
+        p.setY(20);
+
+        int x = p.getX();// 取出的时候自动拆箱。
+        int y = p.getY();// 取出的时候自动拆箱。
+
+        System.out.println("整数表示，x坐标为：" + x);
+        System.out.println("整数表示，y坐标为：" + y);
+    }
+```
+测试2：   
+实例化泛型类的时候不指定泛型具体类型，将报安全警告并擦除泛型，使用Object接收。   
+擦除后和直接使用Object接收没有任何区别，所以使用了泛型就一定要指定具体的泛型类型。   
+如果擦除泛型后使用Object接收，则客户端误操作后同样报出类转换异常。   
+```java
+    @Test
+    public void test2() {
+        // 实例化泛型类对象时，未明确指定泛型的具体类型，则编译器将擦除泛型使用Object接收，此处报安全警告
+        PointDemo03 p2 = new PointDemo03();
+        p2.setX("东经180度");
+        p2.setY("北纬120度");
+
+        // 取出的时候先向下转型为 String (向下转型前已经向上转型了)，再强转成Integer，再自动拆箱，其实x存储的是String。
+        int x2 = (Integer) p2.getX();
+        // 取出的时候先向下转型为 String (向下转型前已经向上转型了)，再强转成Integer，再自动拆箱，其实x存储的是String。
+        int y2 = (Integer) p2.getY();
+        System.out.println("整数表示，x坐标为：" + x2);
+        System.out.println("整数表示，y坐标为：" + y2);
+    }
+```
+## 5.2 指定泛型接口的具体类型
+对泛型接口而言，在子类实现接口时，指定接口中泛型变量的具体类型；或者就是实现类不指定，当实例化实现类对象时指定具体类型，此时就和上面泛型类的情况相同。   
+## 5.3 指定泛型的具体类型
+对泛型方法而言：   
+泛型方法和泛型类、泛型接口不太一样。泛型方法除了可以共用泛型类或者泛型接口上面声明的泛型外，还可以在方法本身内部定义属于自己的泛型。   
+属于方法自己本身定义的泛型如何指定真实类型呢？   
+很简单，调用这个泛型方法时，直接传入具体类型的参数就可以了。   
+如果泛型方法的返回值类型不属于泛型类上面的，也和泛型方法中的参数类型不同，比如单独定义了一个S表示返回值泛型，这种情况下返回值类型该如何指定呢？   
+这就需要在参数中，再传入一个具体的class对象进去，传递进去的这个class对象所表示的类型，就是返回值需要的真实类型，然后返回值应该使用这个class对象去反射构造即可。   
+
+对于使用泛型声明的方法，即泛型方法，存在几种情况：   
+（1）如果泛型方法中的参数或者返回值共用了类上的泛型，则调用该方法的对象在实例化时也应该明确指定具体的类型；   
+```java
+package zeh.myjavase.code25generic.demo08;
+
+import java.util.List;
+import java.util.Map;
+
+// 声明一个泛型类，该泛型类总共指定3个泛型：T1,T2,T3，这样整个类中凡是使用类型的地方，都可以复用这3个泛型类指定类型
+class Demo08<T1, T2, T3> {
+
+
+    private T1 name;
+
+    private List<T2> userList;
+
+    private Map<String, T3> infoMap;
+
+    // 声明一个泛型方法，其中参数类型和返回值类型都复用类中声明的泛型
+    public T3 fun(T1 param1, T2 param2) {
+        T3 result = (T3) new StringBuilder().append(param1).append(param2).toString();
+        return result;
+    }
+}
+```
+调用：
+```java
+    @Test
+    public void testFun1() {
+        // 实例化泛型类时，明确指定泛型类中声明的泛型真实类型
+        Demo08<String, String, String> demo = new Demo08();
+
+        // 调用泛型方法fun1时，直接传入真实参数即可
+        String str = demo.fun1("Eric", "Daisy");
+        System.out.println("str:" + str);
+    }
+```
+因为fun1复用的是类上声明的泛型，其真实类型在实例化类对象时就已经指定为String,String,String，因此fun1只能接收String类型的参数。如果传入其他类型，则直接编译报错：
+```java
+        // 因为传入了两个整型，因此编译无法通过
+        int a = demo.fun1(100,200);
+        System.out.println("a:" + a);
+```
+（2）如果泛型方法中的参数或者返回值完全使用方法中自定义的泛型，并且返回值类型复用了其中某个参数的泛型，则调用该方法时，只需要传入实际参数即可，编译器会自动根据实际参数类型自动推断出目标方法中的泛型类型；
+```java
+    // 定义一个泛型方法，泛型由该方法声明，需要在方法返回值类型前使用<T>来声明该方法独立使用的泛型
+    // 这种方法中独立声明的泛型，外部调用时，直接传入真实的参数即可，编译器会根据真实传入的参数类型直接推断出此处的T类型
+    // 并且该方法返回值也复用了该类型
+    public <T> T fun2(T t) {
+        return t;
+    }
+```   
+调用:
+```java
+    @Test
+    public void testFun2() {
+        Demo08<String, String, String> demo = new Demo08();
+
+        // 传递一个字符串参数，则直接返回一个字符串类型
+        String result = demo.fun2("Eric");
+        System.out.println("result is : " + result);
+
+        //传递int类型，则自动装箱成Integer，返回类型也是Integer，自动拆箱
+        int a = demo.fun2(200);
+        System.out.println("a is : " + a);
+    }
+```
+（3）如果泛型方法中的参数使用方法中自定义的泛型，返回值也使用方法中自定义的泛型，且返回值类型没有复用参数中的某个泛型，是完全独立的，那么在实际调用该方法时，传入实际参数可以推断目标方法的参数泛型，但返回值的真实类型编译器无法推断，需要我们在调用方法时，多加一个参数Class对象，这样传递进去的Class对象就可以明确指定目标方法返回值的泛型类型。   
+<font color="#FF0000"> class对象的泛型默认就是它描述的类型。 </font> 
+```java
+    // 定义一个泛型方法
+    // t1复用类泛型
+    // t的泛型是方法单独定义的
+    // R表示返回值类型，它独立定义，因此必须加一个class参数，由外部直接传入该R对应的返回值真实类型的class
+    public <T1, T, R> R fun3(T1 t1, T t, Class<R> rClass) throws IllegalAccessException, InstantiationException {
+        System.out.println(t1);
+        System.out.println(t);
+        return rClass.newInstance();
+    }
+```
+调用：
+```java
+    @Test
+    public void testFun3() throws InstantiationException, IllegalAccessException {
+        Demo08<String, String, String> demo = new Demo08();
+        // 第一个参数类型必须是String，因为复用了泛型类上声明的T1，而T1在实例化Demo08对象时已经被明确指定为String
+        // 第二个参数是fun3方法自己声明的泛型，并且是参数类型，因此可以随便传入，会根据实际传入的参数类型自动推断真实类型
+        // 第三个参数是fun3方法自己声明的泛型，表示返回值类型，没有复用任何参数的类型，因此必须新增一个Class类型的参数，用于表示返回值类型
+        String result = demo.fun3("Eric", 105, String.class);
+        System.out.println("result is : " + result);
+    }
+```
+
+# 6. 泛型对象在引用传递中的限制
 引用传递传递的是引用地址，对于泛型对象而言，应该也能够传递引用。  
 普通java对象传递引用时，可以传递相同类型的引用，也可以向上转型，但是泛型对象不同。  
 对于普通java对象而言，person对象就是Object类的子类对象，所以person在引用传递时，被调用方可以使用Object接收。  
@@ -255,8 +666,8 @@ public class MyGeneric<T> {
 2.  被调用方使用通配符类型?来接受任意的泛型对象，但是不能设置泛型对象的属性值（null值除外）。  
 3.  被调用方指定和调用方一致的泛型类型。  
 
-# 6. 通配符类型
-## 6.1 什么是通配符类型？
+# 7. 通配符类型
+## 7.1 什么是通配符类型？
 java泛型中的通配符用?表示，这玩意儿看起来挺玄乎，实际上它就是一种类型，表示任意类型，不清楚的类型。  
 由于泛型对象在引用传递中的限制，所以引出了通配符的概念。  
 通配符类型只能依赖泛型类型生存，而不能单独使用。  
@@ -270,7 +681,7 @@ private ? name;
 private List<?> list;
 ```
 通配符类型作为泛型类型的实际类型，结合泛型类型使用，这种才是通配符打开的唯一正确方式，就如上面的List<?> 。  
-下面我们说的通配符类型，指的就是结合泛型类型的这种方式，类似List\<?\>。
+下面我们说的通配符类型，指的就是结合泛型类型的这种方式，类似List<?>。
 
 当一个对象被通配符类型修饰时，表示该泛型对象可以接受一个实际类型为任意类型的泛型对象，如下：  
 ```java
@@ -304,7 +715,96 @@ List<String> myList = (List<String>)list;
 通配符使用场景：修饰一个成员、一个方法变量、方法参数、方法返回值时，我们不清楚修饰的这些目标的具体成员到底是什么，这个时候就可以使用泛型的通配符类型进行修饰。  
 <b>通配符的出现实际上就是应付泛型对象在引用传递中的限制，通配符类型修饰的泛型对象可以接受实际类型为任意类型的泛型对象。</b>  
 
-## 6.2 受限泛型
+通配符案例：   
+定义一个泛型类：   
+```java
+package zeh.myjavase.code25generic.demo06;
+
+// 声明泛型类，指定多个泛型类型
+class PointDemo06<K, V> {
+    // 使用K泛型声明泛型变量
+    private K key;
+    // 使用V泛型声明泛型变量
+    private V value;
+
+    // 使用K泛型和V泛型声明泛型构造方法
+    public PointDemo06(K key, V value) {
+        this.setKey(key);
+        this.setValue(value);
+    }
+
+    // 使用K泛型声明泛型方法
+    public K getKey() {
+        return key;
+    }
+
+    // 使用K泛型声明泛型方法
+    public void setKey(K key) {
+        this.key = key;
+    }
+
+    // 使用V泛型声明泛型方法
+    public V getValue() {
+        return value;
+    }
+
+    // 使用V泛型声明泛型方法
+    public void setValue(V value) {
+        this.value = value;
+    }
+
+    @Override
+    public String toString() {
+        return "key = " + this.getKey() + ";value = " + this.getValue();
+    }
+
+}
+```
+运行：
+```java
+package zeh.myjavase.code25generic.demo06;
+
+public class StudyGenericTongPeiFuRun {
+    public static void main(String[] args) {
+        // 实例化泛型对象，指定具体泛型类型。
+        // 同样在实例化泛型对象时，指定具体泛型类型只需要在new对象的时候指定，接收方因为接收的也是一个引用（实际上=本来就是引用传递的方式之一），所以也符合引用传递，因此接收方也可以使用通配符进行接收。
+        PointDemo06<?, ?> p = new PointDemo06<String, Integer>("赵二虎", 22);
+
+        // 错误，无法传递。
+        //         testFun(p);
+        // 由于被调用方直接使用擦除了泛型，所以可以传递泛型对象。
+        testFun1(p);
+        // 由于被调用方直接使用通配符?，所以可以接收任意的泛型类型。
+        testFun2(p);
+    }
+
+    // 通过引用传递引出泛型中的通配符?
+    public static void testFun(PointDemo06<Object, Object> p) {
+        //该方法中用于接收的形式参数类型是Demo05Point<Object,Object>，而传递进来的泛型对象的类型是Demo05Point< String, Integer>；
+        //很明显在泛型的引用传递中，Demo05Point<String,Integer>并不是Demo05Point<Object,Object>的子类。所以无法传递。
+        System.out.println(p);
+    }
+
+    // 解决办法一：将形式参数的泛型标识直接去掉，此时擦除了泛型，使用Object接收（显式使用Object接收泛型对象是不行的）
+    public static void testFun1(PointDemo06 p) {// 引用传递没有指定具体的泛型类型，擦除了泛型，所以编译报警告
+        // 该方法擦除了泛型，这样泛型对象就可以在引用传递中传递。
+        p.setKey("hello");
+        System.out.println(p);
+    }
+
+    // 被调用方不知道传递进来的泛型具体类型是什么，但是想要接收，而解决办法一中直接擦除了泛型，这样不优雅，所以引入了通配符的概念.
+    // 即我不知道你指定的具体泛型类型，但是我还想要接收任意的泛型类型，就使用通配符?。
+    public static void testFun2(PointDemo06<?, ?> p) {
+        // 使用通配符除了设置null值，其他的属性值一律无法设置，因为不知道具体类型。
+        // p.setKey("hello");
+        // 通配符接收的泛型对象可以设置null值。
+        p.setKey(null);
+        System.out.println(p);
+    }
+}
+
+```
+## 7.2 受限泛型
 通配符类型修饰泛型对象时，表示该对象可以接受实际类型为任意类型的泛型对象。  
 但是也可以设置通配符类型的上限和下限。  
 指定通配符类型的上限，即通配符类型可以接受的实际类型必须是Number类型或者其子类型：  
@@ -316,7 +816,7 @@ List<? extends Number>
 List<? super Integer>
 ```
 
-## 6.3 通配符案例
+## 7.3 通配符案例
 通配符案例:  
 ```java
 package com.zeh.main.generic.basemygeneric;
@@ -373,8 +873,8 @@ public class MyGeneric {
 }
 ```
 
-# 7. 案例详解：java中5种类型
-## 7.1 类类型
+# 8. 案例详解：java中5种类型
+## 8.1 类类型
 代码：  
 ```java
 package com.zeh.main.generic.mygeneric;
@@ -528,7 +1028,7 @@ myGenericDemo01成员的类型信息：
 ---------------------------------------------
 ```
 
-## 7.2 泛型变量类型
+## 8.2 泛型变量类型
 代码：  
 ```java
 package com.zeh.main.generic.mygeneric;
@@ -835,7 +1335,7 @@ myGenericDemo02成员的类型信息：
 ---------------------------------------------
 ```
 
-## 7.3 泛型类型
+## 8.3 泛型类型
 代码：  
 ```java
 package com.zeh.main.generic.mygeneric;
@@ -1174,7 +1674,7 @@ com.zeh.main.generic.mygeneric.GenericDemo03I1
 com.zeh.main.generic.mygeneric.GenericDemo03I2
 ```
 
-## 7.4 通配符类型
+## 8.4 通配符类型
 代码：  
 ```java
 package com.zeh.main.generic.mygeneric;
@@ -1376,7 +1876,7 @@ com.zeh.main.generic.mygeneric.GenericDemo04I1
 该通配符类型的下边界清单：
 ```
 
-## 7.5 泛型数组类型
+## 8.5 泛型数组类型
 代码：  
 ```java
 package com.zeh.main.generic.mygeneric;
