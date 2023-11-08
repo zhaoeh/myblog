@@ -305,7 +305,8 @@ class ModeDemo06 {
     }
 }
 ```
-接下来通过Stream API来操作集合：
+接下来通过Stream API来操作集合。   
+创建一个运行类，先组装一个List出来：   
 ```java
 package zeh.myjavase.code42java8.demo06;
 
@@ -336,22 +337,26 @@ public class StreamRun {
         personList.add(new ModeDemo06("李康", null, "中国", 'M'));
     }
 
-    /**
-     * Stream的filter方法接受一个Predicate对象，使用Lambda表达式实现Predicate接口的抽象方法。
-     * 返回一个Stream对象，Predicate对象指定规则，返回的Stream是符合规则的过滤后的数据流。
-     */
+}
+```
+## 2.1 Stream的filter方法
+Stream的filter()方法用于对流中的元素进行过滤操作。   
+1. Stream的filter方法接受一个Predicate对象，使用Lambda表达式实现Predicate接口的抽象方法。   
+2. 返回一个Stream对象，Predicate对象指定规则，返回的Stream是符合规则的过滤后的数据流。   
+3. filter()方法返回一个新的Stream，其和源Stream完全独立。   
+4. Collection集合在Java8中也增加了一个stream()默认方法，该方法返回Stream类型对象，用于将List转换为Stream。      
+```java
     @Test
     public void testStream_filter() {
         // 1）找到年龄大于18岁的人并输出；
-        //stream()方法返回Stream类型对象；
-        //filter()是Stream接口中的方法，接收一个Predicate对象；
-        //Predicate接口是函数式接口，所以使用Lambda表达式实现其对象并传递进去；
-        //forEach()也是Stream接口的方法，接收默认的Consumer对象，同样Consumer接口是函数式接口，通过方法引用实现简写的Lambda表达式；
-        //Predicate接口最开始是apache官方的第三方包，java8整合进去了很多第三方的包。
-        //创建流：personList.stream()；中间操作：filter()；终止操作：foreach()。
+        // filter()是Stream接口中的方法，接收一个Predicate对象；
+        // Predicate接口是函数式接口，所以使用Lambda表达式实现其对象并传递进去；
+        // forEach()也是Stream接口的方法，接收默认的Consumer对象，同样Consumer接口是函数式接口，通过方法引用实现简写的Lambda表达式；
+        // Predicate接口最开始是apache官方的第三方包，java8借鉴后自己也搞了一个。
+        // 创建流：personList.stream()；中间操作：filter()；终止操作：foreach()。
         personList.stream().filter((p) -> p.getAge() > 18).forEach(System.out::println);
 
-        //filter()方法是返回一个新的Stream，不会改变源数据。
+        // filter()方法是返回一个新的Stream，不会改变源数据。
         System.out.println("-------------------------------------------" + personList);
 
         // 2）找出所有中国人的数量
@@ -359,33 +364,30 @@ public class StreamRun {
         long chinaPersonNum = personList.stream().filter((p) -> p.getCountry().equals("中国")).count();
         System.out.println("中国人有：" + chinaPersonNum + "个");
     }
-
-    /**
-     * map()方法接受一个Function对象，使用Lambda表达式实现Function接口的抽象方法,所谓map，从字面理解就是映射,这里指的是对象关系的映射,将上游Stream的每一个元素按照逻辑进行元素转换。
-     * 返回一个Stream对象。Function对象指定上游数据中每一个元素的转换规则，返回的Stream是转换后的数据流。
-     * <p>
-     * 查看map()方法的实现：map()默认处理的是上流Stream中的每一个元素对象，将每一个元素按照实现的Function接口的抽象方法实现规则（使用Lambda）进行转换后返回到
-     * 一个新的Stream中。
-     * <p>
-     * 总结：map()就是按照指定的实现逻辑对传入的每一个元素对象进行转换后返回到新的Stream中。
-     */
-    @Test
-    public void testStream_map() {
-        personList.stream().map((element) -> {
-            //将每一个元素的age加上20后返回每一个元素到Stream中，最后使用Stream的foreach()方法进行遍历。
-            element.setAge(element.getAge() + 20);
-            return element;
-        }).forEach(System.out::println);
-    }
-
-
-    /**
-     * reduce()方法用于对上游Stream中每一个元素进行聚合运算。可以求和、求平均数、求个数等。
-     * SQL中类似 sum()、avg() 或者 count() 的聚集函数，实际上就是 reduce 操作，因为它们接收多个值并返回一个值。
-     * 返回值是Optional，使用get()方法获取对应的统计结果。
-     * <p>
-     * 注意：上游Stream传入的数据中，每一个元素的数据类型必须要符合要求，如果不符合，应该先使用map()进行转换后再对整个Steam进行统计。
-     */
+```
+## 2.2 Stream的map方法
+Stream接口的map()方法用于对流中的元素进行转换，它接收流中的每一个元素，返回转换后的值，通过它转换后，源流中的所有元素都将被映射为它转换后的值了。   
+1. map()方法接收一个Function对象，使用Lambda表达式实现Function接口的抽象方法,所谓map，从字面理解就是映射,这里指的是对象关系的映射,将上游Stream的每一个元素按照逻辑进行元素转换。   
+2. 该方法返回一个Stream对象。Function对象指定上游数据中每一个元素的转换规则，返回的Stream是转换后的数据流。    
+3. 查看map()方法的实现：map()默认处理的是上流Stream中的每一个元素对象，将每一个元素按照实现的Function接口的抽象方法实现规则（使用Lambda）进行转换后返回到一个新的Stream中。   
+4. 总结：map()就是按照指定的实现逻辑对传入的每一个元素对象进行转换后返回到新的Stream中。      
+```java
+@Test
+public void testStream_map() {
+    personList.stream().map((element) -> {
+        //将每一个元素的age加上20后返回每一个元素到Stream中，最后使用Stream的foreach()方法进行遍历。
+        element.setAge(element.getAge() + 20);
+        return element;
+    }).forEach(System.out::println);
+}
+```
+## 2.4 Stream的reduce方法
+reduce()方法用于对上游Stream中每一个元素进行聚合运算。可以求和、求平均数、求个数等。   
+1. SQL中类似 sum()、avg() 或者 count() 的聚集函数，实际上就是 reduce 操作，因为它们接收多个值并返回一个值。   
+2. 它接收一个 BinaryOperator 对象，这个对象也是一个函数式接口，它继承BiFunction接口，因此，它接收两个参数，返回一个值。   
+3. 返回值是Optional，使用get()方法获取对应的统计结果。   
+4. 注意：上游Stream传入的数据中，每一个元素的数据类型必须要符合要求，如果不符合，应该先使用map()进行转换后再对整个Steam进行统计。
+```java
     @Test
     public void testStream_reduce() {
         //因为上游Stream传入的一堆Person，而reduce()方法接受的类型默认就是传入的类型，而默认传入的类型就是上游stream中的每一个元素类型，即Person。
@@ -396,44 +398,43 @@ public class StreamRun {
         Integer totalAge = personList.stream().map((element) -> element.getAge()).reduce((sum, element) -> sum + element).get();
         System.out.println("统计所有人的年龄之和：" + totalAge);
     }
+```
+## 2.5 Stream的collect方法
+collect()方法接受一个Collector收集器对象，将上游stream数据流转换成自己Collectors收集器指定的数据。   
+目标就是将指定的上游stream流数据聚合成对应的集合对象。   
 
-
-    /**
-     * collect()方法接受一个Collector收集器对象，将上游stream数据流转换成自己Collectors收集器指定的数据。
-     * <p>
-     * 目标就是将指定的上游stream流数据聚合成对应的集合对象。
-     */
+```java
     @Test
     public void testStream_collect() {
         List<String> resultList = personList.stream().map((element) -> element.getName()).collect(Collectors.toList());
         System.out.println("resultList:" + resultList);
     }
-
-    /**
-     * 使用filter()方法指定回调过滤接口规则；使用collect()将数据按照指定收集器规则进行收集。
-     * <p>
-     * 再强调一遍：filter()方法会产生一个符合过滤规则的新列表，而不会更改源列表。
-     */
+```
+## 2.6 filter结合collect
+使用filter()方法指定回调过滤接口规则；使用collect()将数据按照指定收集器规则进行收集。   
+再强调一遍：filter()方法会产生一个符合过滤规则的新列表，而不会更改源列表。   
+```java
     @Test
     public void testStream_filter_collect() {
         List<ModeDemo06> resultList = personList.stream().filter(e -> e.getAge() > 18).collect(Collectors.toList());
         System.out.println("resultList:" + resultList);
     }
-
-    /**
-     * 对列表中每一个元素使用函数等，Collectors.joining():使用目标字符拼接上游Stream中的各个元素使之成为一个字符串。
-     */
+```
+## 2.7 Collectors的joining方法
+对列表中每一个元素使用函数等，Collectors.joining():使用目标字符拼接上游Stream中的各个元素使之成为一个字符串。   
+```java
     @Test
     public void testStream_function() {
         String resultStr = personList.stream().map(x -> x.getName().toUpperCase()).collect(Collectors.joining("---"));
         System.out.println("resultStr:" + resultStr);
     }
-
-    /**
-     * 对目标Stream进行结果去重复。
-     * 注意：distinct()对Stream数据流进行去重复，默认是根据元素对应的引用地址去判断是否是重复元素的(和hashSet一样，如果要真正去重复必须实现equals()方法和hashCode()方法)。
-     * 注意，即便元素为null值，它也同样参与去重复比较。
-     */
+```
+## 2.8 Stream的distinct方法
+对目标Stream进行结果去重复。   
+1. distinct方法返回一个新的Stream，不会影响源Stream。   
+2. distinct()对Stream数据流进行去重复，默认是根据元素对应的引用地址去判断是否是重复元素的(和hashSet一样，如果要真正去重复必须实现equals()方法和hashCode()方法)。   
+3. 注意，即便元素为null值，它也同样参与去重复比较。
+```java
     @Test
     public void testStream_distinct() {
         //对stream数据流进行去重复，stream中保存的是一堆对象
@@ -455,15 +456,13 @@ public class StreamRun {
         System.out.println("去重复后的age属性的count：" + count);
         System.out.println("去重复前的age属性的count：" + persons.size());
     }
-
-
-    /**
-     * mapToInt()：直接将上游元素每一个转换成int类型的。
-     * <p>
-     * IntStream、LongStream 和 DoubleStream 等流的类中，有个非常有用的方法叫做 summaryStatistics() 。
-     * 可以返回 IntSummaryStatistics、LongSummaryStatistics 或者 DoubleSummaryStatistic s，描述流中元素的各种摘要数据。
-     * 在本例中，我们用这个方法来计算列表的最大值和最小值。它也有 getSum() 和 getAverage() 方法来获得列表的所有元素的总和及平均值。
-     */
+```
+## 2.9 Stream的mapToInt方法
+mapToInt()：直接将上游元素每一个转换成int类型的。它的返回值是IntStream。       
+1. IntStream、LongStream 和 DoubleStream 等流的类中，有个非常有用的方法叫做 summaryStatistics() 。   
+可以返回 IntSummaryStatistics、LongSummaryStatistics 或者 DoubleSummaryStatistic s，描述流中元素的各种摘要数据。   
+在本例中，我们用这个方法来计算列表的最大值和最小值。它也有 getSum() 和 getAverage() 方法来获得列表的所有元素的总和及平均值。
+```java
     @Test
     public void testStream_IntStream() {
         IntSummaryStatistics summaryStatistics = personList.stream().map(e -> e.getAge()).mapToInt(x -> x).summaryStatistics();
@@ -473,31 +472,34 @@ public class StreamRun {
         System.out.println("求和：" + summaryStatistics.getSum());
         System.out.println("求平均值：" + summaryStatistics.getAverage());
     }
-
-
-    /**
-     * 指定过滤规则后，选取前面2个。
-     * <p>
-     * limit()：Stream的方法，对上游数据流进行截取。
-     */
+```
+## 2.10 Stream的limit方法
+limit()：Stream的方法，对上游数据流进行截取。   
+同样，它返回一个新的Stream。   
+```java
+    // 指定过滤规则后，选取前面2个。
     @Test
     public void testStream_limit() {
         personList.stream().filter(e -> e.getAge() > 18).limit(2).forEach(e -> System.out.println(e));
     }
-
-    /**
-     * of()：Stream的静态方法，创建一个指定数据集合的Stream流
-     */
+```
+## 2.11 Stream的of方法
+of()：Stream的静态方法，创建一个指定数据集合的Stream流，该方法通常用于我们快速的创建一个Stream对象。   
+它接收一个T类型的可变参数，实际上本质就是一个T类型的数组。   
+因此，我们可以传递任意类型的一个数组对象进去，将它转换为Stream。      
+```java
     @Test
     public void testStream_of() {
         Stream<String> stringStream = Stream.of("Eric", "Daisy", "Poppy", "Sam");
         stringStream.forEach(e -> System.out.println(e));
     }
-
-    /**
-     * max():从上游Stream中获取到指定比较元素对应的最大值的元素，注意返回的是对应规则的最大元素，即返回的是Person。
-     * min():从上游Stream中获取到指定比较元素对一个的最小值的元素。
-     */
+```
+## 2.12 Stream的max和min方法
+max():从上游Stream中获取到指定比较元素对应的最大值的元素，注意返回的是对应规则的最大元素，即返回的是Person。   
+min():从上游Stream中获取到指定比较元素对一个的最小值的元素。   
+它接收一个Comparator比较器对象，该对象也被改造为函数式接口了，其中只有一个抽象方法 compare()，用于指定两个对象的比较规则。   
+max和min返回一个Optional。   
+```java
     @Test
     public void testStream_max_min() {
         ModeDemo06 maxPerson = personList.stream().max(Comparator.comparing(a -> a.getAge())).get();
@@ -505,34 +507,38 @@ public class StreamRun {
         ModeDemo06 minPerson = personList.stream().min(Comparator.comparing(a -> a.getAge())).get();
         System.out.println("年龄最小的人是：" + minPerson);
     }
-
+```
+## 2.13 Stream的allMatch
+allMatch()：上游Stream各个元素是否全部匹配指定的规则。      
+1. 接收一个Predicate，表示一个条件表达式。      
+2. 返回值是boolean，判断所有的元素是否都符合该条件表达式，如果符合则为true，如果有一个不符合，则为false。     
+```java
     /**
-     * 综合测试
-     */
-    @Test
-    public void testStream_zonghe() {
-        List<ModeDemo06> allList = personList.stream().filter(e -> e.getName().startsWith("T")).sorted(Comparator.comparing(s -> s.getName())).collect(Collectors.toList());
-        System.out.println("allList:" + allList);
-    }
-
-    /**
-     * allMatch()：上游Stream各个元素是否全部匹配指定的规则。
+     * 
      */
     @Test
     public void testStream_allMatch() {
         Boolean result = personList.stream().allMatch(e -> e.getName().startsWith("T"));
         System.out.println("是否匹配：" + result);
     }
-
-    /**
-     * anyMatch()：上游Stream各个元素是否任意匹配指定的规则。
-     */
+```
+## 2.14 Stream的anyMatch
+和allMatch刚好相反，只要上游Stream中有一个元素符合条件规则，则返回true，否则返回false。   
+anyMatch()：上游Stream各个元素是否任意匹配指定的规则。
+```java
     @Test
     public void testStream_anyMatch() {
         Boolean result = personList.stream().anyMatch(e -> e.getName().startsWith("T"));
         System.out.println("是否匹配：" + result);
     }
-}
+```
+## 2.15 综合案例
+```java
+    @Test
+    public void testStream_zonghe() {
+        List<ModeDemo06> allList = personList.stream().filter(e -> e.getName().startsWith("T")).sorted(Comparator.comparing(s -> s.getName())).collect(Collectors.toList());
+        System.out.println("allList:" + allList);
+    }
 ```
 # 3. Stream的collect()方法和Collectors收集器
 collect是一个将管道流的结果集到一个list中的结束操作。   
