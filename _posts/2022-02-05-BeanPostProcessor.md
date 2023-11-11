@@ -110,7 +110,45 @@ getOrder 方法的返回值越小的 BeanPostProcessor 对象，它所实现的�
 <b>不论是哪种方式注册的BeanPostProcessor，都必须要清楚一点，我们注册的BeanPostProcessor对象的逻辑都会对spring容器中的所有普通bean进行处理。</b>   
 
 # 4. @Bean注解注册BeanPostProcessor的注意点
-使用@Bean去标注一个方法去返回一个自定义的BeanPostProcessor对象时，切结，方法返回值的类型必须是BeanPostProcessor类型或者是其子类型，而不能是Ordered类型。   
+使用@Bean去标注一个方法去返回一个自定义的BeanPostProcessor对象时，切记，方法返回值的类型必须是BeanPostProcessor类型或者是其子类型，而不能是Ordered类型。   
+<b>并且，再扩展一下：@Bean注册的bean的类型，一定是它标注的方法的返回值类型。</b>      
+如何理解呢？    
+看一段rabbitMQ自动配置的代码：   
+```java
+        @Bean
+        @ConditionalOnSingleCandidate(ConnectionFactory.class)
+        @ConditionalOnProperty(
+            prefix = "spring.rabbitmq",
+            name = {"dynamic"},
+            matchIfMissing = true
+        )
+        @ConditionalOnMissingBean
+        // 注意，这个bean实例是RabbitAdmin类型
+        // 但是方法的返回值是AmqpAdmin类型
+        // 那么注册到容器中的 BeanDefinition 的这个bean的类型就是 AmqpAdmin 类型而不是 RabbitAdmin
+        public AmqpAdmin amqpAdmin(ConnectionFactory connectionFactory) {
+            return new RabbitAdmin(connectionFactory);
+        }
+```
+通过@Bean注册的 BeanDefinition ，其中目标bean的类型一定是方法中定义的返回值的类型，而不是方法返回对象的实际子类型。    
+这个其他方式注册bean是有区别的。   
+其他方式是注册bean，都是直接拿到class对象，那么直接就能确定这个bean的类型。    
+但是@Bean的bean，它的类型和bean的实例是分开的，类型通过方法的返回类型确定，实例通过方法体去构建。    
+因此，如果尝试自动注入上面的RabbitAdmin实例，请注意：   
+```java
+    // 错误的注入      
+    @Autowired
+    private RabbitAdmin rabbitAdmin;
+```
+因为容器中没有RabbitAdmin类型的bean。   
+你尝试通过 context.getBeansOfType(RabbitAdmin.class); 去获取RabbitAdmin类型的bean，发现容器中根本没有。    
+下面才是正确的注入方式：   
+```java
+    @Autowired
+    private AmqpAdmin amqpAdmin;
+```
+因为@Bean定义的 BeanDefinition 的类型实际山是 AmqpAdmin 类型，而不是 RabbitAdmin 类型。   
+其他同理的操作，一定要注意。   
 
 # 5. BeanPostProcessor 源码
 ## 5.1 BeanPostProcessor注册到spring容器中
