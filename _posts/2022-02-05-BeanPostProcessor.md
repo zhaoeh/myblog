@@ -22,6 +22,8 @@ import org.springframework.lang.Nullable;
 
 public interface BeanPostProcessor {
     // post 表示在....之后，postProcessor的意思表示“后置处理器”，因此所有的BeanPostProcessor都统称为bean的后置处理器
+    // 所以，所有的BeanPostProcessor都表示 “在有了bean定义之后” 的统一操作，这意味着，所有BeanPostProcessor都是在容器中已经加载完所有bean定义信息之后才进行的。
+    // 实际上，所有的BeanPostProcessor都是在遍历容器中的BeanDefinition，开始准备实例化目标bean的前后被触发执行的。   
     // Initialization表示初始化
     // 这个方法名称的关键字是 before 这个单词
     // 这个方法在每一个普通bean的初始化方法执行之前进行调用
