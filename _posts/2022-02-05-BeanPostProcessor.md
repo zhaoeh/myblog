@@ -21,8 +21,7 @@ import org.springframework.beans.BeansException;
 import org.springframework.lang.Nullable;
 
 public interface BeanPostProcessor {
-    // post 表示在....之后，postProcessor的意思表示“后置处理器”，因此所有的BeanPostProcessor都统称为bean的后置处理器
-    // Initialization表示初始化
+
     // 这个方法名称的关键字是 before 这个单词
     // 这个方法在每一个普通bean的初始化方法执行之前进行调用
     @Nullable
@@ -38,7 +37,12 @@ public interface BeanPostProcessor {
     }
 }
 ```   
-我们可以看到，BeanPostProcessor 钩子接口是属于spring的，而不是springboot的。   
+我们可以看到，BeanPostProcessor 钩子接口是属于spring的，而不是springboot的。      
+post 表示在....之后，postProcessor的意思表示“后置处理器”，因此所有的BeanPostProcessor都统称为bean的后置处理器。      
+所以，所有的BeanPostProcessor都表示 “在有了BeanDefinition之后” 的统一操作。   
+这意味着，所有BeanPostProcessor都是在容器中已经加载完所有BeanDefinition信息之后才进行的；所有的BeanPostProcessor都是在遍历容器中的BeanDefinition，开始准备实例化目标bean的前后被触发执行的。       
+Initialization表示初始化。      
+
 有时候我们希望spring容器在创建bean对象的过程中，能够执行我们自定义的逻辑，对创建的bean做一些处理，或者执行一些业务（实际上就是拦截bean的创建过程，介入bean的生命周期）。   
 实现这种回调逻辑的方案有很多种，比如自定义 bean 的初始化方法等，当bean对象被实例化（通过反射构造器进行实例化），并填充完属性后，紧接着就执行目标bean的初始化方法。      
 而 BeanPostProcessor 钩子接口也能够实现类似的功能，并且更通用，因为它能够做到对所有的普通bean都统一插入自定义的逻辑，而不仅仅针对某一个bean。   
