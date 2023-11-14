@@ -1,0 +1,23 @@
+ConcurrentReferenceHashMap
+博客维护 java8 stream相关内容
+mybatis的@Options注解
+博客维护繁杂if else 多分枝的优化改造内容
+博客维护 spring 读取各种外部配置的优先级顺序以及和Environment环境对象相关的源码分析
+mybatis selectKey
+自增
+MDC学习
+mySQL和Oracle的分页
+SQL中的约束
+postConstruct和@Value的顺序
+@Value是在bean实例化完成，填充属性阶段设置进去的值。@PostConstruct注解是在属性填充完成后的初始化阶段执行的。
+log4j日志整理
+oracle和mysql对于日期类型的比较
+假如有一个类继承了容器中的父类，这个父类中有一个字段，@Value如何为容器内部的这个字段赋值？
+@Value、@Autowire等源码解读
+java8 Optional整理
+可变参数，空数组，new Class[0]
+泛型，A.class，Class<T>，泛型方法
+lombok，链式编程，builder,build，链式编程源码参考
+工具类交给spring管理的方式（构造器直接注入、set方法直接注入、postConstruct初始化方法完成等）
+spring容器怎么启动？启动后都做了啥？什么才叫spring容器的启动？什么才是spring容器？refresh方法是表示启动容器吗？new 一个 ApplicationContext()的过程其实就是在执行refresh。
+容器级钩子和应用级（业务级）钩子。
