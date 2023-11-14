@@ -23,3 +23,6 @@ spring容器怎么启动？启动后都做了啥？什么才叫spring容器的�
 容器级钩子和应用级（业务级）钩子。
 spring工具箱（spring常用工具类、反射工具类等）ClassUtils、BeanUtils、
 InitializingBean源码分析，@PostConstruct源码分析，实现InitializingBean接口的类要交给spring管理才能生效吗？必须的，就是实现BeanPostProcessor一样，必须交给spring管理。spring源码中有的类是人家spring自己手动加到容器中的，我们外部的实现就需要我们自己将这个实现类交给spring容器进行管理。
+ObjectProvider的学习
+策略模式，一个大map用来缓存对象，在需要的时候根据key后去不同的对象去实现多态。
+
