@@ -21,3 +21,4 @@ lombok，链式编程，builder,build，链式编程源码参考
 工具类交给spring管理的方式（构造器直接注入、set方法直接注入、postConstruct初始化方法完成等）
 spring容器怎么启动？启动后都做了啥？什么才叫spring容器的启动？什么才是spring容器？refresh方法是表示启动容器吗？new 一个 ApplicationContext()的过程其实就是在执行refresh。
 容器级钩子和应用级（业务级）钩子。
+spring工具箱（spring常用工具类、反射工具类等）
