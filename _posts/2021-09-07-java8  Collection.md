@@ -27,12 +27,7 @@ import org.junit.Test;
 
 import java.util.*;
 
-/**
- *
- * @ClassName Demo04CollectionAndMapForeach
- * @Author zhaoerhu
- * @Date 2019/8/9 17:25
- */
+// Demo04CollectionAndMapForeach
 public class CollectionAndMapForeachRun {
 
     //java8之前,遍历list和map
@@ -84,17 +79,10 @@ import org.junit.Test;
 
 import java.util.*;
 
-/**
- * @ClassName Demo07Sort
- * @Author zhaoerhu
- * @Date 2019/8/13 9:12
- */
 public class SortRun {
 
-    /**
-     * sort()方法是java8对List扩展的默认方法；
-     * Comparator.naturalOrder()方法是一个自然排序算法的实现。
-     */
+    // sort()方法是java8对List扩展的默认方法；
+    // Comparator.naturalOrder()方法是一个自然排序算法的实现。
     @Test
     public void test_sort_comparator() {
         List<Integer> integerList = Arrays.asList(2, 7, 3, 9, 1, 7, 0, 4, 3);
@@ -102,10 +90,7 @@ public class SortRun {
         System.out.println("排序后的 integerList:" + integerList);
     }
 
-
-    /**
-     * 对集合遍历：使用java8对Collection接口扩展的默认方法foreach()
-     */
+    // 对集合遍历：使用java8对Collection接口扩展的默认方法foreach()
     @Test
     public void test_foreach() {
         List<String> stringList = Arrays.asList("Eric", "YuRui", "Daisy", "Poppy", "Alisa", "SuSan");
@@ -118,9 +103,8 @@ public class SortRun {
         newList.forEach(System.out::println);
     }
 
-    /**
-     * 自己实现比较器Comparator，指定排序规则进行排序。
-     */
+
+    // 自己实现比较器Comparator，指定排序规则进行排序。
     @Test
     public void test_sorted() {
         List<String> stringList = Arrays.asList("Eric", "YuRui", "Daisy", "Poppy", "Alisa", "SuSan");

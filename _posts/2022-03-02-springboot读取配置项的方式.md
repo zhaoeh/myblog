@@ -435,13 +435,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 功能描述：测试springboot读取文件的各种方式
- *
- * @ClassName Demo03GetConfigController
- * @Author zhaoerhu
- * @Date 2023/10/6 21:59
- */
+// 测试springboot读取文件的各种方式
 @RestController
 @RequestMapping("demo03GetConfigController")
 public class Demo03GetConfigController {
@@ -692,13 +686,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 功能描述：测试springboot读取文件的各种方式
- *
- * @ClassName Demo03GetConfigController
- * @Author zhaoerhu
- * @Date 2023/10/6 21:59
- */
+// 测试springboot读取文件的各种方式
 @RestController
 @RequestMapping("demo03GetConfigController")
 public class Demo03GetConfigController {
@@ -833,13 +821,7 @@ code04controller.controller.Demo03GetConfigController如下：
 ```java
 package code04controller.controller;
 
-/**
- * 功能描述：测试springboot读取文件的各种方式
- *
- * @ClassName Demo03GetConfigController
- * @Author zhaoerhu
- * @Date 2023/10/6 21:59
- */
+// 测试springboot读取文件的各种方式
 @RestController
 @RequestMapping("demo03GetConfigController")
 public class Demo03GetConfigController {
@@ -1058,13 +1040,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 功能描述：测试springboot读取文件的各种方式
- *
- * @ClassName Demo03GetConfigController
- * @Author zhaoerhu
- * @Date 2023/10/6 21:59
- */
+// 测试springboot读取文件的各种方式
 @RestController
 @RequestMapping("demo03GetConfigController")
 public class Demo03GetConfigController {
