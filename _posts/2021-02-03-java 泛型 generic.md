@@ -554,13 +554,19 @@ class PointDemo03<T> {
 ```
 ## 5.2 指定泛型接口的具体类型
 对泛型接口而言，在子类实现接口时，指定接口中泛型变量的具体类型；或者就是实现类不指定，当实例化实现类对象时指定具体类型，此时就和上面泛型类的情况相同。   
-## 5.3 指定泛型的具体类型
+## 5.3 指定泛型方法的具体类型
 对泛型方法而言：   
 泛型方法和泛型类、泛型接口不太一样。泛型方法除了可以共用泛型类或者泛型接口上面声明的泛型外，还可以在方法本身内部定义属于自己的泛型。   
 属于方法自己本身定义的泛型如何指定真实类型呢？   
 很简单，调用这个泛型方法时，直接传入具体类型的参数就可以了。   
 如果泛型方法的返回值类型不属于泛型类上面的，也和泛型方法中的参数类型不同，比如单独定义了一个S表示返回值泛型，这种情况下返回值类型该如何指定呢？   
 这就需要在参数中，再传入一个具体的class对象进去，传递进去的这个class对象所表示的类型，就是返回值需要的真实类型，然后返回值应该使用这个class对象去反射构造即可。   
+
+当然上面所说的直接掺入具体的泛型类型实际上属于简写模式，正确的做法是在调用方法时，在方法名称前指定泛型。如下：   
+```youtrack
+demo.<String, String>fun1("Eric", "Daisy");
+```   
+但这种指定编译器会自动优化，根据实际传入的参数类型做泛型类型推断，一般都不需要显式指定。   
 
 对于使用泛型声明的方法，即泛型方法，存在几种情况：   
 （1）如果泛型方法中的参数或者返回值共用了类上的泛型，则调用该方法的对象在实例化时也应该明确指定具体的类型；   
@@ -594,8 +600,8 @@ class Demo08<T1, T2, T3> {
         // 实例化泛型类时，明确指定泛型类中声明的泛型真实类型
         Demo08<String, String, String> demo = new Demo08();
 
-        // 调用泛型方法fun1时，直接传入真实参数即可
-        String str = demo.fun1("Eric", "Daisy");
+        // 调用泛型方法fun1时，直接传入真实参数即可；也可以显式指定具体的泛型类型
+        String str = demo.<String, String>fun1("Eric", "Daisy");
         System.out.println("str:" + str);
     }
 ```
@@ -650,7 +656,25 @@ class Demo08<T1, T2, T3> {
         // 第一个参数类型必须是String，因为复用了泛型类上声明的T1，而T1在实例化Demo08对象时已经被明确指定为String
         // 第二个参数是fun3方法自己声明的泛型，并且是参数类型，因此可以随便传入，会根据实际传入的参数类型自动推断真实类型
         // 第三个参数是fun3方法自己声明的泛型，表示返回值类型，没有复用任何参数的类型，因此必须新增一个Class类型的参数，用于表示返回值类型
-        String result = demo.fun3("Eric", 105, String.class);
+        String result = demo.<String, Integer, String>fun3("Eric", 105, String.class);
+        System.out.println("result is : " + result);
+    }
+```
+（4）静态方法的泛型指定。   
+如果一个方法是static的话，那么如何指定它的泛型呢？和上面的方式完全相同。      
+```java
+    // 静态方法中的泛型
+    public static <T1,T,R> R fun4(T1 t1,T t,Class<R> rClass) throws IllegalAccessException, InstantiationException {
+        System.out.println(t1);
+        System.out.println(t);
+        return rClass.newInstance();
+    }
+```
+调用：   
+```java
+    @Test
+    public void testFun4() throws InstantiationException, IllegalAccessException {
+        String result = Demo08.<String,Integer,String>fun4("Eric", 105, String.class);
         System.out.println("result is : " + result);
     }
 ```
