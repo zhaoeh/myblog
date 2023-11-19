@@ -1091,7 +1091,48 @@ eric not contains r
 对于包含if....else....的语句，可以使用filter替代它，然后借助orElseGet的特性，当value为null值时才执行orElseGet的Supplier函数式对象，在其逻辑中指定else的逻辑；      
 然后再单独对返回的对象做非空判断，在里面做if的逻辑，从而简介的替代了if...else...的场景。   
 
+但很显然，上面的写法比较low。   
+因为我们只是在orElseGet里面实现了else的逻辑，而if的逻辑还需要我们手动重写一个if语句去判断执行。    
+这显然不是我们想要的结果。    
+有没有一种方式，在操作Optional的链式编程中，能够一次性的既编写了我们的if逻辑，又编写了我们的else逻辑呢？    
+看下一个案例。   
 
+## 3.9 使用Optional完全替代if else
+要想完全替代if else的逻辑，那就得把if中的条件表达式嵌套进去，然后还要能同时完成if 和 else 对应逻辑的编写。   
+让我们仔细想一想Lambda表达式到底是干啥的。Lambda表达式就是一段可以执行的逻辑，因为 if 和 else 的语句，只要我们在操作Optional的链式编程中能找到传递Lambda表达式进去的地方，就有可能实现我们的想法。   
+很庆幸，Optional的这几个方法中，让我找到了这种实现。   
+```youtrack
+filter()方法：用于设置if中的条件表达式。     
+map()方法：用于设置当条件表达式成立时的逻辑处理。   
+orElseGet()：用于设置当条件表达式不成立时的逻辑处理。   
+```
+有人觉得这种处理很怪异，其实那是因为我们没有搞清楚Lambda表达式的真正意图。   
+java8的原理就是通过链式编程，处理数据流，因为它的每一个链式编程节点都是通过Lambda表达式去支撑的。    
+因为Lambda表达式本身就是用于设置逻辑的。   
+所以，map()方法接收一个Function函数式对象，我们不能局限于map方法仅仅用来映射对象的转换，它既然接收一个Function函数式对象，我们就可以传入一个Lambda表达式，就可以在其中执行我们任何想要执行的逻辑，只要符合Function函数式对象的语义即可。    
+下面，我们尝试这么做：   
+```java
+    @Test
+    public void testFilter() {
+        String str = "Eric";
+        Optional.ofNullable(str).filter(e -> e.contains("r")).map(e -> {
+            System.out.println("eric contains r");
+            return e;
+        }).orElseGet(() -> {
+            System.out.println("eric not contains r");
+            return null;
+        });
+
+    }
+```
+运行：   
+```youtrack
+eric contains r
+```
+（1）filter：用于指定if中的条件。      
+（2）map：用于指定当数据符合条件时的逻辑处理，处理完逻辑后再返回原始的数据。         
+（3）orElseGet：用于指定当数据不符合条件时的逻辑处理，处理完逻辑后再返回一个null值。    
+  
 # 4. 介绍其他博主的文章
 [原始链接](https://segmentfault.com/a/1190000012263070)    
 本篇介绍的Optional虽然并不是一个函数式接口，但是也是一个极其重要的类。   
