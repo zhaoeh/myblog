@@ -2,7 +2,7 @@
 layout:     post
 title:      springboot怎么没有web.xml呢？
 subtitle:   为何在springboot中我没从来没有见过web.xml?
-categories: [spring]
+categories: [springboot专题]
 mermaid: false
 sequence: false
 flow: false

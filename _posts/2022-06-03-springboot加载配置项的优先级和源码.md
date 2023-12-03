@@ -1,8 +1,8 @@
 ---
 layout:     post
-title:      springboot如何快速读取配置项？
-subtitle:   汇总springboot读取外部配置项的几种方式
-categories: [spring]
+title:      springboot加载配置项的源码解析以及加载顺序和配置项的优先级
+subtitle:   从源码角度分析springboot加载配置项的顺序和优先级
+categories: [springboot专题]
 mermaid: false
 sequence: false
 flow: false

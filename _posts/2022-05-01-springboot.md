@@ -2,7 +2,7 @@
 layout:     post
 title:      springboot启动流程简单分析
 subtitle:   对springboot的启动流程源码做简单的分析
-categories: [spring]
+categories: [springboot专题]
 mermaid: false
 sequence: false
 flow: false

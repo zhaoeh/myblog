@@ -2,7 +2,7 @@
 layout:     post
 title:      springboot与tomcat那点事儿
 subtitle:   spring是如何内嵌tomcat的呢？
-categories: [spring]
+categories: [springboot专题]
 mermaid: false
 sequence: false
 flow: false

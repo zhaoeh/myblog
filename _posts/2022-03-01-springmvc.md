@@ -1,8 +1,8 @@
 ---
 layout:     post
-title:      spring工具箱
-subtitle:   spring常用的工具类
-categories: [spring]
+title:      springMVC
+subtitle:   什么是springMVC?
+categories: [spring MVC专题]
 mermaid: false
 sequence: false
 flow: false

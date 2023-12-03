@@ -2,7 +2,7 @@
 layout:     post
 title:      bean中的autowire-candidate属性又是干什么的？
 subtitle:   autowire-candidate属性的作用分析
-categories: [spring]
+categories: [spring专题]
 mermaid: false
 sequence: false
 flow: false

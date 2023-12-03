@@ -2,7 +2,7 @@
 layout:     post
 title:      什么是ThreadLocal？
 subtitle:   spring中是如何使用ThreadLocal的？其他框架有使用到吗？
-categories: [spring]
+categories: [springboot专题]
 mermaid: false
 sequence: false
 flow: false

@@ -2,7 +2,7 @@
 layout:     post
 title:      springboot如何快速读取配置项？
 subtitle:   汇总springboot读取外部配置项的几种方式
-categories: [spring]
+categories: [springboot专题]
 mermaid: false
 sequence: false
 flow: false

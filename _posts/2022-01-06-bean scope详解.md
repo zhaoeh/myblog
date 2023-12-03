@@ -2,7 +2,7 @@
 layout:     post
 title:      spring的bean scope详解
 subtitle:   spring管理bean对象，bean是存在作用域的
-categories: [spring]
+categories: [spring专题]
 mermaid: false
 sequence: false
 flow: false

@@ -2,7 +2,7 @@
 layout:     post
 title:      lookup-method和replaced-method比较陌生，怎么玩的？
 subtitle:   详细解释lookup-method和replaced-method
-categories: [spring]
+categories: [spring专题]
 mermaid: false
 sequence: false
 flow: false

@@ -2,7 +2,7 @@
 layout:     post
 title:      spring创建bean的方式
 subtitle:   spring管理bean对象，都通过哪些方式创建bean实例呢？
-categories: [spring]
+categories: [spring专题]
 mermaid: false
 sequence: false
 flow: false

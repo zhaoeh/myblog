@@ -2,7 +2,7 @@
 layout:     post
 title:      彻底掌握spring中的事件监听器
 subtitle:   从springboot出发完整分析spring容器中的事件监听模型
-categories: [spring]
+categories: [springboot专题]
 mermaid: false
 sequence: false
 flow: false

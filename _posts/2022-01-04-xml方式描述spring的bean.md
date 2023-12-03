@@ -2,7 +2,7 @@
 layout:     post
 title:      xml方式描述spring的bean
 subtitle:   我们先学习传统的xml方式描述spring的bean
-categories: [spring]
+categories: [spring专题]
 mermaid: false
 sequence: false
 flow: false
