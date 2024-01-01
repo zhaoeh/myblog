@@ -608,6 +608,7 @@ protected Object doCreateBean(String beanName, RootBeanDefinition mbd, @Nullable
         synchronized(mbd.postProcessingLock) {
             if (!mbd.postProcessed) {
                 try {
+                    // 在创建每一个bean之后，首先进行bean定义的合并
                     this.applyMergedBeanDefinitionPostProcessors(mbd, beanType, beanName);
                 } catch (Throwable var17) {
                     throw new BeanCreationException(mbd.getResourceDescription(), beanName, "Post-processing of merged bean definition failed", var17);

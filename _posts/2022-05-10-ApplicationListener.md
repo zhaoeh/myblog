@@ -16,6 +16,12 @@ mindmap2: false
 对于监听器的原理探究，请参考： [监听器和事件驱动模型](https://zhaoehcode.gitee.io/2021/04/06/%E4%BA%8B%E4%BB%B6%E9%A9%B1%E5%8A%A8%E6%A8%A1%E5%9E%8B/)   
 
 # 2. 向springboot中注册ApplicationListener
+这里先springboot中注册的监听器，实际上是ApplicationListener对象，该对象是spring容器中定义的接口。   
+如果我们想让自定定义的ApplicationListener监听器对象，直接对springboot容器以及整个spring容器中发布的早期事件都感兴趣（感兴趣实际上就是可以对这些事件进行订阅），那么我们自定义的ApplicationListener对象就必须从springboot容器一开始启动就要注册到事件广播器中去。   
+目前我们看到，通过在spring.factories文件中配置自己的ApplicationListener实现类，就可以直接将这个对象注册给springboot容器。    
+
+下面我们逐步分析。   
+
 ## 2.1 setListeners 
 在构造SpringApplication对象时，有如下代码：   
 ```java
@@ -211,6 +217,8 @@ this.setListeners(this.getSpringFactoriesInstances(ApplicationListener.class));
 我们一层一层的来剥开spring事件监听（通知）机制的神秘面纱。   
 
 ## 3.1 初始化 SpringApplicationRunListeners 
+注意，这里在springboot容器中初始化的对象是 SpringApplicationRunListeners ，它是springboot自己定义的一个类。   
+
 ### 3.1.1 run方法
 ```java
 public ConfigurableApplicationContext run(String... args) {
@@ -358,17 +366,17 @@ public class EventPublishingRunListener implements SpringApplicationRunListener,
         // 注意，这里是在springboot容器中直接new一个广播器对象
         this.initialMulticaster = new SimpleApplicationEventMulticaster();
         
-        // 这一行代码至关重要：将springboot中注册的spring时期的监听器对象集在这个转移到了spring容器中了（从springboot中取出然后注册到spring容器的事件广播器中了）
+        // 这一行代码至关重要：将springboot中注册的spring时期的监听器对象集在这个转移到了springboot容器中创建的广播器中了。
+        // 主要逻辑：从springboot的SpringApplication对象中取出已经注册的所有SpringListener对象集合，然后注册到springboot容器自己创建的事件广播器中了。
         // 前面我们知道在springboot容器构造SpringApplication对象时，就从spring.factories中实例化了所有的ApplicationListener对象并聚合为一个集合。
-        // 那些注册到SpringApplication中的 List<ApplicationListener<?>> listeners 就是在这里被真正使用的。
+        // 那些注册到SpringApplication中的 List<ApplicationListener<?>> listeners 就是在这里被springboot容器真正使用的。
         // 此处直接获取SpringApplication中前期注册的所有List<ApplicationListener<?>> listeners，然后遍历每一个 ApplicationListener.
-        // 将其添加到事件广播器中。
-        // 同时我们要注意，SimpleApplicationEventMulticaster是spring时期的东西。
+        // 将其添加到springboot容器自己的事件广播器中。
+        // 同时我们要注意，SimpleApplicationEventMulticaster类是spring时期的东西；但在目前这个阶段，仍旧属于springboot容器的启动阶段，springboot容器手动创建了一个广播器对象而已。
         Iterator var3 = application.getListeners().iterator();
-
         while(var3.hasNext()) {
             ApplicationListener<?> listener = (ApplicationListener)var3.next();
-            // 遍历ApplicationListener将其添加到事件广播器对象initialMulticaster中。
+            // 遍历ApplicationListener将其添加到springboot自己的事件广播器对象initialMulticaster中。
             this.initialMulticaster.addApplicationListener(listener);
         }
     }
@@ -376,7 +384,8 @@ public class EventPublishingRunListener implements SpringApplicationRunListener,
 
 ### 3.1.5 ApplicationEventMulticaster事件广播器接口
 <b><u><font color="#dc143c">SpringApplicationRunListeners、SpringApplicationRunListener、EventPublishingRunListener都是springboot的接口，而ApplicationEventMulticaster广播器是spring的接口。</font>  </u></b>    
-因此，springboot容器中注册的ApplicationListener对象集就是通过注册到广播器ApplicationEventMulticaster中，从而介入到spring容器中的。   
+因此，springboot容器中注册的ApplicationListener对象集就是通过注册到广播器ApplicationEventMulticaster中，从而通过委托spring容器中的广播器，来注册目前已经实例化的所有监听器。    
+当然，实际上：底层对于监听器的注册、以及事件的发布，其实最终都是委托广播器   ApplicationEventMulticaster 来进行管理的。   
 ```java
 package org.springframework.context.event;
 
@@ -391,6 +400,9 @@ public interface ApplicationEventMulticaster {
     void addApplicationListener(ApplicationListener<?> listener);
 
     // 向广播器中注册一个ApplicationListener的bean权限定名
+    // 从这个方法可以看出：广播器不仅仅支持直接注册一个ApplicationListener实例，还支持先注册一个beanName
+    // 之所以要这么做，是因为在一些早期的事件中，spring容器中只有bean定义，还没有开始执行实例化bean的动作，因此，为了不遗漏在这个阶段内对某些事件感兴趣的监听器，它允许先将beanName给注册进来
+    // 之后，一旦当广播器发布某个指定事件，它也会尝试根据beanName直接从beanFactory容器中获取对应的ApplicationListener对象，如果能获取到，它也会调用它的onApplicationEvent()方法，从而消费这个阶段发布的事件
     void addApplicationListenerBean(String listenerBeanName);
 
     // 从广播器中移除一个ApplicationListener监听器
@@ -712,6 +724,7 @@ public class EventPublishingRunListener implements SpringApplicationRunListener,
         
         
         // 重点：注意这个for循环，里面实际上做了一件非常重要的事情，将springboot容器中的注册的所有监听器在这个生命周期阶段全部转移注册到spring上下文中了
+        // 也就说，在这个逻辑中，对于springboot时期中已经注册的所有ApplicationListener集合，都转移注册到了spring容器上下文中了
         for(Iterator var2 = this.application.getListeners().iterator(); var2.hasNext(); context.addApplicationListener(listener)) {
             listener = (ApplicationListener)var2.next();
             if (listener instanceof ApplicationContextAware) {
@@ -926,6 +939,12 @@ private Collection<ApplicationListener<?>> retrieveApplicationListeners(Resolvab
         synchronized(this.defaultRetriever) {
             // 关键逻辑：获取当前广播器持有的applicationListeners和applicationListenerBeans
             listeners = new LinkedHashSet(this.defaultRetriever.applicationListeners);
+            
+            // 这个listenerBeans集合有什么存在的必要？
+            // 别看它好像挺多余，其实一点都不多余。
+            // 这个listenerBeans集合是在什么时候被搞到广播器对象中的呢？后面有分析
+            // 剧透一下，它是在spring容器实例化好自己的广播器对象后，在registerListeners时期将spring容器中已经存在的ApplicationListener类型的bean名称给注册进来了
+            // 那为啥不直接注册ApplicationListener的对象进来呢？因为在registerListeners阶段，spring容器中只有spring bean定义，还没有开始实例化bean呢。
             listenerBeans = new LinkedHashSet(this.defaultRetriever.applicationListenerBeans);
         }
 
@@ -943,8 +962,9 @@ private Collection<ApplicationListener<?>> retrieveApplicationListeners(Resolvab
             }
         }
 
+        // 查找对某个时间感兴趣的所有监听器集合时，除了直接在已经注册到当前广播器中的ApplicationListener对象中找，还在当前广播器中已经注册的beanName集合中去找
         if (!listenerBeans.isEmpty()) {
-            // 如果存在listenerBeans，listenerBeans本身是监听器的权限定名
+            // 如果存在listenerBeans，listenerBeans本身是监听器的bean名称
             ConfigurableBeanFactory beanFactory = this.getBeanFactory();
             Iterator var17 = listenerBeans.iterator();
 
@@ -952,16 +972,20 @@ private Collection<ApplicationListener<?>> retrieveApplicationListeners(Resolvab
                 String listenerBeanName = (String)var17.next();
 
                 try {
-                    // 如果listenerBeans对当前事件感兴趣
+                    // 如果beanFactory对当前事件感兴趣，哦？怎么是beanFactory对当前事件感兴趣呢？？？我们一会看它的源码
                     if (this.supportsEvent(beanFactory, listenerBeanName, eventType)) {
                         // 注意，这里直接通过beanFactory从spring容器中尝试获取ApplicationListener类型的listenerBeanName
                         // 如果容器中不存在，则会实例化对应的ApplicationListener bean。
                         ApplicationListener<?> listener = (ApplicationListener)beanFactory.getBean(listenerBeanName, ApplicationListener.class);
+                        
+                        // 如果allListeners不包含该监听器，且该监听器对目标事件感兴趣
                         if (!allListeners.contains(listener) && this.supportsEvent(listener, eventType, sourceType)) {
                             if (retriever != null) {
+                                // 如果该beaname是单例的bean，则将该监听器收集到 filteredListeners 
                                 if (beanFactory.isSingleton(listenerBeanName)) {
                                     filteredListeners.add(listener);
                                 } else {
+                                    // 否则，如果是多例的bean，则将该bean name收集到 filteredListenerBeans
                                     filteredListenerBeans.add(listenerBeanName);
                                 }
                             }
@@ -982,6 +1006,7 @@ private Collection<ApplicationListener<?>> retrieveApplicationListeners(Resolvab
             }
         }
 
+        // 对聚合后的监听器列表进行排序（Ordered接口，@Order等之类）
         AnnotationAwareOrderComparator.sort(allListeners);
         if (retriever != null) {
             if (filteredListenerBeans.isEmpty()) {
@@ -993,9 +1018,42 @@ private Collection<ApplicationListener<?>> retrieveApplicationListeners(Resolvab
             }
         }
 
+        // 最终，每当传入一个事件，从当前广播器中获取对目标事件感兴趣的监听器时，都会从当前广播器中已经注册的ApplicationListener监听器集合和已经注册的ApplicationListener的beanName集合中，聚合出一个总的监听器列表返回
+        // 返回后，广播器就会迭代执行这些监听器的 onApplicationEvent 方法了，从而达到消费事件的目的
         return allListeners;
     }
 ```
+
+supportsEvent方法：这个方法有好几个重载，下面的是beanFactory作为参数的重载逻辑。   
+```java
+    private boolean supportsEvent(ConfigurableBeanFactory beanFactory, String listenerBeanName, ResolvableType eventType) {
+        // 根据 listenerBeanName 获取到它的类型
+        Class<?> listenerType = beanFactory.getType(listenerBeanName);
+        
+        // 如果类型不为null，且类型不是GenericApplicationListener，不是SmartApplicationListener的话
+        if (listenerType != null && !GenericApplicationListener.class.isAssignableFrom(listenerType) && !SmartApplicationListener.class.isAssignableFrom(listenerType)) {
+            // 如果该类型对目标事件不感兴趣，则返回false
+            if (!this.supportsEvent(listenerType, eventType)) {
+                return false;
+            } else {
+                
+                // 否则，该类型对目标事件感兴趣，当该类型是ApplicationListener时，则返回true
+                try {
+                    BeanDefinition bd = beanFactory.getMergedBeanDefinition(listenerBeanName);
+                    ResolvableType genericEventType = bd.getResolvableType().as(ApplicationListener.class).getGeneric(new int[0]);
+                    return genericEventType == ResolvableType.NONE || genericEventType.isAssignableFrom(eventType);
+                } catch (NoSuchBeanDefinitionException var7) {
+                    // 请注意，如果该bean name在bean定义中不存在，也返回true。
+                    return true;
+                }
+            }
+        } else {
+            // 否则，默认返回true
+            return true;
+        }
+    }
+```
+上面的方法，实际上默认返回的就是true，它最大限度的认为该bean name对该事件感兴趣。   
 
 ### 3.3.2 spring上下文发布事件
 参考started方法源码：
@@ -1086,7 +1144,7 @@ AbstractApplicationContext:
 
 ## 3.4 总结springboot中注册的ApplicationListener使用
 整个流程分析下来，大概如下：   
-（1）初始化一个SpringApplicationRunListeners对象，这个对象是对SpringApplicationRunListener运行监听器的包装；SpringApplicationRunListener的实现类EventPublishingRunListener在被构造时，从springboot中获取到了前期注册的所有ApplicationListener监听器集合，并注册到了其自身负责实例化好的事件广播器SimpleApplicationEventMulticaster中。      
+（1）初始化一个SpringApplicationRunListeners对象，这个对象是对SpringApplicationRunListener运行监听器的包装；SpringApplicationRunListener的实现类EventPublishingRunListener在被构造时，从springboot中获取到了前期注册到springboot容器中的所有ApplicationListener监听器集合，并注册到了其自身（自身指的是springboot容器）负责实例化好的事件广播器SimpleApplicationEventMulticaster中。         
 （2）调用SpringApplicationRunListeners的对应方法实际上是在委托EventPublishingRunListener中实例化好的广播器SimpleApplicationEventMulticaster，进行对应事件的广播。   
 （3）也可以直接通过spring上下文进行事件的广播，底层也是委托SimpleApplicationEventMulticaster广播器进行事件的广播。   
 （4）广播器广播事件的原理很简单，就是从当前广播器中注册的所有ApplicationListener监听器集合中找到订阅了当前事件的目标监听器，然后回调执行目标监听器的逻辑。      
@@ -1101,7 +1159,7 @@ AbstractApplicationContext:
 springboot说白了是在spring的基础之上套了一层外壳，它依赖spring提供的某些扩展机制实现自己的行为，因此springboot有自己的事件发布机制。    
 同样的，当springboot拉起spring容器启动后，就进入到了spring容器的生命周期中，spring也有自己的事件发布机制。   
 其实，前面我们已经分析过了，不论是springboot还是spring，发布事件的底层逻辑是完全一样的，都是委托一个事件广播器对象SimpleApplicationEventMulticaster将指定的事件广播出去。   
-但这里我们要综合分析下，这两种容器阶段，对于事件的处理道理有什么异同点。    
+但这里我们要综合分析下，这两种容器阶段，对于事件的处理到底有什么异同点。    
 
 ## 4.1 springboot事件处理流程
 准备好一个SpringApplicationRunListeners对象：
@@ -1119,33 +1177,38 @@ listeners.started(context, timeTakenToStartup);
     public EventPublishingRunListener(SpringApplication application, String[] args) {
         this.application = application;
         this.args = args;
+        
         // springboot自己负责创建的广播器
         this.initialMulticaster = new SimpleApplicationEventMulticaster();
+        // 下面逻辑：将springboot时期的所有ApplicationListener对象都遍历注册到springboot自己的广播器中了
         Iterator var3 = application.getListeners().iterator();
-
         while(var3.hasNext()) {
             ApplicationListener<?> listener = (ApplicationListener)var3.next();
             this.initialMulticaster.addApplicationListener(listener);
         }
-
     }
 
+    // springboot容器正在启动，发布一个事件，因为这个时候spring容器还没有refresh，因此只能使用springboot容器自己实例化的广播器去广播
     public void starting(ConfigurableBootstrapContext bootstrapContext) {
         this.initialMulticaster.multicastEvent(new ApplicationStartingEvent(bootstrapContext, this.application, this.args));
     }
-    // 省略
+    // 省略，同上
     public void contextPrepared(ConfigurableApplicationContext context) {
         this.initialMulticaster.multicastEvent(new ApplicationContextInitializedEvent(this.application, this.args, context));
     }
     // 省略
 ```
-这样一来，在springboot容器阶段，注册到广播器中的监听器，就会被该广播器发布的指定事件触发执行。   
+这样一来，在springboot容器阶段，注册到springboot广播器中的所有监听器，就会被该广播器发布的指定事件触发执行。   
 
 ## 4.2 spring事件处理流程
 同样在EventPublishingRunListener源码中，我们看到，有的事件是通过spring上下文发布的：
 ```java
     public void started(ConfigurableApplicationContext context, Duration timeTaken) {
-        // 这里通过传入进来的spring context来发布事件，而不是使用springboot创建的广播器
+        // 这里通过传入进来的spring context来发布事件，而不是使用springboot创建的广播器，很显然，要想使用spring上下文去发布事件，那这个阶段肯定是已经实例化了spring上下文了才行
+        // 所以，简单点理解就是：当整个生命周期还没有实例化spring上下文对象时，springboot想发布事件，就只能使用自己实例化好的广播器去发布；
+        // 当生命周期已经实例化了spring上下文对象后，发布事件就直接使用spring上下文去发布
+        // 那spring上下文对象被实例化后，它的事件怎么来的呢？它能够转移springboot的广播器中的所有监听器到自己的身上吗？
+        // 下面深入分析
         context.publishEvent(new ApplicationStartedEvent(this.application, this.args, context, timeTaken));
         AvailabilityChangeEvent.publish(context, LivenessState.CORRECT);
     }
@@ -1232,7 +1295,7 @@ run方法：
         context.setApplicationStartup(this.applicationStartup);
         this.prepareContext(bootstrapContext, context, environment, listeners, applicationArguments, printedBanner);
         
-        // refreshContext方法开始进入spring生命周期
+        // refreshContext方法开始进入spring生命周期，开始启动spring容器
         this.refreshContext(context);
         this.afterRefresh(context, applicationArguments);
         Duration timeTakenToStartup = Duration.ofNanos(System.nanoTime() - startTime);
@@ -1249,7 +1312,12 @@ public void refresh() throws BeansException, IllegalStateException {
         Object var1 = this.startupShutdownMonitor;
         synchronized(this.startupShutdownMonitor) {
             StartupStep contextRefresh = this.applicationStartup.start("spring.context.refresh");
+            
+            
+            // 这个方法里面，创建了早期监听器集合和早期事件集合
             this.prepareRefresh();
+            
+            
             ConfigurableListableBeanFactory beanFactory = this.obtainFreshBeanFactory();
             this.prepareBeanFactory(beanFactory);
 
@@ -1260,12 +1328,17 @@ public void refresh() throws BeansException, IllegalStateException {
                 this.registerBeanPostProcessors(beanFactory);
                 beanPostProcess.end();
                 this.initMessageSource();
+                
                 // 核心：这个方法用来初始化spring上下文容器中的广播器
                 this.initApplicationEventMulticaster();
+                
+                
                 this.onRefresh();
                 
                 // 这个方法用来向spring上下文容器中注册事件监听器ApplicationListener集合
                 this.registerListeners();
+                
+                
                 this.finishBeanFactoryInitialization(beanFactory);
                 this.finishRefresh();
             } catch (BeansException var10) {
@@ -1305,6 +1378,7 @@ AbstractApplicationContext:
     protected void publishEvent(Object event, @Nullable ResolvableType eventType) {
         Assert.notNull(event, "Event must not be null");
         // 省略
+        // 如果存在早期事件，则对早期事件进行收集
         if (this.earlyApplicationEvents != null) {
             this.earlyApplicationEvents.add(applicationEvent);
         } else {
@@ -1396,21 +1470,30 @@ AbstractApplicationContext的addApplicationListener方法：
     }
 ```
 
-到这里，spring容器中已经同步了springboot中的所有监听器了，那么什么时候注册到spring容器自己的广播器里面的呢？   
+到这里，spring容器中已经同步了springboot中的所有监听器了，它将springboot中的所有监听器拿过来，注册到自己的applicationListeners中了。   
+那么什么时候注册到spring容器自己的广播器里面的呢？   
 这个问题上面已经提了一笔，在refresh方法中：
 ```java
    beanPostProcess.end();
    this.initMessageSource();
+   
+   // 创建spring容器自己的广播器
    this.initApplicationEventMulticaster();
+   
+   
    this.onRefresh();
+   
    
    // 向spring容器自己的广播器中注册所有符合条件的监听器
    this.registerListeners();
 ```
+
 registerListeners方法源码：
 ```java
 protected void registerListeners() {
-        // 遍历spring容器中已经持有的监听器列表
+        // 遍历spring容器中已经持有的监听器列表，这些列表来源两部分：
+        // 1.是从springboot时期转移过来的（springboot转移的过程也是通过2的方式手动添加到spring上下文容器中的）
+        // 2.通过context.addApplicationListener(new MyApplicationListener())进行手动添加的ApplicationListener
         Iterator var1 = this.getApplicationListeners().iterator();
 
         while(var1.hasNext()) {
@@ -1419,17 +1502,22 @@ protected void registerListeners() {
             this.getApplicationEventMulticaster().addApplicationListener(listener);
         }
 
-        // 从spring容器中获取所有类型为ApplicationListener的bean权限定名
+        // 从spring容器中获取所有类型为ApplicationListener的bean name，这里获取的bean names不包括上面 getApplicationListeners() 方法获得的 ApplicationListener
+        // 注意，这个之所以注册的是spring容器管理的ApplicationListener类型的bean name，而不是直接注册 ApplicationListener 的实例，是因为当前还没有实例
+        // 当前只有 bean 定义
+        // 在这里将bean name注册到spring容器自己的广播器中后，后续在通过spring上下文去广播事件时，如果该bean name订阅了目标事件，就会主动从spring容器中去创建该监听器，然后回调其逻辑
+        // 这里正好说明：我们自定义的一个ApplicationListener的bean，只要交给spring容器进行管理，在这个阶段，它的bean nama就能注册到spring自己的广播器中。
+        // 然后通过spring上下文发布指定事件，就能够回调我们自定义的监听器逻辑
         String[] listenerBeanNames = this.getBeanNamesForType(ApplicationListener.class, true, false);
         String[] var7 = listenerBeanNames;
         int var3 = listenerBeanNames.length;
-
         for(int var4 = 0; var4 < var3; ++var4) {
             String listenerBeanName = var7[var4];
-            // 将这些符合条件的bean的权限定名注册到spring容器自己的广播器中
+            // 将这些符合条件的bean name注册到spring容器自己的广播器中
             this.getApplicationEventMulticaster().addApplicationListenerBean(listenerBeanName);
         }
 
+        // 如果存在早期事件集合，则遍历发布对应的早期事件
         Set<ApplicationEvent> earlyEventsToProcess = this.earlyApplicationEvents;
         this.earlyApplicationEvents = null;
         if (!CollectionUtils.isEmpty(earlyEventsToProcess)) {
@@ -1443,12 +1531,391 @@ protected void registerListeners() {
 
     }
 ```
-上面的逻辑核心就干了一件事：将spring容器中已经持有的所有监听器注册到自己的广播器中，同时将beanFactory中所有类型为ApplicationListener的bean权限定名注册到自己的广播器中。   
-然后广播器在发布事件时，会将自身持有的所有监听器和监听器权限定名实例化后聚合为一个整体监听器列表，进行事件的发布，触发对应监听器的执行。   
-<b><u><font color="#dc143c">这意味着，我们可以定义一个普通bean，只需要直接或者间接实现ApplicationListener接口，就可以自定义一个事件监听器注册到spring容器中了。</font>  </u></b>。      
-广播器如何广播事件 请参考： [3.3.1 SimpleApplicationEventMulticaster广播器发布事件](#3.3.1)
+上面的逻辑核心就干了一件事：将spring容器中已经持有的所有监听器注册到自己的广播器中，同时将beanFactory中所有类型为ApplicationListener的bean name注册到自己的广播器中。   
+然后广播器在发布事件时，会根据事件类型，从自身持有的所有监听器对象和监听器bean name中找出对该事件感兴趣的ApplicationListener，聚合为一个整体监听器列表，进行事件的发布，触发对应监听器的执行。   
+注意：对于spring广播器中注册的bean name，如果它对目标事件感兴趣，会强制从spring容器中实例化该bean实例，最后和已有的监听器聚合在一起，作为符合条件的监听器集合返回。   
 
-# 5. 自定义spring事件模型
+<b><u><font color="#dc143c">这意味着，我们可以定义一个普通bean，只需要直接或者间接实现ApplicationListener接口，然后交给spring管理，就可以自定义一个事件监听器注册到spring容器中了。</font>  </u></b>。      
+广播器如何广播事件 请参考： [3.3.1 SimpleApplicationEventMulticaster广播器发布事件](#3.3.1)     
+
+总结一下：   
+（1）springboot时期注册的监听器对象，一般通过spring.factories中进行注册，它注册到springboot自己的SpringApplication对象中。     
+（2）SpringApplication对象中的监听器集合，通过EventPublishingRunListener的构造器逻辑，同步转移到了springboot自己的广播器中。   
+（3）springboot通过 SpringApplicationRunListener 去发布自己的某些早期事件(在spring上下文产生之前的事件，比如starting事件)，底层是通过自己的广播器去发布事件的，当然有可能消费这些事件的，也只能是当前这个广播器中已经注册的监听器集合了。   
+（4）随着spring上下文的产生，springboot执行prepareContext方法，在其中通过SpringApplicationRunListeners去发布contextLoaded事件，在这里将springboot中所有注册的监听器都转移到spring上下文中了。   
+（5）随着spring容器的refresh执行，在initApplicationEventMulticaster方法中创建了spring自己的广播器。      
+（6）在spring容器的registerListeners方法中，会将spring容器中自己已经持有的监听器全部转移到自己的广播器中（当然默认spring当前没有持有任何监听器，但是可以通过侵入式addApplicationListener方法手动注册一个），同时会从spring容器中获取所有类型为ApplicationListener的bean name，注册到spring自己的广播器中。至于为啥注册一个beanName，前面说过原因，在这个阶段，spring容器中只有bean定义，还没有产生bean实例。      
+（7）最后就是广播事件，通过广播器去广播事件：如果是spring上下文产生之前的事件，则由springboot容器自己的广播器去广播；如果已经产生了spring上下文了，则由spring容器自己的广播器去广播（反正spring容器最终已经转移了springboot阶段所有的监听器了）   
+    广播事件的逻辑很简单：   
+    就是找出订阅了当前时间的所有监听器集合，然后统一执行它们的逻辑。   
+
+# 5. ApplicationListenerDetector
+其实监听器的注册、转移，广播器的实例化，事件的发布等，前面都已经讲完了。   
+但是，ApplicationListenerDetector 又是什么鬼？   
+## 5.1 为什么需要ApplicationListenerDetector？
+前面分析：    
+当spring容器实例化了自己的广播器后（initApplicationEventMulticaster方法中），通过执行registerListeners方法，将自己持有的所有监听器以及spring容器中此时存在的所有类型为ApplicationListener的bean name，分别注册到自己的广播器中。   
+其中，已经持有的监听器集合会收集到广播器的：this.defaultRetriever.applicationListeners 字段中，其中元素就是ApplicationListener类型的实例对象；      
+spring容器中所有类型为ApplicationListener的bean name会收集到广播器的：this.defaultRetriever.applicationListenerBeans 字段中，其中元素是ApplicationListener类型的bean name，是String类型。   
+
+最后，当通过spring上下文去广播某个指定的事件时，最终会调用到广播器AbstractApplicationEventMulticaster的如下方法：   
+```java
+private Collection<ApplicationListener<?>> retrieveApplicationListeners(ResolvableType eventType, @Nullable Class<?> sourceType, @Nullable AbstractApplicationEventMulticaster.CachedListenerRetriever retriever) {
+        List<ApplicationListener<?>> allListeners = new ArrayList();
+        Set<ApplicationListener<?>> filteredListeners = retriever != null ? new LinkedHashSet() : null;
+        Set<String> filteredListenerBeans = retriever != null ? new LinkedHashSet() : null;
+        AbstractApplicationEventMulticaster.DefaultListenerRetriever var9 = this.defaultRetriever;
+        LinkedHashSet listeners;
+        LinkedHashSet listenerBeans;
+        synchronized(this.defaultRetriever) {
+            listeners = new LinkedHashSet(this.defaultRetriever.applicationListeners);
+            listenerBeans = new LinkedHashSet(this.defaultRetriever.applicationListenerBeans);
+        }
+
+        // 1.如果listeners存在监听器集合（这些监听器集合就是在registerListeners方法中注册的），则直接收集广播器中对当前事件感兴趣的ApplicationListener对象集
+        Iterator var15 = listeners.iterator();
+        while(var15.hasNext()) {
+            ApplicationListener<?> listener = (ApplicationListener)var15.next();
+            if (this.supportsEvent(listener, eventType, sourceType)) {
+                if (retriever != null) {
+                    filteredListeners.add(listener);
+                }
+
+                allListeners.add(listener);
+            }
+        }
+
+        // 2.如果listenerBeans存在监听器的bean name集合（这些监听器bean name集合也是在registerListeners方法中注册的），则直接收集广播器中对当前事件感兴趣的ApplicationListener bean name集
+        // 收集完成后会判断该bean name是否是单例，如果是单例则直接从容器中获取该bean name对应的对象
+        if (!listenerBeans.isEmpty()) {
+            ConfigurableBeanFactory beanFactory = this.getBeanFactory();
+            Iterator var17 = listenerBeans.iterator();
+
+            while(var17.hasNext()) {
+                String listenerBeanName = (String)var17.next();
+
+                try {
+                    if (this.supportsEvent(beanFactory, listenerBeanName, eventType)) {
+                        ApplicationListener<?> listener = (ApplicationListener)beanFactory.getBean(listenerBeanName, ApplicationListener.class);
+                        if (!allListeners.contains(listener) && this.supportsEvent(listener, eventType, sourceType)) {
+                            if (retriever != null) {
+                                if (beanFactory.isSingleton(listenerBeanName)) {
+                                    filteredListeners.add(listener);
+                                } else {
+                                    filteredListenerBeans.add(listenerBeanName);
+                                }
+                            }
+
+                            allListeners.add(listener);
+                        }
+                    } else {
+                        Object listener = beanFactory.getSingleton(listenerBeanName);
+                        if (retriever != null) {
+                            filteredListeners.remove(listener);
+                        }
+
+                        allListeners.remove(listener);
+                    }
+                } catch (NoSuchBeanDefinitionException var13) {
+                    ;
+                }
+            }
+        }
+
+        AnnotationAwareOrderComparator.sort(allListeners);
+        if (retriever != null) {
+            if (filteredListenerBeans.isEmpty()) {
+                retriever.applicationListeners = new LinkedHashSet(allListeners);
+                retriever.applicationListenerBeans = filteredListenerBeans;
+            } else {
+                retriever.applicationListeners = filteredListeners;
+                retriever.applicationListenerBeans = filteredListenerBeans;
+            }
+        }
+
+        return allListeners;
+    }
+```
+重点分析上述方法的第2步。   
+第2步主要逻辑如下：   
+（1）当通过spring上下文发布某个事件时（底层是通过spring容器自己持有的广播器去发布事件的），它尝试获取spring广播器中持有的前期注册的所有ApplicationListener类型的bean name。   
+（2）然后从spring容器中获取这个bean name对应的bean实例，注意，到底这个时候容器中有没有这个bean实例呢？这取决于该事件发布的时机：   
+    如果该事件是在spring容器的registerListeners方法之前就发布的，那么根本不会执行到上述方法，因为此时还没有bean name被注册进去；   
+    如果该事件是在spring容器的registerListeners方法之后，spring实例化容器中的ApplicationListener类型的bean之前发布，那么此时在这个就会主动触发spring容器去实例化所有bean name符合的ApplicationListener类型的bean对象；   
+    如果该事件是在spring容器整体都启动完成后发布，此时所有的bean都交给spring容器实例化完成了，那么此时这个逻辑就直接从spring容器中获取到该bean name对应的ApplicationListener实例即可。   
+（3）然后对这些bean name做判断，先判断已有的监听器对象集合中有没有这个bean name对应的bean，如果没有，再看他是否对目标事件感兴趣。    
+（4）最后统一返回所有对目标事件感兴趣的ApplicationListener对象集，最终遍历回调其中的 onApplicationEvent 方法，达到消费目标事件的目的。   
+
+上面的逻辑有没有什么缺点呢？   
+最大的缺点就在于，如果我们是在spring容器启动完成后去发布一个目标事件的话，那么每次都会执行上面的方法，而每次在业务中发布一个事件，如果存在我们交给spring管理的自定义监听器，则每次发布事件都需要执行如下逻辑：      
+```java
+ if (!allListeners.contains(listener) && this.supportsEvent(listener, eventType, sourceType)) {
+     // ApplicationListenerDetector存在的目的：主要就是将下面这段逻辑给提前了，在ApplicationListenerDetector中已经将spring中的bean注册到广播器的监听器集合中了
+     // 因此，条件 !allListeners.contains(listener) 此时就不会满足，下面的逻辑就不会执行
+     if (retriever != null) {
+         if (beanFactory.isSingleton(listenerBeanName)) {
+             filteredListeners.add(listener);
+         } else {
+             filteredListenerBeans.add(listenerBeanName);
+         }
+     }
+
+     allListeners.add(listener);
+ }
+```
+判断该bean name对应的bean实例，是不是单例，如果是单例，就将其添加到目标监听器列表中返回。    
+如果我们交给spring容器管理的自定义监听器特别多，那在业务中每次发布一个事件，这段逻辑都得遍历执行。     
+其实这段逻辑，可不可以提前呢？   
+retrieveApplicationListeners方法的目的主要有两步：   
+（1）第一步遍历广播器持有的监听器对象列表，遍历判断是否对目标事件感兴趣。   
+（2）第二步遍历广播器持有的监听器bean name列表，这个列表就是我们交给spring容器管理的ApplicationListener类型的bean名称，遍历判断是否对目标事件感兴趣。   
+最后统一返回对目标事件感兴趣的监听器对象集合。   
+
+我们现在考虑一下，如果在执行这个方法之前，我们能够将我们交给spring管理的ApplicationListener类型的bean name对应的bean实例，就直接给他注册到spring广播器持有的监听器对象集中去，那么上面的第二步就不会执行了。    
+spring容器中所有符合条件的ApplicationListener类型的单例监听器对象，此时都会在第一步就执行聚合完毕。   
+此时 条件 !allListeners.contains(listener) 不满足，就不会再去挨个判断我们的bean是不是单例bean这一大堆逻辑。    
+
+spring在3.x版本也意识到了这个问题，所以它新增了一个类，负责提前上面的逻辑，这个类就是 ApplicationListenerDetector。   
+我们先设想一下，spring最有可能在什么阶段去执行这个逻辑呢？   
+我们先把refresh方法源码贴在下面：   
+```java
+public void refresh() throws BeansException, IllegalStateException {
+        Object var1 = this.startupShutdownMonitor;
+        synchronized(this.startupShutdownMonitor) {
+            StartupStep contextRefresh = this.applicationStartup.start("spring.context.refresh");
+            this.prepareRefresh();
+            ConfigurableListableBeanFactory beanFactory = this.obtainFreshBeanFactory();
+            this.prepareBeanFactory(beanFactory);
+
+            try {
+                this.postProcessBeanFactory(beanFactory);
+                StartupStep beanPostProcess = this.applicationStartup.start("spring.context.beans.post-process");
+                this.invokeBeanFactoryPostProcessors(beanFactory);
+                this.registerBeanPostProcessors(beanFactory);
+                beanPostProcess.end();
+                this.initMessageSource();
+                this.initApplicationEventMulticaster();
+                this.onRefresh();
+                
+                // 只能在下面这个时期执行上面的逻辑
+                this.registerListeners();
+                this.finishBeanFactoryInitialization(beanFactory);
+                
+                
+                this.finishRefresh();
+            } catch (BeansException var10) {
+                if (this.logger.isWarnEnabled()) {
+                    this.logger.warn("Exception encountered during context initialization - cancelling refresh attempt: " + var10);
+                }
+
+                this.destroyBeans();
+                this.cancelRefresh(var10);
+                throw var10;
+            } finally {
+                this.resetCommonCaches();
+                contextRefresh.end();
+            }
+
+        }
+    }
+```
+其实只能在registerListeners方法之后，在spring容器实例化所有bean之前执行。    
+说白了，只能在finishBeanFactoryInitialization方法里面去想办法执行了。    
+finishBeanFactoryInitialization方法就是spring容器开始根据所有的bean定义去实例化bean实例的过程。 而这个方法里面在遍历实例化容器中所有目标bean的过程中，大量使用了BeanPostProcessor，因此，我们肯定猜到spring也是通过创建一个新的BeanPostProcessor去做这个事情。    
+逻辑也很简单：    
+新增一个BeanPostProcessor，当实例化某个bean之后，执行该bean的初始化操作之后，去判断一下，这个bean是不是ApplicationListener类型，如果是，再判断这个bean是不是单例，如果是，就将这个bean注册到spring容器的广播器中。     
+为什么必须在执行完该bean的初始化操作之后再执行呢？因为，我们注册到spring广播器中的ApplicationListener对象必须是已经加工完成的对象，即必须确保它的所有初始化逻辑都成功执行完毕才行，所以不能初始化之前做。       
+
+## 5.2 ApplicationListenerDetector的实现
+org.springframework.context.support.ApplicationListenerDetector   
+```java
+package org.springframework.context.support;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor;
+import org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor;
+import org.springframework.beans.factory.support.RootBeanDefinition;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.ApplicationEventMulticaster;
+import org.springframework.lang.Nullable;
+import org.springframework.util.ObjectUtils;
+
+// 该beanPostProcessor实现了 DestructionAwareBeanPostProcessor 接口和  MergedBeanDefinitionPostProcessor 接口
+// 而 DestructionAwareBeanPostProcessor 继承了 BeanPostProcessor 接口
+// MergedBeanDefinitionPostProcessor也继承了 BeanPostProcessor 接口
+class ApplicationListenerDetector implements DestructionAwareBeanPostProcessor, MergedBeanDefinitionPostProcessor {
+    private static final Log logger = LogFactory.getLog(ApplicationListenerDetector.class);
+    private final transient AbstractApplicationContext applicationContext;
+    private final transient Map<String, Boolean> singletonNames = new ConcurrentHashMap(256);
+
+    // 构造器，直接接收spring上下文对象
+    public ApplicationListenerDetector(AbstractApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
+    }
+    
+    // 该方法是 MergedBeanDefinitionPostProcessor 接口的方法，它在合并bean定义之后调用
+    // 此处的实现很简单，判断这个bean类型是不是ApplicationListener，如果是，则将beanName作为key，将该bean是否为单例作为value，缓存起来
+    public void postProcessMergedBeanDefinition(RootBeanDefinition beanDefinition, Class<?> beanType, String beanName) {
+        if (ApplicationListener.class.isAssignableFrom(beanType)) {
+            this.singletonNames.put(beanName, beanDefinition.isSingleton());
+        }
+
+    }
+
+    // 在bean初始化方法之前进行调用
+    public Object postProcessBeforeInitialization(Object bean, String beanName) {
+        return bean;
+    }
+
+    // 在bean初始化方法执行之后立即调用，核心逻辑就在这里：
+    // 判断目标bean是不是ApplicationListener类型，如果是，判断是不是单例，如果是，则将该bean实例注册到spring上下文中
+    // 否则，会打印一个警告日志
+    public Object postProcessAfterInitialization(Object bean, String beanName) {
+        if (bean instanceof ApplicationListener) {
+            Boolean flag = (Boolean)this.singletonNames.get(beanName);
+            if (Boolean.TRUE.equals(flag)) {
+                this.applicationContext.addApplicationListener((ApplicationListener)bean);
+            } else if (Boolean.FALSE.equals(flag)) {
+                if (logger.isWarnEnabled() && !this.applicationContext.containsBean(beanName)) {
+                    logger.warn("Inner bean '" + beanName + "' implements ApplicationListener interface but is not reachable for event multicasting by its containing ApplicationContext because it does not have singleton scope. Only top-level listener beans are allowed to be of non-singleton scope.");
+                }
+
+                this.singletonNames.remove(beanName);
+            }
+        }
+
+        return bean;
+    }
+
+    // 目标bean销毁之前执行
+    public void postProcessBeforeDestruction(Object bean, String beanName) {
+        if (bean instanceof ApplicationListener) {
+            try {
+                ApplicationEventMulticaster multicaster = this.applicationContext.getApplicationEventMulticaster();
+                multicaster.removeApplicationListener((ApplicationListener)bean);
+                multicaster.removeApplicationListenerBean(beanName);
+            } catch (IllegalStateException var4) {
+                ;
+            }
+        }
+
+    }
+
+    public boolean requiresDestruction(Object bean) {
+        return bean instanceof ApplicationListener;
+    }
+
+    public boolean equals(@Nullable Object other) {
+        return this == other || other instanceof ApplicationListenerDetector && this.applicationContext == ((ApplicationListenerDetector)other).applicationContext;
+    }
+
+    public int hashCode() {
+        return ObjectUtils.nullSafeHashCode(this.applicationContext);
+    }
+}
+
+```   
+注释已经写的很清晰了，在构造 ApplicationListenerDetector 对象时直接传入了spring上下文，就可以直接操作spring上下文了。    
+那 ApplicationListenerDetector 是什么时候被注册到spring容器中的呢？    
+其实我们已经有感觉了，它肯定是在spring注册beanPostProcessor时期被注册进去的：   
+```java
+    public static void registerBeanPostProcessors(ConfigurableListableBeanFactory beanFactory, AbstractApplicationContext applicationContext) {
+        // 获取spring容器中所有类型为 BeanPostProcessor 的bean名称
+        String[] postProcessorNames = beanFactory.getBeanNamesForType(BeanPostProcessor.class, true, false);
+        // 计算出当前spring容器中的目标BeanPostProcessor后置处理器的总数。
+        // 为什么要+1呢？是因为下面一行手动注册了一个内置处理器BeanPostProcessorChecker，它的个数也直接在这里进行统计了。
+        int beanProcessorTargetCount = beanFactory.getBeanPostProcessorCount() + 1 + postProcessorNames.length;
+        // 手动增加BeanPostProcessorChecker处理器，用于日志记录和一些校验。
+        beanFactory.addBeanPostProcessor(new PostProcessorRegistrationDelegate.BeanPostProcessorChecker(beanFactory, beanProcessorTargetCount));
+        // 定义存放实现了priorityOrdered接口的处理器集合。
+        List<BeanPostProcessor> priorityOrderedPostProcessors = new ArrayList();
+        // 定义存放spring内部实现的处理器集合。
+        List<BeanPostProcessor> internalPostProcessors = new ArrayList();
+        
+        // 定义实现了Ordered接口的处理器的name集合。
+        List<String> orderedPostProcessorNames = new ArrayList();
+        // 定义没有实现Ordered接口的处理器的name集合。
+        List<String> nonOrderedPostProcessorNames = new ArrayList();
+        
+        String[] var8 = postProcessorNames;
+        int var9 = postProcessorNames.length;
+
+        String ppName;
+        BeanPostProcessor pp;
+        for(int var10 = 0; var10 < var9; ++var10) {
+            ppName = var8[var10];
+            if (beanFactory.isTypeMatch(ppName, PriorityOrdered.class)) {
+                // 从spring容器中获取BeanPostProcessor对象，并放入到priorityOrderedPostProcessors中。
+                pp = (BeanPostProcessor)beanFactory.getBean(ppName, BeanPostProcessor.class);
+                priorityOrderedPostProcessors.add(pp);
+                
+                // 如果是内部的beanPostProcessor，则放入internalPostProcessors中。
+                if (pp instanceof MergedBeanDefinitionPostProcessor) {
+                    internalPostProcessors.add(pp);
+                }
+            } else if (beanFactory.isTypeMatch(ppName, Ordered.class)) {
+                // 如果实现了Ordered接口，则放入到orderedPostProcessorNames中。
+                orderedPostProcessorNames.add(ppName);
+            } else {
+                // 否则，放入到nonOrderedPostProcessorNames中。
+                nonOrderedPostProcessorNames.add(ppName);
+            }
+        }
+
+        // 根据order对priorityOrderedPostProcessors排序
+        sortPostProcessors(priorityOrderedPostProcessors, beanFactory);
+        // 注册priorityOrderedPostProcessors到spring容器中。
+        registerBeanPostProcessors(beanFactory, (List)priorityOrderedPostProcessors);
+        List<BeanPostProcessor> orderedPostProcessors = new ArrayList(orderedPostProcessorNames.size());
+        Iterator var14 = orderedPostProcessorNames.iterator();
+
+        // 遍历缓存Ordered接口的beanPostProcessor处理器
+        while(var14.hasNext()) {
+            String ppName = (String)var14.next();
+            BeanPostProcessor pp = (BeanPostProcessor)beanFactory.getBean(ppName, BeanPostProcessor.class);
+            orderedPostProcessors.add(pp);
+            if (pp instanceof MergedBeanDefinitionPostProcessor) {
+                internalPostProcessors.add(pp);
+            }
+        }
+
+        // 对orderedPostProcessors进行排序
+        sortPostProcessors(orderedPostProcessors, beanFactory);
+        // 注册 orderedPostProcessors 到spring容器中
+        registerBeanPostProcessors(beanFactory, (List)orderedPostProcessors);
+        
+        // 普通的没有排序的BeanPostProcessor
+        List<BeanPostProcessor> nonOrderedPostProcessors = new ArrayList(nonOrderedPostProcessorNames.size());
+        Iterator var17 = nonOrderedPostProcessorNames.iterator();
+
+        // 遍历缓存普通的beanPostProcessor处理器
+        while(var17.hasNext()) {
+            ppName = (String)var17.next();
+            pp = (BeanPostProcessor)beanFactory.getBean(ppName, BeanPostProcessor.class);
+            nonOrderedPostProcessors.add(pp);
+            if (pp instanceof MergedBeanDefinitionPostProcessor) {
+                internalPostProcessors.add(pp);
+            }
+        }
+        // 注册普通的BeanPostProcessor，因此普通的BeanPostProcessor没有实现Ordered接口，因此没法指定排序，顺序就是获取处理器的随机顺序
+        registerBeanPostProcessors(beanFactory, (List)nonOrderedPostProcessors);
+        // 对spring内部的处理器 internalPostProcessors 进行排序
+        sortPostProcessors(internalPostProcessors, beanFactory);
+        // 注册 internalPostProcessors 到spring容器中
+        registerBeanPostProcessors(beanFactory, (List)internalPostProcessors);
+        
+        // 核心：手动注册一个内部的beanPostProcessor - ApplicationListenerDetector
+        beanFactory.addBeanPostProcessor(new ApplicationListenerDetector(applicationContext));
+    }
+```
+```
+
+
+
+# 6. 自定义spring事件模型
 上面从源码角度分析了那么多，目的只有一个，那就是我们可以借助spring提供的事件监听机制，来自定义我们自己的事件模型。   
 依赖spring的这套事件模型，我们需要实现如下：   
 （1）自定义事件监听器，并想办法注册到spring的广播器中（监听器）。    
