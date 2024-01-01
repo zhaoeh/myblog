@@ -1823,21 +1823,12 @@ class ApplicationListenerDetector implements DestructionAwareBeanPostProcessor, 
 其实我们已经有感觉了，它肯定是在spring注册beanPostProcessor时期被注册进去的：   
 ```java
     public static void registerBeanPostProcessors(ConfigurableListableBeanFactory beanFactory, AbstractApplicationContext applicationContext) {
-        // 获取spring容器中所有类型为 BeanPostProcessor 的bean名称
         String[] postProcessorNames = beanFactory.getBeanNamesForType(BeanPostProcessor.class, true, false);
-        // 计算出当前spring容器中的目标BeanPostProcessor后置处理器的总数。
-        // 为什么要+1呢？是因为下面一行手动注册了一个内置处理器BeanPostProcessorChecker，它的个数也直接在这里进行统计了。
         int beanProcessorTargetCount = beanFactory.getBeanPostProcessorCount() + 1 + postProcessorNames.length;
-        // 手动增加BeanPostProcessorChecker处理器，用于日志记录和一些校验。
         beanFactory.addBeanPostProcessor(new PostProcessorRegistrationDelegate.BeanPostProcessorChecker(beanFactory, beanProcessorTargetCount));
-        // 定义存放实现了priorityOrdered接口的处理器集合。
         List<BeanPostProcessor> priorityOrderedPostProcessors = new ArrayList();
-        // 定义存放spring内部实现的处理器集合。
         List<BeanPostProcessor> internalPostProcessors = new ArrayList();
-        
-        // 定义实现了Ordered接口的处理器的name集合。
         List<String> orderedPostProcessorNames = new ArrayList();
-        // 定义没有实现Ordered接口的处理器的name集合。
         List<String> nonOrderedPostProcessorNames = new ArrayList();
         
         String[] var8 = postProcessorNames;
