@@ -12,6 +12,7 @@ mindmap2: false
 ---
 
 # 1. 什么是BeanPostProcessor？
+## 1.1 BeanPostProcessor是什么东西？
 下面是 BeanPostProcessor 钩子接口的源码：   
 ```java
 
@@ -40,9 +41,27 @@ public interface BeanPostProcessor {
 我们可以看到，BeanPostProcessor 钩子接口是属于spring的，而不是springboot的。      
 post 表示在....之后，postProcessor的意思表示“后置处理器”，因此所有的BeanPostProcessor都统称为bean的后置处理器。      
 所以，所有的BeanPostProcessor都表示 “在有了BeanDefinition之后” 的统一操作。   
-这意味着，所有BeanPostProcessor都是在容器中已经加载完所有BeanDefinition信息之后才进行的；所有的BeanPostProcessor都是在遍历容器中的BeanDefinition，开始准备实例化目标bean的前后被触发执行的。       
+这意味着，所有BeanPostProcessor都是在容器中已经加载完所有BeanDefinition信息之后才进行的；所有的BeanPostProcessor都是在遍历容器中的BeanDefinition，开始准备初始化目标bean的前后被触发执行的。       
 Initialization表示初始化。      
 
+## 1.2 BeanPostProcessor在bean生命周期的什么阶段进行介入？
+我们回顾下spring控制bean的基本生命周期步骤如下：   
+```youtrack
+1.根据扫描范围或者配置的范围确认那些bean需要被spring容器进行管理
+2.全局扫描这些bean，将这些bean的定义封装成对应的beanDefinition对象，全部注册到spring容器中
+3.开始遍历这些beanDefinition对象，反射其构造方法按个实例化bean对象
+4.反射出一个bean对象后，开始为这个bean填充属性，即确定这个bean依赖的属性值都来自于哪里，然后或者这些属性值，将其填充到这个bean的字段上
+5.当一个bean的属性填充完毕后，开始执行这个bean的初始化方法，为这个bean做一些初始化动作，当然初始化逻辑中可以执行任意自己想插入的逻辑都行
+6.当bean的初始化方法执行完毕，这个bean就完整的被创建出来了，随后会被注册到spring容器中缓存起来以供后续业务使用
+7.创建完一个bean之后开始重复执行3-6步骤，将容器中所有的beanDefinition对象都挨个实例化、填充属性、初始化、然后注册到spring容器中
+8.业务应用开始使用spring容器中注册好的完整bean对象
+8.业务容器关闭时，开始遍历的销毁bean对象
+..........
+
+```
+<font color="#dc143c"><b>从spring的bean生命周期可以看出来，BeanPostProcessor主要介入的是bean的初始化阶段，它在每一个bean的初始化阶段前后开始被回调。</b></font>         
+
+## 1.3 为什么需要使用 BeanPostProcessor ？
 有时候我们希望spring容器在创建bean对象的过程中，能够执行我们自定义的逻辑，对创建的bean做一些处理，或者执行一些业务（实际上就是拦截bean的创建过程，介入bean的生命周期）。   
 实现这种回调逻辑的方案有很多种，比如自定义 bean 的初始化方法等，当bean对象被实例化（通过反射构造器进行实例化），并填充完属性后，紧接着就执行目标bean的初始化方法。      
 而 BeanPostProcessor 钩子接口也能够实现类似的功能，并且更通用，因为它能够做到对所有的普通bean都统一插入自定义的逻辑，而不仅仅针对某一个bean。   

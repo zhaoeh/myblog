@@ -1675,7 +1675,7 @@ retrieveApplicationListeners方法的目的主要有两步：
 spring容器中所有符合条件的ApplicationListener类型的单例监听器对象，此时都会在第一步就执行聚合完毕。   
 此时 条件 !allListeners.contains(listener) 不满足，就不会再去挨个判断我们的bean是不是单例bean这一大堆逻辑。    
 
-spring在3.x版本也意识到了这个问题，所以它新增了一个类，负责提前上面的逻辑，这个类就是 ApplicationListenerDetector。   
+spring在4.3.4版本也意识到了这个问题，所以它新增了一个类，负责提前上面的逻辑，这个类就是 ApplicationListenerDetector。   
 我们先设想一下，spring最有可能在什么阶段去执行这个逻辑呢？   
 我们先把refresh方法源码贴在下面：   
 ```java
@@ -1902,11 +1902,10 @@ class ApplicationListenerDetector implements DestructionAwareBeanPostProcessor, 
         beanFactory.addBeanPostProcessor(new ApplicationListenerDetector(applicationContext));
     }
 ```
-```
 
+# 6. @EventListener
 
-
-# 6. 自定义spring事件模型
+# 7. 自定义spring事件模型
 上面从源码角度分析了那么多，目的只有一个，那就是我们可以借助spring提供的事件监听机制，来自定义我们自己的事件模型。   
 依赖spring的这套事件模型，我们需要实现如下：   
 （1）自定义事件监听器，并想办法注册到spring的广播器中（监听器）。    
