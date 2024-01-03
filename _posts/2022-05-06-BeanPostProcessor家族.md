@@ -446,7 +446,7 @@ public interface MergedBeanDefinitionPostProcessor extends BeanPostProcessor {
 
 ## 3.2 BeanPostProcessor
 BeanPostProcessor接口是这个继承体系的顶层接口，其中的方法也是整个继承体系中的核心方法。这个接口已经有专门的文章进行讲解。   
-请参考：[beanPostProcessor简介](https://zhaoeh.github.io/myblog/2022/02/05/BeanPostProcessor/)   
+请参考：[beanPostProcessor简介](https://zhaoeh.github.io/myblog/2022/05/05/BeanPostProcessor/)   
 
 # 4. Bean的销毁阶段
 Bean的销毁阶段指的就是Bean在spring容器销毁时执行的阶段。   

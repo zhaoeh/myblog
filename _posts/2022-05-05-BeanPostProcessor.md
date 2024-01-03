@@ -379,7 +379,8 @@ public class Code04ControllerApplication {
 前面分析了在spring容器启动时，何时注册了内部的BeanPostProcessor，何时又注册了容器中我们自定义的BeanPostProcessor等，那么当这些BeanPostProcessor注册到spring容器中后，我们又是何时使用这些处理器的逻辑的呢？   
 从上面的内容我们大概知道，这些BeanPostProcessor的触发使用是在每一个普通bean的初始化方法的前后分别进行的。   
 
-refresh方法中的finishBeanFactoryInitialization方法：
+refresh方法中的finishBeanFactoryInitialization方法，如下：   
+org.springframework.context.support.AbstractApplicationContext#refresh      
 ```java
     public void refresh() throws BeansException, IllegalStateException {
         Object var1 = this.startupShutdownMonitor;
@@ -390,38 +391,117 @@ refresh方法中的finishBeanFactoryInitialization方法：
                 this.onRefresh();
                 this.registerListeners();
                 
-                // 这个方法是从spring容器中获取bean的入口方法
+                // 这个方法是开始遍历容器中beanDefinition按个去反射实例化单例bean的核心方法
                 this.finishBeanFactoryInitialization(beanFactory);
                 this.finishRefresh();
             } 
         }
     }
 ```   
-getBean:
+org.springframework.context.support.AbstractApplicationContext#finishBeanFactoryInitialization：      
 ```java
     protected void finishBeanFactoryInitialization(ConfigurableListableBeanFactory beanFactory) {
-
+        
+        // 获取容器中所有类型为LoadTimeWeaverAware的bean name列表
         String[] weaverAwareNames = beanFactory.getBeanNamesForType(LoadTimeWeaverAware.class, false, false);
         String[] var3 = weaverAwareNames;
         int var4 = weaverAwareNames.length;
 
         for(int var5 = 0; var5 < var4; ++var5) {
             String weaverAwareName = var3[var5];
-            // getBean
+            // 调用getBean方法实例化上面所有的 LoadTimeWeaverAware 类型的单例bean对象
             this.getBean(weaverAwareName);
         }
-
+        
+        // 正式进入根据容器中的所有beanDefinition去反射实例化出所有单例bean的核心逻辑
         beanFactory.preInstantiateSingletons();
     }
 ```
-org.springframework.context.support.AbstractApplicationContext:
+org.springframework.beans.factory.support.DefaultListableBeanFactory#preInstantiateSingletons：      
+```java
+public void preInstantiateSingletons() throws BeansException {
+        if (this.logger.isTraceEnabled()) {
+            this.logger.trace("Pre-instantiating singletons in " + this);
+        }
+
+        List<String> beanNames = new ArrayList(this.beanDefinitionNames);
+        Iterator var2 = beanNames.iterator();
+
+        while(true) {
+            String beanName;
+            Object bean;
+            do {
+                while(true) {
+                    RootBeanDefinition bd;
+                    do {
+                        do {
+                            do {
+                                if (!var2.hasNext()) {
+                                    var2 = beanNames.iterator();
+
+                                    while(var2.hasNext()) {
+                                        beanName = (String)var2.next();
+                                        Object singletonInstance = this.getSingleton(beanName);
+                                        if (singletonInstance instanceof SmartInitializingSingleton) {
+                                            StartupStep smartInitialize = this.getApplicationStartup().start("spring.beans.smart-initialize").tag("beanName", beanName);
+                                            SmartInitializingSingleton smartSingleton = (SmartInitializingSingleton)singletonInstance;
+                                            if (System.getSecurityManager() != null) {
+                                                AccessController.doPrivileged(() -> {
+                                                    smartSingleton.afterSingletonsInstantiated();
+                                                    return null;
+                                                }, this.getAccessControlContext());
+                                            } else {
+                                                smartSingleton.afterSingletonsInstantiated();
+                                            }
+
+                                            smartInitialize.end();
+                                        }
+                                    }
+
+                                    return;
+                                }
+
+                                beanName = (String)var2.next();
+                                bd = this.getMergedLocalBeanDefinition(beanName);
+                            } while(bd.isAbstract());
+                        } while(!bd.isSingleton());
+                    } while(bd.isLazyInit());
+
+                    if (this.isFactoryBean(beanName)) {
+                        bean = this.getBean("&" + beanName);
+                        break;
+                    }
+                    
+                    // 核心：根据beanName开始调用getBean方法
+                    this.getBean(beanName);
+                }
+            } while(!(bean instanceof FactoryBean));
+
+            FactoryBean<?> factory = (FactoryBean)bean;
+            boolean isEagerInit;
+            if (System.getSecurityManager() != null && factory instanceof SmartFactoryBean) {
+                SmartFactoryBean var10000 = (SmartFactoryBean)factory;
+                ((SmartFactoryBean)factory).getClass();
+                isEagerInit = (Boolean)AccessController.doPrivileged(var10000::isEagerInit, this.getAccessControlContext());
+            } else {
+                isEagerInit = factory instanceof SmartFactoryBean && ((SmartFactoryBean)factory).isEagerInit();
+            }
+
+            if (isEagerInit) {
+                this.getBean(beanName);
+            }
+        }
+    }
+```
+
+org.springframework.beans.factory.support.AbstractBeanFactory#getBean(java.lang.String)：
 ```java
     public Object getBean(String name) throws BeansException {
         this.assertBeanFactoryActive();
         return this.getBeanFactory().getBean(name);
     }
 ```
-org.springframework.beans.factory.support.AbstractBeanFactory：
+org.springframework.beans.factory.support.AbstractBeanFactory#doGetBean：
 ```java
 protected <T> T doGetBean(String name, @Nullable Class<T> requiredType, @Nullable Object[] args, boolean typeCheckOnly) throws BeansException {
         String beanName = this.transformedBeanName(name);
@@ -560,7 +640,7 @@ protected <T> T doGetBean(String name, @Nullable Class<T> requiredType, @Nullabl
         return this.adaptBeanInstance(name, beanInstance, requiredType);
     }
 ```
-createBean：org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory
+org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#createBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])：      
 ```java
     protected Object createBean(String beanName, RootBeanDefinition mbd, @Nullable Object[] args) throws BeanCreationException {
         if (this.logger.isTraceEnabled()) {
