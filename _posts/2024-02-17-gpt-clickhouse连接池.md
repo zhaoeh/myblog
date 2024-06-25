@@ -1213,3 +1213,203 @@ Spring Boot 自动配置 Redis 的核心类是 `RedisAutoConfiguration`。这个
 ### 总结
 
 在 Spring Boot 中，包含 `spring-boot-starter-data-redis` 依赖项，并提供至少一个 Redis 连接属性，就会触发自动配置。默认情况下，Spring Boot 使用本地 Redis 实例 (`localhost:6379`) 进行连接。如果需要自定义配置，可以在 `application.properties` 或 `application.yml` 文件中指定相应的属性。
+
+# 23. springboot默认的数据源配置，在什么场景下会导致连接一直超时呢
+在Spring Boot项目中，数据源配置默认使用HikariCP作为连接池。以下是一些常见场景和配置错误可能导致数据库连接一直超时：
+
+### 1. 数据库不可达
+#### 场景：
+- 数据库服务器宕机或不可访问。
+- 数据库地址、端口、用户名、密码配置错误。
+
+#### 解决方案：
+- 确保数据库服务器正在运行且网络可访问。
+- 检查应用程序配置文件中的数据库连接信息是否正确。
+
+### 2. 连接池配置不当
+#### 场景：
+- 连接池配置参数不合理，例如最大连接数太低、连接超时设置不当。
+
+#### 解决方案：
+- 调整连接池配置参数，例如`maximumPoolSize`、`connectionTimeout`。
+
+```yaml
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+```
+
+### 3. 数据库资源耗尽
+#### 场景：
+- 数据库连接数达到上限，导致无法获取新的连接。
+
+#### 解决方案：
+- 增加数据库的最大连接数。
+- 优化应用程序中的数据库连接使用，避免连接泄漏。
+
+### 4. 网络问题
+#### 场景：
+- 网络延迟高或网络不稳定。
+
+#### 解决方案：
+- 检查并确保网络连接稳定。
+- 优化网络配置，确保数据库服务器与应用服务器之间的连接可靠。
+
+### 5. 长时间未关闭的连接
+#### 场景：
+- 应用程序未正确关闭数据库连接，导致连接池耗尽。
+
+#### 解决方案：
+- 确保每次数据库操作后正确关闭连接，通常使用try-with-resources或在Spring中使用事务管理。
+
+### 6. 防火墙或安全组限制
+#### 场景：
+- 防火墙或云提供商的安全组设置阻止了数据库连接。
+
+#### 解决方案：
+- 检查防火墙和安全组设置，确保允许应用服务器访问数据库端口。
+
+### 7. 数据库性能问题
+#### 场景：
+- 数据库负载过高，响应缓慢。
+
+#### 解决方案：
+- 优化数据库查询和索引。
+- 增加数据库服务器的资源（CPU、内存等）。
+
+### 示例配置文件（application.yml）
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/yourdb
+    username: yourusername
+    password: yourpassword
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 30000
+      connection-timeout: 20000
+      max-lifetime: 1800000
+```
+
+### 检查数据库连接的示例代码
+确保数据库连接可用，可以使用如下示例代码：
+```java
+import java.sql.Connection;
+import java.sql.DriverManager;
+
+public class DatabaseConnectionTest {
+    public static void main(String[] args) {
+        String url = "jdbc:mysql://localhost:3306/yourdb";
+        String user = "yourusername";
+        String password = "yourpassword";
+
+        try (Connection conn = DriverManager.getConnection(url, user, password)) {
+            if (conn != null) {
+                System.out.println("Successfully connected to the database.");
+            } else {
+                System.out.println("Failed to connect to the database.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+通过上述方法，您可以逐步排查和解决Spring Boot项目中的数据库连接超时问题。
+
+# 24. 我是说，在默认使用springboot连接池的情况下，哪种可能会导致连接一直超时？
+在使用Spring Boot默认的HikariCP连接池配置时，以下几种情况可能会导致连接一直超时：
+
+### 1. 数据库地址或端口错误
+如果数据库地址或端口配置错误，应用将无法连接到数据库服务器，导致连接超时。
+
+**示例**：
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://incorrect-host:3306/yourdb
+    username: yourusername
+    password: yourpassword
+```
+
+### 2. 数据库用户名或密码错误
+如果数据库用户名或密码配置错误，应用将无法进行身份验证，导致连接超时。
+
+**示例**：
+```yaml
+spring:
+  datasource:
+    username: wrongusername
+    password: wrongpassword
+```
+
+### 3. 数据库不可达
+如果数据库服务器不可用或网络连接有问题，应用将无法连接到数据库，导致连接超时。
+
+**可能原因**：
+- 数据库服务器宕机。
+- 网络问题导致无法连接到数据库服务器。
+
+### 4. 连接池配置不合理
+连接池的配置参数不合理可能会导致连接超时。例如，`connectionTimeout`配置过短或`maximumPoolSize`设置过小，无法满足并发请求的需求。
+
+**示例**：
+```yaml
+spring:
+  datasource:
+    hikari:
+      connection-timeout: 500  # 连接超时过短，单位为毫秒
+      maximum-pool-size: 2     # 最大连接池大小过小
+```
+
+### 5. 数据库连接数耗尽
+如果数据库的最大连接数设置过小，当连接请求超过数据库允许的最大连接数时，新请求将被阻塞，导致连接超时。
+
+**解决方法**：
+- 增加数据库允许的最大连接数。
+- 优化应用程序的连接池配置，合理设置`maximumPoolSize`。
+
+### 6. 防火墙或安全组限制
+防火墙或安全组配置不当，阻止应用程序与数据库之间的连接，导致连接超时。
+
+**解决方法**：
+- 检查防火墙和安全组设置，确保允许应用程序访问数据库端口。
+
+### 7. 数据库性能问题
+如果数据库负载过高，响应缓慢，连接池中的连接可能会超时。
+
+**解决方法**：
+- 优化数据库查询和索引。
+- 增加数据库服务器的资源（如CPU和内存）。
+
+### 8. 连接泄漏
+如果应用程序在使用数据库连接后未正确关闭连接，连接池中的可用连接数将逐渐减少，最终导致连接超时。
+
+**解决方法**：
+- 确保所有数据库连接在使用后正确关闭，建议使用`try-with-resources`语法。
+
+### 示例配置文件
+以下是一个合理的HikariCP配置示例：
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/yourdb
+    username: yourusername
+    password: yourpassword
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 30000   # 连接闲置超时时间，单位为毫秒
+      connection-timeout: 20000  # 连接超时时间，单位为毫秒
+      max-lifetime: 1800000  # 连接池中连接的最大存活时间，单位为毫秒
+```
+
+通过合理配置连接池参数，确保数据库连接信息正确，并排除网络和防火墙等问题，可以有效避免连接超时问题。
