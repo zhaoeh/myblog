@@ -1,7 +1,7 @@
 ---
 layout:     post
-title:      动态数据源
-subtitle:   动态数据源
+title:      swagger
+subtitle:   swagger
 categories: [gpt]
 mermaid: false
 sequence: false
