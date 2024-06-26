@@ -713,4 +713,768 @@ public class GlobalExceptionHandler {
 
 通过这种方式，`address` 字段可以为 `null`，但如果它不为 `null`，其内部字段将会被验证。这样可以确保应用的验证逻辑更加灵活，适应更多实际场景。
 
-# 5. 
+# 5. springboot如何读取配置项，读取为一个map结构，这个map的key是String，value是一个java对象比如User，User里面有String类型的name和int类型的age
+在 Spring Boot 中，可以通过配置属性读取配置文件中的内容，并将其映射到一个 `Map<String, User>` 结构中。可以使用 `@ConfigurationProperties` 注解来实现这一点。
+
+下面是一个具体的示例，展示如何读取配置项，并将其转换为一个 `Map<String, User>` 结构，其中 `User` 对象包含 `name` 和 `age` 属性。
+
+### 1. 配置文件
+
+首先，在 `application.yml` 或 `application.properties` 文件中定义你的配置项。这里使用 `application.yml` 作为示例：
+
+```yaml
+users:
+  user1:
+    name: Alice
+    age: 30
+  user2:
+    name: Bob
+    age: 25
+```
+
+### 2. 创建 `User` 类
+
+创建一个 `User` 类，用于映射配置文件中的用户信息：
+
+```java
+public class User {
+    private String name;
+    private int age;
+
+    // Getters and setters
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "User{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                '}';
+    }
+}
+```
+
+### 3. 创建配置类
+
+使用 `@ConfigurationProperties` 注解创建一个配置类，将配置项映射到 `Map<String, User>` 结构：
+
+```java
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+
+import java.util.Map;
+
+@Configuration
+@ConfigurationProperties(prefix = "users")
+public class UserConfig {
+    private Map<String, User> userMap;
+
+    // Getters and setters
+
+    public Map<String, User> getUserMap() {
+        return userMap;
+    }
+
+    public void setUserMap(Map<String, User> userMap) {
+        this.userMap = userMap;
+    }
+}
+```
+
+### 4. 启用配置属性
+
+在你的 Spring Boot 应用主类中启用配置属性：
+
+```java
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+
+@SpringBootApplication
+@EnableConfigurationProperties(UserConfig.class)
+public class DemoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(DemoApplication.class, args);
+    }
+}
+```
+
+### 5. 使用配置
+
+现在，你可以在任何需要的地方注入 `UserConfig` 并使用 `userMap`：
+
+```java
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import javax.annotation.PostConstruct;
+
+@Component
+public class UserPrinter {
+    private final UserConfig userConfig;
+
+    @Autowired
+    public UserPrinter(UserConfig userConfig) {
+        this.userConfig = userConfig;
+    }
+
+    @PostConstruct
+    public void printUsers() {
+        userConfig.getUserMap().forEach((key, user) -> {
+            System.out.println("Key: " + key + ", User: " + user);
+        });
+    }
+}
+```
+
+### 6. 运行应用
+
+运行你的 Spring Boot 应用，你应该会在控制台看到以下输出：
+
+```
+Key: user1, User: User{name='Alice', age=30}
+Key: user2, User: User{name='Bob', age=25}
+```
+
+### 总结
+
+通过上述步骤，你可以在 Spring Boot 中将配置文件中的内容映射到一个 `Map<String, User>` 结构中，并轻松读取和使用这些配置项。这种方法利用了 Spring Boot 的 `@ConfigurationProperties` 注解和自动绑定特性，使配置管理变得简单和高效。
+
+# 6. 你这个案例中，配置项的命名和类中字段的命名不符合规范啊
+好的，了解了。我们可以优化配置项和类中的字段命名，使其更符合 Java 和 YAML 配置文件的命名规范。
+
+### 1. 配置文件
+
+我们使用符合规范的命名方式，在 `application.yml` 中配置用户信息：
+
+```yaml
+users:
+  user1:
+    name: Alice
+    age: 30
+  user2:
+    name: Bob
+    age: 25
+```
+
+### 2. 创建 `User` 类
+
+创建一个 `User` 类，用于映射配置文件中的用户信息，确保字段名与配置项一致：
+
+```java
+public class User {
+    private String name;
+    private int age;
+
+    // Getters and setters
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "User{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                '}';
+    }
+}
+```
+
+### 3. 创建配置类
+
+使用 `@ConfigurationProperties` 注解创建一个配置类，将配置项映射到 `Map<String, User>` 结构：
+
+```java
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+
+import java.util.Map;
+
+@Configuration
+@ConfigurationProperties(prefix = "users")
+public class UserConfig {
+    private Map<String, User> userMap;
+
+    // Getters and setters
+    public Map<String, User> getUserMap() {
+        return userMap;
+    }
+
+    public void setUserMap(Map<String, User> userMap) {
+        this.userMap = userMap;
+    }
+}
+```
+
+### 4. 启用配置属性
+
+在你的 Spring Boot 应用主类中启用配置属性：
+
+```java
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+
+@SpringBootApplication
+@EnableConfigurationProperties(UserConfig.class)
+public class DemoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(DemoApplication.class, args);
+    }
+}
+```
+
+### 5. 使用配置
+
+现在，你可以在任何需要的地方注入 `UserConfig` 并使用 `userMap`：
+
+```java
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import javax.annotation.PostConstruct;
+
+@Component
+public class UserPrinter {
+    private final UserConfig userConfig;
+
+    @Autowired
+    public UserPrinter(UserConfig userConfig) {
+        this.userConfig = userConfig;
+    }
+
+    @PostConstruct
+    public void printUsers() {
+        userConfig.getUserMap().forEach((key, user) -> {
+            System.out.println("Key: " + key + ", User: " + user);
+        });
+    }
+}
+```
+
+### 6. 运行应用
+
+运行你的 Spring Boot 应用，你应该会在控制台看到以下输出：
+
+```
+Key: user1, User: User{name='Alice', age=30}
+Key: user2, User: User{name='Bob', age=25}
+```
+
+### 总结
+
+通过上述步骤，我们使用符合规范的命名方式，将配置文件中的内容映射到一个 `Map<String, User>` 结构中，并轻松读取和使用这些配置项。这样不仅保持了代码的清晰和可维护性，还确保了命名规范的一致性。
+
+# 7. userMap不需要和配置项中的名称保持一致吗
+在 Spring Boot 中，使用 `@ConfigurationProperties` 注解时，配置类中的字段名称不需要与配置文件中的名称完全一致。Spring Boot 可以自动将 YAML 配置文件中的嵌套结构映射到 Java 对象中的字段。如果有需要，可以使用注解 `@Value` 或者通过提供自定义的 `Binder` 来实现更细粒度的控制。
+
+### 调整示例，使字段名称更加规范
+
+让我们重新整理一下代码，使配置类中的字段名称保持一致，并符合 Java 的命名规范。
+
+### 1. 配置文件
+
+在 `application.yml` 中定义你的配置项：
+
+```yaml
+users:
+  user1:
+    name: Alice
+    age: 30
+  user2:
+    name: Bob
+    age: 25
+```
+
+### 2. 创建 `User` 类
+
+创建一个 `User` 类，用于映射配置文件中的用户信息：
+
+```java
+public class User {
+    private String name;
+    private int age;
+
+    // Getters and setters
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "User{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                '}';
+    }
+}
+```
+
+### 3. 创建配置类
+
+使用 `@ConfigurationProperties` 注解创建一个配置类，将配置项映射到 `Map<String, User>` 结构：
+
+```java
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+
+import java.util.Map;
+
+@Configuration
+@ConfigurationProperties(prefix = "users")
+public class UserConfig {
+    private Map<String, User> map;
+
+    // Getters and setters
+
+    public Map<String, User> getMap() {
+        return map;
+    }
+
+    public void setMap(Map<String, User> map) {
+        this.map = map;
+    }
+}
+```
+
+### 4. 启用配置属性
+
+在你的 Spring Boot 应用主类中启用配置属性：
+
+```java
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+
+@SpringBootApplication
+@EnableConfigurationProperties(UserConfig.class)
+public class DemoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(DemoApplication.class, args);
+    }
+}
+```
+
+### 5. 使用配置
+
+现在，你可以在任何需要的地方注入 `UserConfig` 并使用 `map`：
+
+```java
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import javax.annotation.PostConstruct;
+
+@Component
+public class UserPrinter {
+    private final UserConfig userConfig;
+
+    @Autowired
+    public UserPrinter(UserConfig userConfig) {
+        this.userConfig = userConfig;
+    }
+
+    @PostConstruct
+    public void printUsers() {
+        userConfig.getMap().forEach((key, user) -> {
+            System.out.println("Key: " + key + ", User: " + user);
+        });
+    }
+}
+```
+
+### 6. 运行应用
+
+运行你的 Spring Boot 应用，你应该会在控制台看到以下输出：
+
+```
+Key: user1, User: User{name='Alice', age=30}
+Key: user2, User: User{name='Bob', age=25}
+```
+
+### 总结
+
+通过上述步骤，我们确保了配置文件中的命名和配置类中的字段名一致，同时遵循了 Java 的命名规范。这样不仅保持了代码的清晰和可维护性，还确保了命名规范的一致性。Spring Boot 的 `@ConfigurationProperties` 注解会自动映射配置文件中的嵌套结构到 Java 对象中的字段，使配置管理变得简单和高效。
+
+# 8. @ConfigurationProperties这种方式可以指定默认值吗
+`@ConfigurationProperties` 注解本身不直接支持指定默认值。但是，可以通过以下几种方式为配置属性设置默认值：
+
+1. **在字段声明中初始化默认值**：
+   直接在字段声明时赋予默认值。
+
+2. **在配置类的构造方法或 `@PostConstruct` 方法中初始化默认值**：
+   在类的构造方法或 `@PostConstruct` 方法中设置默认值。
+
+3. **使用 `@Value` 注解**：
+   可以在 `@ConfigurationProperties` 类中结合使用 `@Value` 注解为特定字段设置默认值。
+
+### 示例代码
+
+以下示例展示了如何使用这几种方法为配置属性设置默认值。
+
+#### 1. 在字段声明中初始化默认值
+
+```java
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Configuration
+@ConfigurationProperties(prefix = "users")
+public class UserConfig {
+    private Map<String, User> map = new HashMap<>(); // 设置默认值为空的 HashMap
+
+    public Map<String, User> getMap() {
+        return map;
+    }
+
+    public void setMap(Map<String, User> map) {
+        this.map = map;
+    }
+}
+```
+
+#### 2. 在构造方法或 `@PostConstruct` 方法中初始化默认值
+
+```java
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+
+import javax.annotation.PostConstruct;
+import java.util.HashMap;
+import java.util.Map;
+
+@Configuration
+@ConfigurationProperties(prefix = "users")
+public class UserConfig {
+    private Map<String, User> map;
+
+    public Map<String, User> getMap() {
+        return map;
+    }
+
+    public void setMap(Map<String, User> map) {
+        this.map = map;
+    }
+
+    @PostConstruct
+    public void init() {
+        if (this.map == null) {
+            this.map = new HashMap<>();
+        }
+    }
+}
+```
+
+#### 3. 使用 `@Value` 注解
+
+```java
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Configuration
+@ConfigurationProperties(prefix = "users")
+public class UserConfig {
+
+    @Value("#{new java.util.HashMap()}")
+    private Map<String, User> map;
+
+    public Map<String, User> getMap() {
+        return map;
+    }
+
+    public void setMap(Map<String, User> map) {
+        this.map = map;
+    }
+}
+```
+
+### 用户类 `User`
+
+```java
+public class User {
+    private String name = "Default Name"; // 默认值
+    private int age = 18; // 默认值
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "User{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                '}';
+    }
+}
+```
+
+### 总结
+
+虽然 `@ConfigurationProperties` 本身不直接支持设置默认值，但可以通过字段初始化、构造方法、`@PostConstruct` 方法以及结合 `@Value` 注解等方式来实现默认值设置。这些方法都能有效地确保在配置文件中未指定值时，配置类能够使用默认值。
+
+# 9. 通过这种方式我在postConstruct中debug获取到的配置map为null，是不是和配置项的命名有关系啊？之前不是说会自动映射的吗？不指定规则会自动映射吗
+`@ConfigurationProperties` 注解确实会自动将配置文件中的属性映射到配置类中的字段，但映射成功的前提是属性名称与配置类中的字段名称必须匹配。如果在 `@PostConstruct` 中获取到的 `map` 为 `null`，可能是以下几个原因：
+
+1. 配置文件中的属性名称与配置类中的字段名称不匹配。
+2. 配置文件中的属性未配置或配置错误。
+3. Spring Boot 没有正确加载配置文件。
+
+### 确保属性名称匹配
+
+确保 `application.yml` 中的配置项与 `UserConfig` 类中的字段名称完全匹配。示例：
+
+#### application.yml
+
+```yaml
+users:
+  user1:
+    name: Alice
+    age: 30
+  user2:
+    name: Bob
+    age: 25
+```
+
+#### UserConfig.java
+
+```java
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+
+import java.util.Map;
+
+@Configuration
+@ConfigurationProperties(prefix = "users")
+public class UserConfig {
+    private Map<String, User> map;
+
+    // Getters and setters
+    public Map<String, User> getMap() {
+        return map;
+    }
+
+    public void setMap(Map<String, User> map) {
+        this.map = map;
+    }
+}
+```
+
+### 使用 `@PostConstruct` 方法
+
+确保在 `@PostConstruct` 方法中检查配置类是否正确注入：
+
+```java
+import javax.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+@Component
+public class UserPrinter {
+    private final UserConfig userConfig;
+
+    @Autowired
+    public UserPrinter(UserConfig userConfig) {
+        this.userConfig = userConfig;
+    }
+
+    @PostConstruct
+    public void printUsers() {
+        if (userConfig.getMap() == null) {
+            System.out.println("Map is null");
+        } else {
+            userConfig.getMap().forEach((key, user) -> {
+                System.out.println("Key: " + key + ", User: " + user);
+            });
+        }
+    }
+}
+```
+
+### 完整示例
+
+确保所有代码正确配置如下：
+
+#### application.yml
+
+```yaml
+users:
+  user1:
+    name: Alice
+    age: 30
+  user2:
+    name: Bob
+    age: 25
+```
+
+#### User.java
+
+```java
+public class User {
+    private String name;
+    private int age;
+
+    // Getters and setters
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "User{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                '}';
+    }
+}
+```
+
+#### UserConfig.java
+
+```java
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+
+import java.util.Map;
+
+@Configuration
+@ConfigurationProperties(prefix = "users")
+public class UserConfig {
+    private Map<String, User> map;
+
+    // Getters and setters
+    public Map<String, User> getMap() {
+        return map;
+    }
+
+    public void setMap(Map<String, User> map) {
+        this.map = map;
+    }
+}
+```
+
+#### DemoApplication.java
+
+```java
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+
+@SpringBootApplication
+@EnableConfigurationProperties(UserConfig.class)
+public class DemoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(DemoApplication.class, args);
+    }
+}
+```
+
+#### UserPrinter.java
+
+```java
+import javax.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+@Component
+public class UserPrinter {
+    private final UserConfig userConfig;
+
+    @Autowired
+    public UserPrinter(UserConfig userConfig) {
+        this.userConfig = userConfig;
+    }
+
+    @PostConstruct
+    public void printUsers() {
+        if (userConfig.getMap() == null) {
+            System.out.println("Map is null");
+        } else {
+            userConfig.getMap().forEach((key, user) -> {
+                System.out.println("Key: " + key + ", User: " + user);
+            });
+        }
+    }
+}
+```
+
+### 注意事项
+
+- 确保配置文件正确加载并解析。
+- 确保配置类中的字段名称与配置文件中的名称匹配。
+- 确保配置类被 Spring Boot 正确管理和注入。
+
+通过上述方式，可以确保 `@ConfigurationProperties` 注解正确映射配置文件中的属性，并在应用启动时正确加载这些属性。如果配置项的命名不规范或未匹配，可能导致字段未正确映射为 `null`。
+
