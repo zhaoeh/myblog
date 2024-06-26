@@ -627,7 +627,727 @@ SELECT id, name, tenant_id FROM user WHERE tenant_id = 1;
 
 通过这种方式，可以确保每个租户只能访问属于自己的数据，从而实现多租户数据隔离。
 
-# 7. springboot中处理@ConditionalOnProperty注解时，判断的逻辑是什么样的？我想了解它判断的时机，比如它是判断Envrioment中有对应的属性时，还是在判断把对应的属性值注入到某个PropertyBean中之后才做的判断呢？
+# 7. mybatisplus的多租户管理中，TenantLineInnerInterceptor里TenantLineHandler中各个方法详解
+MyBatis-Plus 提供了多租户的支持，通过 `TenantLineInnerInterceptor` 和 `TenantLineHandler` 实现。下面是 `TenantLineHandler` 中各个方法的详细解释：
+
+### 1. `getTenantId()`
+```java
+Expression getTenantId();
+```
+- **功能**：获取当前租户ID。
+- **返回值**：返回一个 `Expression` 对象，该对象表示当前租户ID的值。在实际应用中，这个值通常是从当前用户的上下文中获取的，例如从JWT token或session中。
+
+### 2. `getTenantIdColumn()`
+```java
+String getTenantIdColumn();
+```
+- **功能**：获取租户ID在数据库表中的列名。
+- **返回值**：返回一个字符串，表示租户ID列的名称。例如，如果租户ID在数据库中的列名是 `tenant_id`，那么该方法应返回 `"tenant_id"`。
+
+### 3. `doTableFilter(String tableName)`
+```java
+boolean doTableFilter(String tableName);
+```
+- **功能**：判断是否需要过滤指定表的多租户功能。
+- **参数**：`tableName` 表示表的名称。
+- **返回值**：返回 `true` 表示该表不需要应用多租户过滤，返回 `false` 表示需要应用多租户过滤。通常可以通过配置某些表不需要多租户隔离来实现。
+
+### 4. `ignoreTable(String tableName)`
+```java
+default boolean ignoreTable(String tableName) {
+    return false;
+}
+```
+- **功能**：判断是否忽略指定表的多租户过滤（可选方法，通常用于增强功能）。
+- **参数**：`tableName` 表示表的名称。
+- **返回值**：返回 `true` 表示忽略该表的多租户过滤，返回 `false` 表示不忽略。
+
+### 实现示例
+
+以下是一个简单的 `TenantLineHandler` 实现示例：
+
+```java
+public class MyTenantLineHandler implements TenantLineHandler {
+
+    @Override
+    public Expression getTenantId() {
+        // 假设从ThreadLocal或其他上下文中获取当前租户ID
+        Long tenantId = TenantContext.getCurrentTenantId();
+        return new LongValue(tenantId);
+    }
+
+    @Override
+    public String getTenantIdColumn() {
+        return "tenant_id";
+    }
+
+    @Override
+    public boolean doTableFilter(String tableName) {
+        // 假设有些表不需要多租户过滤，比如一些公共配置表
+        if ("sys_config".equals(tableName)) {
+            return true;
+        }
+        return false;
+    }
+}
+```
+
+### 配置 `TenantLineInnerInterceptor`
+
+在MyBatis-Plus的配置中，你需要将 `TenantLineInnerInterceptor` 注册到拦截器链中：
+
+```java
+@Configuration
+public class MyBatisPlusConfig {
+
+    @Bean
+    public MybatisPlusInterceptor mybatisPlusInterceptor() {
+        MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+        TenantLineInnerInterceptor tenantLineInnerInterceptor = new TenantLineInnerInterceptor(new MyTenantLineHandler());
+        interceptor.addInnerInterceptor(tenantLineInnerInterceptor);
+        return interceptor;
+    }
+}
+```
+
+通过上述配置，当执行SQL查询时，MyBatis-Plus会自动在SQL中加入租户ID的过滤条件，从而实现多租户隔离。
+
+# 8. 我看到的代码中没有doTableFilter方法，反而有一个ignoreInsert方法
+在较新版本的 MyBatis-Plus 中，`TenantLineHandler` 的方法可能有所变化。`ignoreInsert` 方法是用来决定插入操作是否忽略多租户处理的。下面是对 `TenantLineHandler` 中各个方法的详细解释，包括 `ignoreInsert` 方法：
+
+### 1. `getTenantId()`
+```java
+Expression getTenantId();
+```
+- **功能**：获取当前租户ID。
+- **返回值**：返回一个 `Expression` 对象，该对象表示当前租户ID的值。在实际应用中，这个值通常是从当前用户的上下文中获取的，例如从JWT token或session中。
+
+### 2. `getTenantIdColumn()`
+```java
+String getTenantIdColumn();
+```
+- **功能**：获取租户ID在数据库表中的列名。
+- **返回值**：返回一个字符串，表示租户ID列的名称。例如，如果租户ID在数据库中的列名是 `tenant_id`，那么该方法应返回 `"tenant_id"`。
+
+### 3. `doTableFilter(String tableName)`
+```java
+boolean doTableFilter(String tableName);
+```
+- **功能**：判断是否需要过滤指定表的多租户功能。
+- **参数**：`tableName` 表示表的名称。
+- **返回值**：返回 `true` 表示该表不需要应用多租户过滤，返回 `false` 表示需要应用多租户过滤。通常可以通过配置某些表不需要多租户隔离来实现。
+
+### 4. `ignoreInsert()`
+```java
+default boolean ignoreInsert(String tableName) {
+    return false;
+}
+```
+- **功能**：判断在插入操作时是否忽略多租户处理。
+- **参数**：`tableName` 表示表的名称。
+- **返回值**：返回 `true` 表示在插入操作时忽略该表的多租户处理，返回 `false` 表示不忽略。
+
+### 实现示例
+
+以下是一个包含 `ignoreInsert` 方法的 `TenantLineHandler` 实现示例：
+
+```java
+public class MyTenantLineHandler implements TenantLineHandler {
+
+    @Override
+    public Expression getTenantId() {
+        // 假设从ThreadLocal或其他上下文中获取当前租户ID
+        Long tenantId = TenantContext.getCurrentTenantId();
+        return new LongValue(tenantId);
+    }
+
+    @Override
+    public String getTenantIdColumn() {
+        return "tenant_id";
+    }
+
+    @Override
+    public boolean doTableFilter(String tableName) {
+        // 假设有些表不需要多租户过滤，比如一些公共配置表
+        if ("sys_config".equals(tableName)) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean ignoreInsert(String tableName) {
+        // 可以根据表名判断是否在插入操作时忽略多租户处理
+        if ("sys_log".equals(tableName)) {
+            return true;
+        }
+        return false;
+    }
+}
+```
+
+### 配置 `TenantLineInnerInterceptor`
+
+在MyBatis-Plus的配置中，你需要将 `TenantLineInnerInterceptor` 注册到拦截器链中：
+
+```java
+@Configuration
+public class MyBatisPlusConfig {
+
+    @Bean
+    public MybatisPlusInterceptor mybatisPlusInterceptor() {
+        MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+        TenantLineInnerInterceptor tenantLineInnerInterceptor = new TenantLineInnerInterceptor(new MyTenantLineHandler());
+        interceptor.addInnerInterceptor(tenantLineInnerInterceptor);
+        return interceptor;
+    }
+}
+```
+
+通过上述配置，当执行SQL查询时，MyBatis-Plus会自动在SQL中加入租户ID的过滤条件，从而实现多租户隔离。对于插入操作，根据 `ignoreInsert` 方法的返回值，决定是否在插入时忽略多租户处理。
+
+# 9. 插入时忽略多租户的处理，具体表现是什么
+在 MyBatis-Plus 中，`ignoreInsert` 方法的作用是决定在插入操作时是否忽略多租户处理。如果该方法返回 `true`，表示在执行插入操作时，不会自动添加租户ID相关的处理逻辑。具体表现如下：
+
+1. **忽略多租户处理时：**
+   - 插入操作中不会自动为插入的数据添加租户ID。
+   - 通常用于一些不需要租户隔离的公共表或日志表等特殊情况。
+
+2. **不忽略多租户处理时：**
+   - 插入操作中会自动为插入的数据添加当前租户ID。
+   - 这确保了每条数据都能与正确的租户关联，从而实现多租户数据隔离。
+
+### 实例演示
+
+假设有一个表 `orders`，包含以下列：
+- `id`（主键）
+- `tenant_id`（租户ID）
+- `order_details`（订单详情）
+
+我们希望在插入数据时，不忽略多租户处理，确保每条订单数据都能记录所属租户的ID。
+
+#### 不忽略多租户处理（默认行为）
+
+实现 `TenantLineHandler` 时，`ignoreInsert` 返回 `false`：
+
+```java
+public class MyTenantLineHandler implements TenantLineHandler {
+
+    @Override
+    public Expression getTenantId() {
+        // 假设从ThreadLocal或其他上下文中获取当前租户ID
+        Long tenantId = TenantContext.getCurrentTenantId();
+        return new LongValue(tenantId);
+    }
+
+    @Override
+    public String getTenantIdColumn() {
+        return "tenant_id";
+    }
+
+    @Override
+    public boolean doTableFilter(String tableName) {
+        return false; // 默认所有表都需要多租户过滤
+    }
+
+    @Override
+    public boolean ignoreInsert(String tableName) {
+        return false; // 默认所有表的插入操作都不忽略多租户处理
+    }
+}
+```
+
+当插入数据时，例如：
+
+```sql
+INSERT INTO orders (id, order_details) VALUES (1, 'Order details');
+```
+
+MyBatis-Plus 会自动将SQL转换为：
+
+```sql
+INSERT INTO orders (id, tenant_id, order_details) VALUES (1, 123, 'Order details');
+```
+
+这里的 `123` 是从 `getTenantId` 方法中获取的当前租户ID。
+
+#### 忽略多租户处理
+
+如果我们希望忽略某些表的多租户处理，例如 `sys_log` 表，用于记录系统日志：
+
+```java
+public class MyTenantLineHandler implements TenantLineHandler {
+
+    @Override
+    public Expression getTenantId() {
+        Long tenantId = TenantContext.getCurrentTenantId();
+        return new LongValue(tenantId);
+    }
+
+    @Override
+    public String getTenantIdColumn() {
+        return "tenant_id";
+    }
+
+    @Override
+    public boolean doTableFilter(String tableName) {
+        return false; // 默认所有表都需要多租户过滤
+    }
+
+    @Override
+    public boolean ignoreInsert(String tableName) {
+        // 忽略 sys_log 表的多租户处理
+        return "sys_log".equals(tableName);
+    }
+}
+```
+
+当插入数据到 `sys_log` 表时，例如：
+
+```sql
+INSERT INTO sys_log (id, log_message) VALUES (1, 'System log');
+```
+
+MyBatis-Plus 不会添加租户ID的处理，SQL 保持不变：
+
+```sql
+INSERT INTO sys_log (id, log_message) VALUES (1, 'System log');
+```
+
+通过这种方式，我们可以灵活地控制哪些表在插入操作时需要应用多租户处理，哪些表可以忽略多租户处理。
+
+# 10. 我看到的源码中，ignoreInsert的入参是List<Column> columns,String tenantIdColumn
+在较新版本的 MyBatis-Plus 中，`ignoreInsert` 方法的签名可能有所更新，入参为 `List<Column> columns` 和 `String tenantIdColumn`。这种设计允许你在决定是否忽略插入时考虑更多的信息，例如要插入的列以及租户ID列名。
+
+### 具体解释
+
+#### `ignoreInsert` 方法
+```java
+default boolean ignoreInsert(List<Column> columns, String tenantIdColumn) {
+    return false;
+}
+```
+- **参数**：
+  - `columns`：表示插入操作涉及的列的列表。
+  - `tenantIdColumn`：表示租户ID列的名称。
+- **返回值**：返回 `true` 表示在插入操作时忽略多租户处理，返回 `false` 表示不忽略。
+
+### 具体表现
+
+1. **忽略多租户处理时**：
+   - 插入操作中不会自动为插入的数据添加租户ID。
+   - 适用于一些不需要租户隔离的公共表或日志表等特殊情况。
+
+2. **不忽略多租户处理时**：
+   - 插入操作中会自动为插入的数据添加当前租户ID。
+   - 确保每条数据都能与正确的租户关联，从而实现多租户数据隔离。
+
+### 实现示例
+
+以下是一个包含 `ignoreInsert` 方法新签名的 `TenantLineHandler` 实现示例：
+
+```java
+public class MyTenantLineHandler implements TenantLineHandler {
+
+    @Override
+    public Expression getTenantId() {
+        // 假设从ThreadLocal或其他上下文中获取当前租户ID
+        Long tenantId = TenantContext.getCurrentTenantId();
+        return new LongValue(tenantId);
+    }
+
+    @Override
+    public String getTenantIdColumn() {
+        return "tenant_id";
+    }
+
+    @Override
+    public boolean doTableFilter(String tableName) {
+        // 假设有些表不需要多租户过滤，比如一些公共配置表
+        if ("sys_config".equals(tableName)) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean ignoreInsert(List<Column> columns, String tenantIdColumn) {
+        // 忽略 sys_log 表的多租户处理
+        // 也可以根据 columns 参数决定是否忽略
+        for (Column column : columns) {
+            if (column.getColumnName().equals(tenantIdColumn)) {
+                return false; // 如果要插入的列包含租户ID列，不忽略多租户处理
+            }
+        }
+        return "sys_log".equals(tenantIdColumn); // 忽略 sys_log 表的多租户处理
+    }
+}
+```
+
+### 配置 `TenantLineInnerInterceptor`
+
+在 MyBatis-Plus 的配置中，你需要将 `TenantLineInnerInterceptor` 注册到拦截器链中：
+
+```java
+@Configuration
+public class MyBatisPlusConfig {
+
+    @Bean
+    public MybatisPlusInterceptor mybatisPlusInterceptor() {
+        MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+        TenantLineInnerInterceptor tenantLineInnerInterceptor = new TenantLineInnerInterceptor(new MyTenantLineHandler());
+        interceptor.addInnerInterceptor(tenantLineInnerInterceptor);
+        return interceptor;
+    }
+}
+```
+
+### 插入操作
+
+假设我们有一个表 `orders`，包含以下列：
+- `id`（主键）
+- `tenant_id`（租户ID）
+- `order_details`（订单详情）
+
+当插入数据时，例如：
+
+```sql
+INSERT INTO orders (id, order_details) VALUES (1, 'Order details');
+```
+
+MyBatis-Plus 会自动将 SQL 转换为：
+
+```sql
+INSERT INTO orders (id, tenant_id, order_details) VALUES (1, 123, 'Order details');
+```
+
+如果 `ignoreInsert` 方法根据传入的 `columns` 和 `tenantIdColumn` 判断需要忽略多租户处理，那么 SQL 将保持不变，不会自动添加租户ID的处理逻辑。
+
+通过这种方式，我们可以灵活地控制哪些表在插入操作时需要应用多租户处理，哪些表可以忽略多租户处理。
+
+# 11. 问题是，List<Column>是根据什么来定义的，是表的列？还是定义的实体的列？
+在 MyBatis-Plus 中，`List<Column>` 代表的是即将进行插入操作时涉及的列。具体来说，这些列可以来源于以下两种情况：
+
+1. **表的列**：指的是数据库表的列。这种情况下，`List<Column>` 表示在插入操作时涉及的数据库表中的列。
+
+2. **实体的列**：指的是 Java 实体类的属性。在大多数情况下，MyBatis-Plus 会将实体类的属性映射到数据库表的列，因此 `List<Column>` 也可以表示实体类中的属性。
+
+`Column` 类通常包含列名和列值等信息，用于描述在 SQL 操作中涉及的列。
+
+### `Column` 类的定义
+
+`Column` 类可能包含如下信息：
+
+- `columnName`：列名。
+- `value`：列值。
+
+具体的类定义取决于 MyBatis-Plus 的实现，以下是一个可能的定义示例：
+
+```java
+public class Column {
+    private String columnName;
+    private Object value;
+
+    public Column(String columnName, Object value) {
+        this.columnName = columnName;
+        this.value = value;
+    }
+
+    public String getColumnName() {
+        return columnName;
+    }
+
+    public void setColumnName(String columnName) {
+        this.columnName = columnName;
+    }
+
+    public Object getValue() {
+        return value;
+    }
+
+    public void setValue(Object value) {
+        this.value = value;
+    }
+}
+```
+
+### 示例说明
+
+假设我们有一个表 `orders`，包含以下列：
+
+- `id`（主键）
+- `tenant_id`（租户ID）
+- `order_details`（订单详情）
+
+对应的实体类可能是：
+
+```java
+public class Order {
+    private Long id;
+    private Long tenantId;
+    private String orderDetails;
+
+    // getters and setters
+}
+```
+
+当我们执行插入操作时，例如：
+
+```java
+Order order = new Order();
+order.setId(1L);
+order.setOrderDetails("Order details");
+
+// 插入操作
+orderMapper.insert(order);
+```
+
+MyBatis-Plus 会生成插入的 SQL 语句。在这个过程中，`ignoreInsert` 方法会接收到插入操作涉及的列信息。假设 `tenantIdColumn` 是 `"tenant_id"`，那么 `List<Column>` 可能包含如下内容：
+
+```java
+List<Column> columns = Arrays.asList(
+    new Column("id", 1L),
+    new Column("order_details", "Order details")
+);
+```
+
+### `ignoreInsert` 方法示例
+
+以下是一个包含 `ignoreInsert` 方法的实现示例：
+
+```java
+public class MyTenantLineHandler implements TenantLineHandler {
+
+    @Override
+    public Expression getTenantId() {
+        // 假设从ThreadLocal或其他上下文中获取当前租户ID
+        Long tenantId = TenantContext.getCurrentTenantId();
+        return new LongValue(tenantId);
+    }
+
+    @Override
+    public String getTenantIdColumn() {
+        return "tenant_id";
+    }
+
+    @Override
+    public boolean doTableFilter(String tableName) {
+        return false; // 默认所有表都需要多租户过滤
+    }
+
+    @Override
+    public boolean ignoreInsert(List<Column> columns, String tenantIdColumn) {
+        // 检查即将插入的列是否包含租户ID列
+        for (Column column : columns) {
+            if (column.getColumnName().equals(tenantIdColumn)) {
+                return false; // 如果包含租户ID列，不忽略多租户处理
+            }
+        }
+        return "sys_log".equals(tenantIdColumn); // 忽略 sys_log 表的多租户处理
+    }
+}
+```
+
+通过这种方式，`ignoreInsert` 方法可以根据插入操作涉及的列信息和租户ID列名，灵活决定是否忽略多租户处理。这确保了在特定情况下（例如某些公共表或日志表）可以选择性地忽略多租户处理逻辑。
+
+# 12. 接着之前讨论的 ignoreInsert(List<Column> columns, String tenantIdColumn)，我还是没清楚，columns到底是什么？是在执行插入语句时的实体类字段？还是根据实体类字段哪些有值才决定columns有哪些？
+在 `TenantLineHandler` 接口中，`ignoreInsert` 方法的 `columns` 参数实际上是 MyBatis-Plus 在执行插入操作时传递的列集合。这些列是根据插入语句中的实体类字段决定的，即哪些字段在插入时有值，就会包含在 `columns` 中。
+
+为了更清楚地理解，以下是一些关键点：
+
+1. **`columns` 参数**:
+   - 这个参数是一个包含所有即将插入到数据库中的列的集合。这些列是从实体类的字段中提取的，具体来说是那些在插入操作时被赋予了值的字段。
+
+2. **实体类字段和 `columns`**:
+   - 在插入操作中，MyBatis-Plus 会根据实体类的字段生成相应的插入 SQL 语句。如果某个字段在实体对象中有值，那么它会被包括在 `columns` 集合中。
+
+3. **`ignoreInsert` 的作用**:
+   - `ignoreInsert` 方法用于在插入操作中决定是否忽略租户字段。这个方法的返回值是一个布尔值，决定了在插入操作中是否应该忽略租户字段的插入。
+
+### 示例
+
+假设有一个实体类 `User`，其字段包括 `id`、`name`、`email` 和 `tenantId`：
+
+```java
+public class User {
+    private Long id;
+    private String name;
+    private String email;
+    private Long tenantId;
+
+    // Getters and Setters
+}
+```
+
+当我们插入一个新的 `User` 实例时，例如：
+
+```java
+User user = new User();
+user.setName("John Doe");
+user.setEmail("john.doe@example.com");
+// Note: tenantId is not set
+```
+
+在执行插入操作时，`columns` 集合将包含 `name` 和 `email` 字段，因为这两个字段有值，而 `id` 和 `tenantId` 字段可能会根据数据库自动生成或由 MyBatis-Plus 插入默认值。
+
+### `ignoreInsert` 的实现
+
+假设我们希望在租户字段 `tenantId` 为 `null` 时忽略它的插入，可以这样实现 `ignoreInsert` 方法：
+
+```java
+@Override
+public boolean ignoreInsert(List<Column> columns, String tenantIdColumn) {
+    // Check if tenantIdColumn is present in the columns list
+    for (Column column : columns) {
+        if (column.getName().equals(tenantIdColumn)) {
+            // If tenantIdColumn is found in columns and its value is null, ignore it
+            return column.getValue() == null;
+        }
+    }
+    // If tenantIdColumn is not found, do not ignore
+    return false;
+}
+```
+
+在上述代码中，我们遍历 `columns` 集合，检查是否包含租户字段 `tenantIdColumn`。如果找到并且其值为 `null`，返回 `true` 表示忽略该字段的插入。
+
+### 总结
+
+- `columns` 是在插入操作时传递的列集合，包含所有有值的实体类字段。
+- `ignoreInsert` 方法用于决定是否在插入操作中忽略租户字段。
+- 通过检查 `columns` 集合中是否包含租户字段及其值，可以控制是否忽略该字段的插入。
+
+希望这些解释能够帮助你更好地理解 `ignoreInsert` 方法的工作原理。如果还有其他问题，欢迎继续讨论。
+
+# 13. 多租户这个回调，实在MetaObjectHandler之前还是之后处理的呢
+在 MyBatis-Plus 中，多租户功能通过 `TenantLineInnerInterceptor` 实现。在插入操作中，MyBatis-Plus 的多租户处理机制会通过 `TenantLineHandler` 进行相应处理。
+
+具体来说，多租户处理会在 SQL 生成和执行过程中进行。至于处理的顺序问题，`ignoreInsert` 的调用是在 MyBatis-Plus 处理 SQL 的过程中执行的，而 MetaObjectHandler 通常用于处理实体类在插入和更新操作时的字段自动填充。
+
+### 顺序处理的具体分析
+
+1. **`TenantLineInnerInterceptor` 和 `ignoreInsert` 方法**:
+   - `TenantLineInnerInterceptor` 负责在执行 SQL 前对 SQL 进行改写，以加入租户相关的信息。
+   - `ignoreInsert` 方法是在 MyBatis-Plus 准备生成 SQL 语句时调用的，它决定了租户字段是否需要在插入时被忽略。
+
+2. **`MetaObjectHandler`**:
+   - `MetaObjectHandler` 主要用于在插入和更新操作时自动填充一些字段（如创建时间、更新时间、创建人、更新人等）。
+   - `MetaObjectHandler` 的 `insertFill` 方法通常会在执行插入操作之前被调用，以确保在插入操作执行前，实体类中的相关字段已经被自动填充。
+
+### 处理顺序
+
+通常来说，处理顺序如下：
+
+1. **`MetaObjectHandler` 的 `insertFill` 方法**:
+   - 在 MyBatis-Plus 执行插入操作前，会先调用 `MetaObjectHandler` 的 `insertFill` 方法对实体类进行字段填充。
+   - 这一步确保实体类在插入操作前，其自动填充的字段已经被赋值。
+
+2. **生成插入 SQL**:
+   - 在字段填充完成后，MyBatis-Plus 会生成对应的插入 SQL。
+   - 生成 SQL 时会调用 `TenantLineHandler` 的相关方法（如 `ignoreInsert`）来决定是否在插入操作中忽略租户字段。
+
+3. **`TenantLineInnerInterceptor` 进行 SQL 改写**:
+   - 在生成的 SQL 被执行前，`TenantLineInnerInterceptor` 会对 SQL 进行改写，加入租户信息。
+
+### 简单的流程图
+
+```
+实体类数据准备
+      |
+调用 MetaObjectHandler 的 insertFill 方法 -> 自动填充字段
+      |
+生成插入 SQL
+      |
+调用 TenantLineHandler 的 ignoreInsert 方法 -> 判断是否忽略租户字段
+      |
+TenantLineInnerInterceptor 对 SQL 进行改写 -> 加入租户信息
+      |
+执行最终的 SQL
+```
+
+### 示例
+
+假设我们有一个 `User` 实体类和相应的租户处理配置：
+
+#### `User` 类
+```java
+public class User {
+    private Long id;
+    private String name;
+    private String email;
+    private Long tenantId; // 租户字段
+
+    // Getters and Setters
+}
+```
+
+#### `MyMetaObjectHandler` 类
+```java
+import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
+import org.apache.ibatis.reflection.MetaObject;
+import org.springframework.stereotype.Component;
+
+@Component
+public class MyMetaObjectHandler implements MetaObjectHandler {
+
+    @Override
+    public void insertFill(MetaObject metaObject) {
+        // 自动填充创建时间字段
+        this.strictInsertFill(metaObject, "createTime", LocalDateTime.class, LocalDateTime.now());
+    }
+
+    @Override
+    public void updateFill(MetaObject metaObject) {
+        // 自动填充更新时间字段
+        this.strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
+    }
+}
+```
+
+#### `MyTenantLineHandler` 类
+```java
+import com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler;
+import net.sf.jsqlparser.expression.Expression;
+import net.sf.jsqlparser.expression.StringValue;
+import org.springframework.stereotype.Component;
+
+@Component
+public class MyTenantLineHandler implements TenantLineHandler {
+
+    @Override
+    public Expression getTenantId() {
+        // 返回当前租户 ID
+        return new StringValue("1");
+    }
+
+    @Override
+    public String getTenantIdColumn() {
+        // 返回租户字段名称
+        return "tenantId";
+    }
+
+    @Override
+    public boolean ignoreInsert(List<Column> columns, String tenantIdColumn) {
+        // 判断是否忽略租户字段的插入
+        for (Column column : columns) {
+            if (column.getName().equals(tenantIdColumn)) {
+                return column.getValue() == null;
+            }
+        }
+        return false;
+    }
+}
+```
+
+### 总结
+
+- `MetaObjectHandler` 的 `insertFill` 方法在实体类数据插入之前执行，用于自动填充字段。
+- `ignoreInsert` 方法在生成插入 SQL 时调用，用于决定是否忽略租户字段。
+- `TenantLineInnerInterceptor` 在最终 SQL 执行前对 SQL 进行改写，以加入租户信息。
+
+希望这些信息能帮助你更好地理解 MyBatis-Plus 多租户处理和 `MetaObjectHandler` 的执行顺序。如果还有其他问题，请随时提问。
+
+# 14. springboot中处理@ConditionalOnProperty注解时，判断的逻辑是什么样的？我想了解它判断的时机，比如它是判断Envrioment中有对应的属性时，还是在判断把对应的属性值注入到某个PropertyBean中之后才做的判断呢？
 在 Spring Boot 中，`@ConditionalOnProperty` 注解用于条件性地注册 bean，只有在指定的配置属性满足条件时才会注册该 bean。其判断逻辑主要基于 Spring 的 `Environment`，即它会在配置属性加载到 `Environment` 中时进行判断，而不是在属性注入到某个 `PropertyBean` 之后。
 
 ### 具体的判断逻辑
@@ -707,7 +1427,7 @@ public class OnPropertyCondition extends SpringBootCondition {
 
 `@ConditionalOnProperty` 注解在 Spring Boot 中基于 `Environment` 进行判断。当 Spring 容器启动并加载配置属性到 `Environment` 中之后，但在实际创建 bean 实例之前，Spring 解析并判断 `@ConditionalOnProperty` 注解，根据配置属性决定是否注册该 bean。因此，判断逻辑是在 `Environment` 中检查属性值，而不是在将属性注入到某个 `PropertyBean` 之后。
 
-# 8. sql查询中，order by和select的执行顺序
+# 15. sql查询中，order by和select的执行顺序
 在 SQL 查询的执行过程中，`ORDER BY` 和 `SELECT` 语句的执行顺序是有固定的执行顺序的。以下是标准的 SQL 查询的执行顺序：
 
 1. **FROM**: 确定要查询的表或视图。
@@ -800,7 +1520,7 @@ ORDER BY avg_salary DESC;
 
 在 SQL 查询中，`ORDER BY` 在 `SELECT` 之后执行。这意味着在排序之前，查询已经完成了所有的筛选、分组和列选择。理解这一点对于优化查询和预期结果非常重要。
 
-# 9. 如果select对字段列起别名了，order by使用别名还是数据表字段名呢
+# 16. 如果select对字段列起别名了，order by使用别名还是数据表字段名呢
 在 SQL 查询中，如果 `SELECT` 语句对字段列起了别名，可以在 `ORDER BY` 子句中使用这个别名。大多数数据库管理系统（DBMS）都支持这种用法，这使得查询更简洁和易读。
 
 ### 示例
@@ -846,7 +1566,7 @@ ORDER BY employee_salary DESC;
 
 在 SQL 查询中，可以在 `ORDER BY` 子句中使用 `SELECT` 语句中的别名。这使得查询语句更简洁、更易读，并且是大多数数据库管理系统所支持的常见用法。
 
-# 10. order by不使用select中的别名是不是更合规一些
+# 17. order by不使用select中的别名是不是更合规一些
 从 SQL 标准和跨数据库兼容性的角度来看，`ORDER BY` 使用 `SELECT` 中的别名是完全合规的，也是大多数主流数据库管理系统（DBMS）所支持的。然而，是否使用别名主要取决于具体的需求和项目的风格规范。
 
 ### 使用别名的优势
