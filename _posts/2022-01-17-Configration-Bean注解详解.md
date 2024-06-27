@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      @Configration、@Bean注解
+title:      深入了解@Configration、@Bean注解
 subtitle:   玩转这两个注解
 categories: [spring专题]
 mermaid: false
