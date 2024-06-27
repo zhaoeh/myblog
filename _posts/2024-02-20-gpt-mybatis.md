@@ -641,18 +641,7 @@ public interface UserMapper {
 创建一个 SQL 构建器类，用于构建动态 SQL 语句。
 
 ```java
-import org.apache.ibatis.jdbc.SQL;
 
-public class UserSqlBuilder {
-    public String buildSelectByDynamicField(final String fieldName, final Object fieldValue) {
-        // return new SQL() {{
-        //    SELECT("*");
-        //    FROM("User");
-        //    WHERE(fieldName + " = #{fieldValue}");
-        //}}.toString();
-            return null;
-    }
-}
 ```
 
 #### 3. 实体类
