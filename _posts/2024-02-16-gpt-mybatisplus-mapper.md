@@ -1347,7 +1347,908 @@ public class MyTenantLineHandler implements TenantLineHandler {
 
 希望这些信息能帮助你更好地理解 MyBatis-Plus 多租户处理和 `MetaObjectHandler` 的执行顺序。如果还有其他问题，请随时提问。
 
-# 14. springboot中处理@ConditionalOnProperty注解时，判断的逻辑是什么样的？我想了解它判断的时机，比如它是判断Envrioment中有对应的属性时，还是在判断把对应的属性值注入到某个PropertyBean中之后才做的判断呢？
+# 14. mybatisplus的LambdaQuery如何指定and或者or
+在MyBatis Plus的LambdaQuery中，可以通过`and`和`or`方法来指定条件的连接方式。这两个方法分别表示使用"AND"和"OR"来连接条件。
+
+### 使用AND连接条件：
+
+```java
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+
+public class LambdaQueryExample {
+
+    public static void main(String[] args) {
+        LambdaQueryWrapper<Entity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Entity::getField1, value1)  // 添加条件1
+               .and(i -> i.eq(Entity::getField2, value2));  // 添加条件2，使用AND连接
+
+        // 执行查询操作
+        List<Entity> list = entityMapper.selectList(wrapper);
+    }
+}
+```
+
+### 使用OR连接条件：
+
+```java
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+
+public class LambdaQueryExample {
+
+    public static void main(String[] args) {
+        LambdaQueryWrapper<Entity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Entity::getField1, value1)  // 添加条件1
+               .or(i -> i.eq(Entity::getField2, value2));  // 添加条件2，使用OR连接
+
+        // 执行查询操作
+        List<Entity> list = entityMapper.selectList(wrapper);
+    }
+}
+```
+
+在LambdaQueryWrapper中，可以通过`and`和`or`方法来指定条件的连接方式，从而构建复杂的查询条件。
+
+# 15. 如果一个eq，直接使用下一个eq，默认是and连接吗
+是的，如果连续使用多个`eq`条件，它们默认是使用"AND"连接的。在MyBatis Plus的LambdaQuery中，连续使用多个`eq`条件会自动将它们连接为"AND"条件。
+
+例如，在LambdaQueryWrapper中，连续使用多个`eq`条件时，默认是"AND"连接：
+
+```java
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+
+public class LambdaQueryExample {
+
+    public static void main(String[] args) {
+        LambdaQueryWrapper<Entity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Entity::getField1, value1)  // 添加条件1
+               .eq(Entity::getField2, value2)  // 添加条件2，这两个条件会使用AND连接
+               .eq(Entity::getField3, value3);  // 添加条件3，这三个条件会使用AND连接
+
+        // 执行查询操作
+        List<Entity> list = entityMapper.selectList(wrapper);
+    }
+}
+```
+
+在这个示例中，三个`eq`条件会被自动连接为"AND"条件，即`getField1 = value1 AND getField2 = value2 AND getField3 = value3`。
+
+# 16. mybatisplus的@TableField注解能指定字段别名吗？
+在MyBatis Plus中，`@TableField`注解主要用于指定实体类字段与数据库表字段之间的映射关系，但它不直接支持指定字段别名。不过，可以通过SQL查询语句中的`AS`关键字来实现字段别名的功能。
+
+### 方案1：使用自定义SQL查询
+
+你可以在Mapper接口中使用自定义的SQL查询，并在查询中使用`AS`关键字来指定字段别名。例如：
+
+```java
+public interface EntityMapper extends BaseMapper<Entity> {
+
+    @Select("SELECT field1 AS alias1, field2 AS alias2 FROM table_name WHERE condition")
+    List<Entity> selectWithAlias();
+}
+```
+
+### 方案2：使用`@Select`注解
+
+如果你希望在Mapper接口中直接使用注解来执行自定义SQL查询，可以使用`@Select`注解并指定字段别名。例如：
+
+```java
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Select;
+
+public interface EntityMapper extends BaseMapper<Entity> {
+
+    @Select("SELECT field1 AS alias1, field2 AS alias2 FROM table_name WHERE condition")
+    List<Entity> selectWithAlias();
+}
+```
+
+### 方案3：使用QueryWrapper
+
+如果你想在程序中动态构建查询并指定字段别名，可以使用`QueryWrapper`和`AS`关键字。以下是一个示例：
+
+```java
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import java.util.List;
+
+public class EntityService {
+    
+    private final EntityMapper entityMapper;
+
+    public EntityService(EntityMapper entityMapper) {
+        this.entityMapper = entityMapper;
+    }
+
+    public List<Entity> selectWithAlias() {
+        QueryWrapper<Entity> queryWrapper = Wrappers.query();
+        queryWrapper.select("field1 AS alias1", "field2 AS alias2");
+        return entityMapper.selectList(queryWrapper);
+    }
+}
+```
+
+### 方案4：使用ResultMap
+
+可以在MyBatis的XML文件中定义ResultMap来映射查询结果到实体类，并在查询中使用字段别名。
+
+`Mapper.xml`文件：
+```xml
+<mapper namespace="com.example.EntityMapper">
+    <resultMap id="EntityResultMap" type="com.example.Entity">
+        <result column="alias1" property="field1"/>
+        <result column="alias2" property="field2"/>
+    </resultMap>
+
+    <select id="selectWithAlias" resultMap="EntityResultMap">
+        SELECT field1 AS alias1, field2 AS alias2 FROM table_name WHERE condition
+    </select>
+</mapper>
+```
+
+`Mapper`接口：
+```java
+public interface EntityMapper extends BaseMapper<Entity> {
+    List<Entity> selectWithAlias();
+}
+```
+
+### 总结
+
+虽然`@TableField`注解本身不直接支持指定字段别名，但通过自定义SQL查询、`@Select`注解、`QueryWrapper`以及ResultMap等方式，你可以在MyBatis Plus中实现字段别名的功能。
+
+# 17. 那这个注解指定的value表示什么含义
+在MyBatis Plus中，`@TableField`注解的`value`属性用于指定实体类字段与数据库表字段之间的映射关系。具体来说，`value`属性指定数据库表中的列名，这在数据库列名和实体类字段名不一致时特别有用。
+
+### `@TableField`注解的属性
+
+- **value**：指定数据库表中的列名。
+- **exist**：表示该字段是否为数据库表字段，默认为`true`。如果设置为`false`，则表示该字段在数据库表中不存在，用于实体类中需要的一些临时字段。
+- **strategy**：指定插入和更新时的策略，比如忽略空值等。
+
+### 示例
+
+假设数据库表中有一列名为`user_name`，但实体类中对应的字段名为`userName`，可以使用`@TableField`注解的`value`属性进行映射：
+
+```java
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+
+@TableName("user")
+public class User {
+
+    @TableField("user_name")
+    private String userName;
+
+    // 其他字段和方法
+}
+```
+
+在这个示例中，`userName`字段与数据库表中的`user_name`列映射。
+
+### 其他属性示例
+
+以下是一个更加全面的示例，展示了`@TableField`注解的其他属性：
+
+```java
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+
+@TableName("user")
+public class User {
+
+    @TableField(value = "user_name", strategy = FieldStrategy.NOT_NULL)
+    private String userName;
+
+    @TableField(value = "age", fill = FieldFill.INSERT_UPDATE)
+    private Integer age;
+
+    @TableField(exist = false)
+    private String tempField;
+
+    // 其他字段和方法
+}
+```
+
+- **strategy**：在这个示例中，`strategy`属性设置为`FieldStrategy.NOT_NULL`，表示在插入和更新时，如果`userName`字段为空，则忽略这个字段。
+- **fill**：`fill`属性设置为`FieldFill.INSERT_UPDATE`，表示`age`字段在插入和更新时自动填充。
+- **exist**：`exist`属性设置为`false`，表示`tempField`字段在数据库表中不存在，这是一个临时字段，不会参与数据库的插入和更新操作。
+
+通过这些属性，可以灵活地控制实体类字段和数据库表字段之间的映射关系以及字段的插入、更新策略。
+
+# 18. 也就是说，如果使用了这个注解指定了字段和数据库实体字段的映射后，只能使用mybatisplus本身提供的LambdaQuery之类的方式进行CRUD操作才会生效吧？如果直接使用mapper.xml的方式，是不是这种方式就不行了
+在MyBatis Plus中，`@TableField`注解主要用于在实体类和数据库表之间建立映射关系，从而使MyBatis Plus提供的CRUD操作（如`LambdaQueryWrapper`）能够正确地识别和使用这些映射。然而，如果直接使用`mapper.xml`文件进行SQL查询，`@TableField`注解的映射关系不会自动生效。以下是详细说明：
+
+### 使用MyBatis Plus提供的CRUD操作
+
+当你使用MyBatis Plus提供的CRUD操作时，如`LambdaQueryWrapper`、`QueryWrapper`等，`@TableField`注解的映射关系会自动生效。例如：
+
+```java
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+
+public class UserService {
+
+    private final UserMapper userMapper;
+
+    public UserService(UserMapper userMapper) {
+        this.userMapper = userMapper;
+    }
+
+    public User getUserByUserName(String userName) {
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(User::getUserName, userName);
+        return userMapper.selectOne(queryWrapper);
+    }
+}
+```
+
+在这个示例中，`User::getUserName`会自动映射到数据库表的`user_name`列，因为实体类中的`userName`字段使用了`@TableField("user_name")`注解。
+
+### 使用`mapper.xml`文件进行SQL查询
+
+如果直接在`mapper.xml`文件中编写SQL查询，`@TableField`注解的映射关系不会自动生效。这时你需要在SQL查询中显式地使用数据库表中的列名。例如：
+
+#### `User`实体类：
+
+```java
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+
+@TableName("user")
+public class User {
+
+    @TableField("user_name")
+    private String userName;
+
+    // 其他字段和方法
+}
+```
+
+#### `UserMapper`接口：
+
+```java
+public interface UserMapper extends BaseMapper<User> {
+    User selectUserByUserName(String userName);
+}
+```
+
+#### `UserMapper.xml`文件：
+
+```xml
+<mapper namespace="com.example.UserMapper">
+    <select id="selectUserByUserName" resultType="com.example.User">
+        SELECT user_name AS userName
+        FROM user
+        WHERE user_name = #{userName}
+    </select>
+</mapper>
+```
+
+在这个示例中，你需要在SQL查询中显式地指定数据库表的列名，并使用`AS`关键字将其映射到实体类中的字段名。
+
+### 结论
+
+- **使用MyBatis Plus提供的CRUD操作**：`@TableField`注解的映射关系会自动生效。
+- **使用`mapper.xml`文件进行SQL查询**：需要显式地在SQL查询中指定数据库表的列名，并使用`AS`关键字将其映射到实体类中的字段名。
+
+这样可以确保在不同的操作方式下，实体类和数据库表之间的映射关系能够正确地处理。
+
+# 19. mybatisplus不想直接编写mapper，但是sql又比较复杂，不是单表查询的sql
+如果你在使用MyBatis Plus时，遇到复杂的SQL查询需求，而又不想直接编写Mapper，可以考虑以下几种方法：
+
+1. **使用自定义SQL方法**：通过MyBatis Plus的注解或XML配置文件编写自定义SQL方法。
+
+2. **使用Wrapper和LambdaQuery**：尽量使用MyBatis Plus提供的Wrapper和LambdaQuery来构建复杂的查询条件。
+
+3. **使用XML配置文件**：结合MyBatis的XML配置文件来编写复杂的SQL查询，同时仍然使用MyBatis Plus的自动映射和CRUD功能。
+
+### 方法1：使用自定义SQL方法
+
+你可以在Mapper接口中使用MyBatis的`@Select`、`@Insert`、`@Update`和`@Delete`注解编写自定义SQL查询。例如：
+
+```java
+import org.apache.ibatis.annotations.Select;
+import java.util.List;
+
+public interface UserMapper extends BaseMapper<User> {
+    @Select("SELECT u.*, o.order_no FROM user u JOIN orders o ON u.id = o.user_id WHERE u.status = #{status}")
+    List<UserOrderDto> getUserOrdersByStatus(@Param("status") Integer status);
+}
+```
+
+### 方法2：使用Wrapper和LambdaQuery
+
+尽量利用MyBatis Plus提供的Wrapper和LambdaQuery来构建查询条件。例如：
+
+```java
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import java.util.List;
+
+public class UserService {
+
+    private final UserMapper userMapper;
+
+    public UserService(UserMapper userMapper) {
+        this.userMapper = userMapper;
+    }
+
+    public List<User> getUsersWithOrders() {
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.select("u.*, o.order_no")
+                    .from("user u")
+                    .leftJoin("orders o ON u.id = o.user_id")
+                    .where("u.status = 1");
+
+        return userMapper.selectList(queryWrapper);
+    }
+}
+```
+
+### 方法3：使用XML配置文件
+
+你可以结合MyBatis的XML配置文件来编写复杂的SQL查询，并且仍然可以使用MyBatis Plus的自动映射和CRUD功能。通过这种方式，你可以灵活地编写复杂的SQL语句。
+
+#### `UserMapper`接口：
+
+```java
+import java.util.List;
+
+public interface UserMapper extends BaseMapper<User> {
+    List<UserOrderDto> getUserOrdersByStatus(Integer status);
+}
+```
+
+#### `UserMapper.xml`文件：
+
+```xml
+<mapper namespace="com.example.UserMapper">
+    <select id="getUserOrdersByStatus" resultType="com.example.UserOrderDto">
+        SELECT u.*, o.order_no
+        FROM user u
+        JOIN orders o ON u.id = o.user_id
+        WHERE u.status = #{status}
+    </select>
+</mapper>
+```
+
+### 方法4：使用MyBatis Plus的扩展功能
+
+MyBatis Plus提供了很多扩展功能，比如分页查询等，你可以结合这些功能来实现复杂查询。
+
+#### 分页查询示例：
+
+```java
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+
+public class UserService {
+
+    private final UserMapper userMapper;
+
+    public UserService(UserMapper userMapper) {
+        this.userMapper = userMapper;
+    }
+
+    public IPage<User> getUsersWithOrdersPaged(int current, int size) {
+        Page<User> page = new Page<>(current, size);
+        return userMapper.getUsersWithOrdersPaged(page);
+    }
+}
+```
+
+#### `UserMapper`接口：
+
+```java
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+
+public interface UserMapper extends BaseMapper<User> {
+    IPage<User> getUsersWithOrdersPaged(Page<?> page);
+}
+```
+
+#### `UserMapper.xml`文件：
+
+```xml
+<mapper namespace="com.example.UserMapper">
+    <select id="getUsersWithOrdersPaged" resultType="com.example.User">
+        SELECT u.*, o.order_no
+        FROM user u
+        JOIN orders o ON u.id = o.user_id
+        WHERE u.status = 1
+    </select>
+</mapper>
+```
+
+### 总结
+
+通过以上方法，你可以在使用MyBatis Plus时，灵活编写复杂的SQL查询，而不需要直接在Mapper中编写所有的SQL语句。可以根据实际需求选择合适的方法来实现复杂的查询逻辑。
+
+# 20. mybatisplus的le和lt,ge和gt
+在MyBatis Plus中，`le`、`lt`、`ge` 和 `gt` 分别代表"小于等于"、"小于"、"大于等于"和"大于"条件。这些方法可以在查询条件中灵活地使用，以实现复杂的查询逻辑。
+
+### 使用方法
+
+以下是这些方法的使用示例：
+
+- **`le`（less than or equal to，小于等于）**
+- **`lt`（less than，小于）**
+- **`ge`（greater than or equal to，大于等于）**
+- **`gt`（greater than，大于）**
+
+### 示例
+
+假设有一个`User`实体类和对应的`UserMapper`接口：
+
+```java
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+@Data
+@TableName("user")
+public class User {
+    private Long id;
+    private String name;
+    private Integer age;
+    private String email;
+}
+```
+
+```java
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+
+public interface UserMapper extends BaseMapper<User> {
+}
+```
+
+### 使用LambdaQueryWrapper进行查询
+
+以下示例演示了如何使用`le`、`lt`、`ge`和`gt`方法构建查询条件：
+
+```java
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import java.util.List;
+
+@Service
+public class UserService {
+
+    @Autowired
+    private UserMapper userMapper;
+
+    public List<User> getUsersByAgeRange(Integer minAge, Integer maxAge) {
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.ge(User::getAge, minAge) // 大于等于 minAge
+                    .le(User::getAge, maxAge); // 小于等于 maxAge
+
+        return userMapper.selectList(queryWrapper);
+    }
+
+    public List<User> getUsersYoungerThan(Integer age) {
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.lt(User::getAge, age); // 小于 age
+
+        return userMapper.selectList(queryWrapper);
+    }
+
+    public List<User> getUsersOlderThan(Integer age) {
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.gt(User::getAge, age); // 大于 age
+
+        return userMapper.selectList(queryWrapper);
+    }
+}
+```
+
+### 调用示例
+
+在你的服务类中，可以调用这些方法来执行查询：
+
+```java
+public class Application {
+
+    @Autowired
+    private UserService userService;
+
+    public void run() {
+        List<User> usersInRange = userService.getUsersByAgeRange(18, 30);
+        List<User> usersYoungerThan = userService.getUsersYoungerThan(18);
+        List<User> usersOlderThan = userService.getUsersOlderThan(30);
+
+        // 打印结果
+        System.out.println("Users between 18 and 30: " + usersInRange);
+        System.out.println("Users younger than 18: " + usersYoungerThan);
+        System.out.println("Users older than 30: " + usersOlderThan);
+    }
+}
+```
+
+### 总结
+
+MyBatis Plus的`le`、`lt`、`ge`和`gt`方法提供了一种简洁的方法来构建复杂的查询条件。通过这些方法，可以方便地实现各种范围查询和比较查询，从而满足不同的业务需求。
+
+# 21. 使用mybatisplus的LambdaQuery去构建，每次返回的都是mapper中传入的数据表实体，现在有个需求是，只需要实体中返回的某几个字段，其他字段是不需要的，这种应该怎么实现呢
+在MyBatis Plus中，如果你只想返回实体类中的某几个字段，可以使用 `LambdaQueryWrapper` 和 `select` 方法来指定你需要的字段。MyBatis Plus提供了`select`方法，可以用于选择特定的字段。
+
+### 示例
+
+假设有一个`User`实体类：
+
+```java
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+@Data
+@TableName("user")
+public class User {
+    private Long id;
+    private String name;
+    private Integer age;
+    private String email;
+}
+```
+
+你可以通过`LambdaQueryWrapper`的`select`方法来指定需要返回的字段：
+
+```java
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import java.util.List;
+
+@Service
+public class UserService {
+
+    @Autowired
+    private UserMapper userMapper;
+
+    public List<User> getUsersWithSelectedFields() {
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.select(User::getId, User::getName); // 仅选择 id 和 name 字段
+
+        return userMapper.selectList(queryWrapper);
+    }
+}
+```
+
+### 调用示例
+
+在你的服务类中，可以调用这些方法来执行查询：
+
+```java
+public class Application {
+
+    @Autowired
+    private UserService userService;
+
+    public void run() {
+        List<User> users = userService.getUsersWithSelectedFields();
+
+        // 打印结果
+        users.forEach(user -> {
+            System.out.println("ID: " + user.getId() + ", Name: " + user.getName());
+        });
+    }
+}
+```
+
+### 注意事项
+
+1. **实体类的字段映射**：确保实体类中字段的映射与数据库表的列名一致，否则需要在实体类中使用`@TableField`注解进行指定。
+
+2. **查询结果的映射**：当使用`select`方法选择特定字段时，MyBatis Plus会将查询结果映射到实体类的对应字段中。未选择的字段将保持其默认值。
+
+3. **查询条件的组合**：你可以在同一个`LambdaQueryWrapper`中组合其他查询条件，如`eq`、`ge`、`le`等，以实现复杂的查询逻辑。
+
+### 总结
+
+通过使用`LambdaQueryWrapper`的`select`方法，你可以方便地选择实体类中需要返回的字段，从而优化查询结果，满足特定的业务需求。
+
+# 22. 它没法像写mapper.xml一样，将结果集映射到指定的一个新实体上吗
+在MyBatis Plus中，如果你想将查询结果映射到一个与表结构不同的新实体上，可以使用自定义SQL查询并手动指定结果映射。你可以通过编写Mapper XML文件来实现这种自定义映射。
+
+### 示例
+
+假设有一个`User`表和一个自定义的DTO类`UserDTO`：
+
+#### UserDTO类
+
+```java
+import lombok.Data;
+
+@Data
+public class UserDTO {
+    private Long id;
+    private String name;
+}
+```
+
+#### UserMapper接口
+
+```java
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
+
+@Mapper
+public interface UserMapper extends BaseMapper<User> {
+    List<UserDTO> selectUserDTO();
+}
+```
+
+#### UserMapper.xml文件
+
+```xml
+<mapper namespace="com.example.UserMapper">
+    <select id="selectUserDTO" resultType="com.example.UserDTO">
+        SELECT id, name
+        FROM user
+    </select>
+</mapper>
+```
+
+#### UserService类
+
+```java
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class UserService {
+
+    @Autowired
+    private UserMapper userMapper;
+
+    public List<UserDTO> getUserDTOs() {
+        return userMapper.selectUserDTO();
+    }
+}
+```
+
+### 调用示例
+
+```java
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+@Component
+public class Application implements CommandLineRunner {
+
+    @Autowired
+    private UserService userService;
+
+    @Override
+    public void run(String... args) throws Exception {
+        List<UserDTO> userDTOs = userService.getUserDTOs();
+
+        // 打印结果
+        userDTOs.forEach(userDTO -> {
+            System.out.println("ID: " + userDTO.getId() + ", Name: " + userDTO.getName());
+        });
+    }
+}
+```
+
+### 总结
+
+通过这种方式，你可以利用Mapper XML文件的灵活性，将查询结果映射到指定的DTO类中，而不受限于实体类的字段结构。这种方法特别适合复杂查询和自定义结果映射的场景。
+
+# 23. mapper.xml中的resultType没法导入内部类吗
+在MyBatis的`mapper.xml`中，`resultType`是用于指定结果映射类型的全限定类名。虽然可以在Java中创建内部类，但在XML配置中引用内部类时，需要使用特定的语法。
+
+### 内部类的全限定名称
+
+如果有一个内部类`UserDTO`定义在`UserService`类中，那么内部类的全限定名称应该是`外部类名$内部类名`。例如：
+
+```java
+public class UserService {
+    public static class UserDTO {
+        private Long id;
+        private String name;
+        
+        // getters and setters
+    }
+}
+```
+
+在这种情况下，内部类的全限定名称是`com.example.UserService$UserDTO`。
+
+### 在mapper.xml中使用内部类
+
+你可以在`mapper.xml`中通过如下方式引用内部类：
+
+#### UserMapper.xml
+
+```xml
+<mapper namespace="com.example.UserMapper">
+    <select id="selectUserDTO" resultType="com.example.UserService$UserDTO">
+        SELECT id, name
+        FROM user
+    </select>
+</mapper>
+```
+
+### 完整示例
+
+#### UserService类
+
+```java
+package com.example;
+
+public class UserService {
+    public static class UserDTO {
+        private Long id;
+        private String name;
+        
+        // getters and setters
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+    }
+}
+```
+
+#### UserMapper接口
+
+```java
+package com.example;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
+
+@Mapper
+public interface UserMapper {
+    @Select("SELECT id, name FROM user")
+    List<UserService.UserDTO> selectUserDTO();
+}
+```
+
+#### UserMapper.xml文件
+
+```xml
+<mapper namespace="com.example.UserMapper">
+    <select id="selectUserDTO" resultType="com.example.UserService$UserDTO">
+        SELECT id, name
+        FROM user
+    </select>
+</mapper>
+```
+
+#### UserService使用示例
+
+```java
+package com.example;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class UserService {
+
+    @Autowired
+    private UserMapper userMapper;
+
+    public List<UserDTO> getUserDTOs() {
+        return userMapper.selectUserDTO();
+    }
+}
+```
+
+#### 调用示例
+
+```java
+package com.example;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+@Component
+public class Application implements CommandLineRunner {
+
+    @Autowired
+    private UserService userService;
+
+    @Override
+    public void run(String... args) throws Exception {
+        List<UserService.UserDTO> userDTOs = userService.getUserDTOs();
+
+        // 打印结果
+        userDTOs.forEach(userDTO -> {
+            System.out.println("ID: " + userDTO.getId() + ", Name: " + userDTO.getName());
+        });
+    }
+}
+```
+
+### 总结
+
+在`mapper.xml`中引用内部类时，需要使用`外部类名$内部类名`的格式来指定`resultType`。通过这种方式，可以在MyBatis中使用内部类进行结果映射。
+
+# 24. SQL语句中某个字段的值有单引号，在编写sql查询语句时候要注意什么
+在编写 SQL 查询语句时，如果某个字段的值包含单引号，需要注意以下几点：
+
+1. **转义单引号**：如果你在 SQL 查询中直接使用包含单引号的字符串，需要将单引号进行转义。在大多数数据库中，使用另一个单引号来表示转义，例如将 `'` 替换为 `''`。
+
+   示例：假设要查询名字为 O'Neil 的用户，SQL 查询中应该写成 `WHERE name = 'O''Neil'`。
+
+2. **使用参数化查询**：为避免手动转义单引号带来的繁琐和错误，推荐使用参数化查询（Prepared Statement 或者 Named Parameter）。通过参数化查询，可以将需要查询的值作为参数传入，数据库驱动会自动处理转义等操作，确保查询的安全性和正确性。
+
+   示例（使用 Prepared Statement）：
+
+   ```java
+   String name = "O'Neil";
+   String sql = "SELECT * FROM users WHERE name = ?";
+   PreparedStatement preparedStatement = connection.prepareStatement(sql);
+   preparedStatement.setString(1, name);
+   ResultSet resultSet = preparedStatement.executeQuery();
+   ```
+
+3. **防止 SQL 注入攻击**：不仅仅是单引号，任何用户输入的数据都可能包含恶意代码。因此，使用参数化查询可以有效防止 SQL 注入攻击，提高系统安全性。
+
+4. **使用数据库提供的工具或函数**：某些数据库提供了专门处理包含特殊字符的数据的函数或工具。例如，MySQL 中的 `QUOTENAME` 函数可以用于处理包含特殊字符的字符串。
+
+总的来说，处理包含单引号或其他特殊字符的数据时，应该采取预防性措施，避免直接将用户输入的数据插入到 SQL 查询中，以确保查询的安全性和正确性。
+
+# 25. clickHouse中如何处理这种单引号的问题呢
+在 ClickHouse 中处理包含单引号的数据或字符串时，可以采用以下方法：
+
+1. **使用双单引号转义**：在 ClickHouse 中，可以使用双单引号 `''` 来表示单引号字符。因此，如果要在 SQL 查询中使用包含单引号的字符串，需要将单引号替换为两个连续的单引号。
+
+   示例：假设要查询名字为 O'Neil 的用户，SQL 查询中应该写成 `SELECT * FROM users WHERE name = 'O''Neil'`。
+
+2. **使用转义函数**：ClickHouse 提供了一些转义函数，可以用于处理包含特殊字符的数据。例如，可以使用 `replaceAll` 函数替换字符串中的单引号为双单引号。
+
+   示例：
+
+   ```sql
+   SELECT * FROM users WHERE name = replaceAll('O''Neil', '\'', '\'\'')
+   ```
+
+3. **使用参数化查询**：与其他数据库类似，ClickHouse 也支持参数化查询，可以使用参数将需要查询的值传入 SQL 查询中。这样可以避免手动处理单引号带来的繁琐和错误。
+
+   示例（使用参数化查询）：
+
+   ```sql
+   SELECT * FROM users WHERE name = :name
+   ```
+
+在实际使用时，根据具体情况选择合适的方法。参数化查询是最推荐的做法，可以保证查询的安全性和正确性，并且减少手动处理特殊字符带来的麻烦。
+
+# 26. springboot中处理@ConditionalOnProperty注解时，判断的逻辑是什么样的？我想了解它判断的时机，比如它是判断Envrioment中有对应的属性时，还是在判断把对应的属性值注入到某个PropertyBean中之后才做的判断呢？
 在 Spring Boot 中，`@ConditionalOnProperty` 注解用于条件性地注册 bean，只有在指定的配置属性满足条件时才会注册该 bean。其判断逻辑主要基于 Spring 的 `Environment`，即它会在配置属性加载到 `Environment` 中时进行判断，而不是在属性注入到某个 `PropertyBean` 之后。
 
 ### 具体的判断逻辑
@@ -1427,7 +2328,7 @@ public class OnPropertyCondition extends SpringBootCondition {
 
 `@ConditionalOnProperty` 注解在 Spring Boot 中基于 `Environment` 进行判断。当 Spring 容器启动并加载配置属性到 `Environment` 中之后，但在实际创建 bean 实例之前，Spring 解析并判断 `@ConditionalOnProperty` 注解，根据配置属性决定是否注册该 bean。因此，判断逻辑是在 `Environment` 中检查属性值，而不是在将属性注入到某个 `PropertyBean` 之后。
 
-# 15. sql查询中，order by和select的执行顺序
+# 27. sql查询中，order by和select的执行顺序
 在 SQL 查询的执行过程中，`ORDER BY` 和 `SELECT` 语句的执行顺序是有固定的执行顺序的。以下是标准的 SQL 查询的执行顺序：
 
 1. **FROM**: 确定要查询的表或视图。
@@ -1520,7 +2421,7 @@ ORDER BY avg_salary DESC;
 
 在 SQL 查询中，`ORDER BY` 在 `SELECT` 之后执行。这意味着在排序之前，查询已经完成了所有的筛选、分组和列选择。理解这一点对于优化查询和预期结果非常重要。
 
-# 16. 如果select对字段列起别名了，order by使用别名还是数据表字段名呢
+# 28. 如果select对字段列起别名了，order by使用别名还是数据表字段名呢
 在 SQL 查询中，如果 `SELECT` 语句对字段列起了别名，可以在 `ORDER BY` 子句中使用这个别名。大多数数据库管理系统（DBMS）都支持这种用法，这使得查询更简洁和易读。
 
 ### 示例
@@ -1566,7 +2467,7 @@ ORDER BY employee_salary DESC;
 
 在 SQL 查询中，可以在 `ORDER BY` 子句中使用 `SELECT` 语句中的别名。这使得查询语句更简洁、更易读，并且是大多数数据库管理系统所支持的常见用法。
 
-# 17. order by不使用select中的别名是不是更合规一些
+# 29. order by不使用select中的别名是不是更合规一些
 从 SQL 标准和跨数据库兼容性的角度来看，`ORDER BY` 使用 `SELECT` 中的别名是完全合规的，也是大多数主流数据库管理系统（DBMS）所支持的。然而，是否使用别名主要取决于具体的需求和项目的风格规范。
 
 ### 使用别名的优势
