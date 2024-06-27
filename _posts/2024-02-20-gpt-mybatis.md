@@ -645,11 +645,12 @@ import org.apache.ibatis.jdbc.SQL;
 
 public class UserSqlBuilder {
     public String buildSelectByDynamicField(final String fieldName, final Object fieldValue) {
-        return new SQL() {{
-            SELECT("*");
-            FROM("User");
-            WHERE(fieldName + " = #{fieldValue}");
-        }}.toString();
+        // return new SQL() {{
+        //    SELECT("*");
+        //    FROM("User");
+        //    WHERE(fieldName + " = #{fieldValue}");
+        //}}.toString();
+            return null;
     }
 }
 ```
