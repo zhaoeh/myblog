@@ -1725,3 +1725,573 @@ spring:
       idle-timeout: 300000
       max-lifetime: 1200000
 ```
+# 29. 我的多数据源配置如下
+```java
+package com.bgc.log.config;
+
+import com.bgc.log.constant.DataSourceNameEnum;
+import com.zaxxer.hikari.HikariDataSource;
+import io.micrometer.core.instrument.Clock;
+import io.micrometer.core.instrument.logging.LoggingMeterRegistry;
+import io.micrometer.core.instrument.logging.LoggingRegistryConfig;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+
+import javax.annotation.Resource;
+import javax.sql.DataSource;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * 定义动态数据源
+ *
+ * @author yueds
+ */
+@Configuration
+public class DynamicDataSourceConfig {
+
+
+    @Resource
+    private JdbcParamsConfig jdbcParamsConfig;
+
+    /**
+     * oracle配置类
+     */
+    @Bean(name = "oracleDataSourceProperties")
+    @ConfigurationProperties(prefix = "spring.datasource")
+    public DataSourceProperties oracleDataSourceProperties() {
+        return new DataSourceProperties();
+    }
+
+    /**
+     * 配置oracle数据源
+     */
+    @Bean(name = "oracleDataSource")
+    @ConfigurationProperties(prefix = "spring.datasource.hikari")
+    public DataSource dataSource(@Qualifier("oracleDataSourceProperties") DataSourceProperties properties) {
+        HikariDataSource dataSource = properties.initializeDataSourceBuilder().type(HikariDataSource.class).build();
+        return dataSource;
+    }
+
+    /**
+     * byteHouse配置类
+     */
+    @Bean(name = "byteHouseDataSourceProperties")
+    @ConfigurationProperties(prefix = "spring.bytehouse.datasource")
+    public DataSourceProperties byteHouseDataSourceProperties() {
+        return new DataSourceProperties();
+    }
+
+    /**
+     * 配置byteHouse数据源
+     */
+    @Bean(name = "byteHouseDataSource")
+    public DataSource byteHouseDataSource(@Qualifier("byteHouseDataSourceProperties") DataSourceProperties properties) {
+        HikariDataSource hikariDataSource = properties.initializeDataSourceBuilder().type(HikariDataSource.class).build();
+        hikariDataSource.setIdleTimeout(jdbcParamsConfig.getIdleTimeout());
+        hikariDataSource.setMaxLifetime(jdbcParamsConfig.getMaxLifeTime());
+        hikariDataSource.setConnectionTestQuery(jdbcParamsConfig.getValidationQuery());
+//        hikariDataSource.setValidationTimeout(jdbcParamsConfig.getValidationTimeout());
+        hikariDataSource.setConnectionTimeout(jdbcParamsConfig.getConnectionTimeout());
+        hikariDataSource.setMaximumPoolSize(jdbcParamsConfig.getMaximumPoolSize());
+        hikariDataSource.setMinimumIdle(jdbcParamsConfig.getMinimumIdle());
+        hikariDataSource.setKeepaliveTime(jdbcParamsConfig.getKeepAliveTime());
+        hikariDataSource.setPoolName("bytehouse-hikari");
+
+
+        return hikariDataSource;
+    }
+
+    /**
+     * 将自定义的动态数据源定义为主数据源，如果拓展第三个数据源，此处拓展
+     *
+     * @param oracleDataSource    oracle数据源
+     * @param byteHouseDataSource byteHouse数据源
+     * @return 自定义动态数据源
+     */
+    @Bean
+    @Primary
+    public DynamicDataSource dynamicDataSource(DataSource oracleDataSource, DataSource byteHouseDataSource) {
+        Map<Object, Object> targetDataSources = new HashMap<>(4);
+        targetDataSources.put(DataSourceNameEnum.ORACLE, oracleDataSource);
+        targetDataSources.put(DataSourceNameEnum.BYTE_HOUSE, byteHouseDataSource);
+        return new DynamicDataSource(oracleDataSource, targetDataSources);
+    }
+}
+```
+你的多数据源配置看起来相当全面，涵盖了 Oracle 和 ByteHouse 数据源。以下是一些建议和优化的详细步骤，以确保你的配置能够正常工作并且符合最佳实践。
+
+### 多数据源配置文件 (application.yml 或 application.properties)
+
+确保在你的配置文件中有如下配置项：
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:oracle:thin:@localhost:1521:orcl
+    username: your_oracle_username
+    password: your_oracle_password
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 30000
+      max-lifetime: 600000
+      connection-timeout: 30000
+      validation-timeout: 3000
+      connection-test-query: SELECT 1 FROM DUAL
+
+  bytehouse:
+    datasource:
+      url: jdbc:clickhouse://localhost:8123/default
+      username: your_bytehouse_username
+      password: your_bytehouse_password
+      hikari:
+        maximum-pool-size: 10
+        minimum-idle: 5
+        idle-timeout: 30000
+        max-lifetime: 600000
+        connection-timeout: 30000
+        validation-timeout: 3000
+        connection-test-query: SELECT 1
+```
+
+### 动态数据源配置类 (DynamicDataSourceConfig.java)
+
+确保你的 `DynamicDataSourceConfig` 类中所有数据源配置正确并且所有 Bean 注入顺利完成。你的代码基本符合要求，这里有一些小调整和注意事项：
+
+```java
+package com.bgc.log.config;
+
+import com.bgc.log.constant.DataSourceNameEnum;
+import com.zaxxer.hikari.HikariDataSource;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+
+import javax.annotation.Resource;
+import javax.sql.DataSource;
+import java.util.HashMap;
+import java.util.Map;
+
+@Configuration
+public class DynamicDataSourceConfig {
+
+    @Resource
+    private JdbcParamsConfig jdbcParamsConfig;
+
+    @Bean(name = "oracleDataSourceProperties")
+    @ConfigurationProperties(prefix = "spring.datasource")
+    public DataSourceProperties oracleDataSourceProperties() {
+        return new DataSourceProperties();
+    }
+
+    @Bean(name = "oracleDataSource")
+    @ConfigurationProperties(prefix = "spring.datasource.hikari")
+    public DataSource oracleDataSource(@Qualifier("oracleDataSourceProperties") DataSourceProperties properties) {
+        return properties.initializeDataSourceBuilder().type(HikariDataSource.class).build();
+    }
+
+    @Bean(name = "byteHouseDataSourceProperties")
+    @ConfigurationProperties(prefix = "spring.bytehouse.datasource")
+    public DataSourceProperties byteHouseDataSourceProperties() {
+        return new DataSourceProperties();
+    }
+
+    @Bean(name = "byteHouseDataSource")
+    public DataSource byteHouseDataSource(@Qualifier("byteHouseDataSourceProperties") DataSourceProperties properties) {
+        HikariDataSource hikariDataSource = properties.initializeDataSourceBuilder().type(HikariDataSource.class).build();
+        hikariDataSource.setIdleTimeout(jdbcParamsConfig.getIdleTimeout());
+        hikariDataSource.setMaxLifetime(jdbcParamsConfig.getMaxLifeTime());
+        hikariDataSource.setConnectionTestQuery(jdbcParamsConfig.getValidationQuery());
+        hikariDataSource.setConnectionTimeout(jdbcParamsConfig.getConnectionTimeout());
+        hikariDataSource.setMaximumPoolSize(jdbcParamsConfig.getMaximumPoolSize());
+        hikariDataSource.setMinimumIdle(jdbcParamsConfig.getMinimumIdle());
+        hikariDataSource.setKeepaliveTime(jdbcParamsConfig.getKeepAliveTime());
+        hikariDataSource.setPoolName("bytehouse-hikari");
+        return hikariDataSource;
+    }
+
+    @Bean
+    @Primary
+    public DynamicDataSource dynamicDataSource(DataSource oracleDataSource, DataSource byteHouseDataSource) {
+        Map<Object, Object> targetDataSources = new HashMap<>(2);
+        targetDataSources.put(DataSourceNameEnum.ORACLE, oracleDataSource);
+        targetDataSources.put(DataSourceNameEnum.BYTE_HOUSE, byteHouseDataSource);
+        return new DynamicDataSource(oracleDataSource, targetDataSources);
+    }
+}
+```
+
+### 动态数据源实现类 (DynamicDataSource.java)
+
+确保你的 `DynamicDataSource` 实现了 `AbstractRoutingDataSource`，以动态路由到不同的数据源。
+
+```java
+package com.bgc.log.config;
+
+import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
+
+public class DynamicDataSource extends AbstractRoutingDataSource {
+
+    public DynamicDataSource(DataSource defaultTargetDataSource, Map<Object, Object> targetDataSources) {
+        super.setDefaultTargetDataSource(defaultTargetDataSource);
+        super.setTargetDataSources(targetDataSources);
+        super.afterPropertiesSet();
+    }
+
+    @Override
+    protected Object determineCurrentLookupKey() {
+        return DynamicDataSourceContextHolder.getDataSourceType();
+    }
+}
+```
+
+### 动态数据源上下文持有者 (DynamicDataSourceContextHolder.java)
+
+创建一个上下文持有者，负责保存和切换当前数据源类型。
+
+```java
+package com.bgc.log.config;
+
+public class DynamicDataSourceContextHolder {
+
+    private static final ThreadLocal<String> CONTEXT_HOLDER = new ThreadLocal<>();
+
+    public static void setDataSourceType(String dataSourceType) {
+        CONTEXT_HOLDER.set(dataSourceType);
+    }
+
+    public static String getDataSourceType() {
+        return CONTEXT_HOLDER.get();
+    }
+
+    public static void clearDataSourceType() {
+        CONTEXT_HOLDER.remove();
+    }
+}
+```
+
+### 使用数据源
+
+在需要切换数据源的地方，使用 `DynamicDataSourceContextHolder` 切换数据源，例如：
+
+```java
+public void someMethod() {
+    try {
+        DynamicDataSourceContextHolder.setDataSourceType(DataSourceNameEnum.ORACLE);
+        // 业务逻辑
+    } finally {
+        DynamicDataSourceContextHolder.clearDataSourceType();
+    }
+}
+```
+
+### 总结
+
+通过上述配置，你的多数据源应该能够顺利运行。如果你有更多的具体需求或遇到问题，请随时提供更多信息以便我进一步协助你。
+
+# 30. 我的代码中，使用了Map<Object, Object> targetDataSources = new HashMap<>(2);，整个是局部的变量，会可能导致真实的数据源被gc回收吗
+你提到的 `targetDataSources` 是一个局部变量，确实在方法结束后该变量本身会被 GC 回收，但它指向的内容不会被立即回收。这里有一些细节可以帮助你理解为什么数据源不会被 GC 回收：
+
+1. **Spring Context 管理**：
+   当你创建 `DynamicDataSource` Bean 时，Spring 容器会管理这个 Bean。Spring 容器会确保这些 Bean 在应用程序上下文存在期间不会被 GC 回收。
+
+2. **引用关系**：
+   在 `DynamicDataSource` 初始化过程中，`targetDataSources` 的内容被复制到 `DynamicDataSource` 的内部成员变量中。因为 `DynamicDataSource` 是由 Spring 管理的 Bean，Spring 容器会持有对这些数据源的引用，确保它们不会被 GC 回收。
+
+以下是改进后的代码示例，其中明确了 Spring 管理的 Bean 如何引用这些数据源：
+
+### 改进的 `DynamicDataSourceConfig` 类
+
+```java
+package com.bgc.log.config;
+
+import com.bgc.log.constant.DataSourceNameEnum;
+import com.zaxxer.hikari.HikariDataSource;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+
+import javax.annotation.Resource;
+import javax.sql.DataSource;
+import java.util.HashMap;
+import java.util.Map;
+
+@Configuration
+public class DynamicDataSourceConfig {
+
+    @Resource
+    private JdbcParamsConfig jdbcParamsConfig;
+
+    @Bean(name = "oracleDataSourceProperties")
+    @ConfigurationProperties(prefix = "spring.datasource")
+    public DataSourceProperties oracleDataSourceProperties() {
+        return new DataSourceProperties();
+    }
+
+    @Bean(name = "oracleDataSource")
+    @ConfigurationProperties(prefix = "spring.datasource.hikari")
+    public DataSource oracleDataSource(@Qualifier("oracleDataSourceProperties") DataSourceProperties properties) {
+        return properties.initializeDataSourceBuilder().type(HikariDataSource.class).build();
+    }
+
+    @Bean(name = "byteHouseDataSourceProperties")
+    @ConfigurationProperties(prefix = "spring.bytehouse.datasource")
+    public DataSourceProperties byteHouseDataSourceProperties() {
+        return new DataSourceProperties();
+    }
+
+    @Bean(name = "byteHouseDataSource")
+    public DataSource byteHouseDataSource(@Qualifier("byteHouseDataSourceProperties") DataSourceProperties properties) {
+        HikariDataSource hikariDataSource = properties.initializeDataSourceBuilder().type(HikariDataSource.class).build();
+        hikariDataSource.setIdleTimeout(jdbcParamsConfig.getIdleTimeout());
+        hikariDataSource.setMaxLifetime(jdbcParamsConfig.getMaxLifeTime());
+        hikariDataSource.setConnectionTestQuery(jdbcParamsConfig.getValidationQuery());
+        hikariDataSource.setConnectionTimeout(jdbcParamsConfig.getConnectionTimeout());
+        hikariDataSource.setMaximumPoolSize(jdbcParamsConfig.getMaximumPoolSize());
+        hikariDataSource.setMinimumIdle(jdbcParamsConfig.getMinimumIdle());
+        hikariDataSource.setKeepaliveTime(jdbcParamsConfig.getKeepAliveTime());
+        hikariDataSource.setPoolName("bytehouse-hikari");
+        return hikariDataSource;
+    }
+
+    @Bean
+    @Primary
+    public DynamicDataSource dynamicDataSource(@Qualifier("oracleDataSource") DataSource oracleDataSource, 
+                                               @Qualifier("byteHouseDataSource") DataSource byteHouseDataSource) {
+        Map<Object, Object> targetDataSources = new HashMap<>(2);
+        targetDataSources.put(DataSourceNameEnum.ORACLE, oracleDataSource);
+        targetDataSources.put(DataSourceNameEnum.BYTE_HOUSE, byteHouseDataSource);
+        return new DynamicDataSource(oracleDataSource, targetDataSources);
+    }
+}
+```
+
+### `DynamicDataSource` 实现类
+
+确保你的 `DynamicDataSource` 类正确地继承自 `AbstractRoutingDataSource` 并在 `afterPropertiesSet()` 方法中初始化目标数据源：
+
+```java
+package com.bgc.log.config;
+
+import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
+import javax.sql.DataSource;
+import java.util.Map;
+
+public class DynamicDataSource extends AbstractRoutingDataSource {
+
+    public DynamicDataSource(DataSource defaultTargetDataSource, Map<Object, Object> targetDataSources) {
+        super.setDefaultTargetDataSource(defaultTargetDataSource);
+        super.setTargetDataSources(targetDataSources);
+        super.afterPropertiesSet();  // 确保在 Spring 容器初始化时设置数据源
+    }
+
+    @Override
+    protected Object determineCurrentLookupKey() {
+        return DynamicDataSourceContextHolder.getDataSourceType();
+    }
+}
+```
+
+### `DynamicDataSourceContextHolder` 类
+
+这个类的实现保持不变：
+
+```java
+package com.bgc.log.config;
+
+public class DynamicDataSourceContextHolder {
+
+    private static final ThreadLocal<String> CONTEXT_HOLDER = new ThreadLocal<>();
+
+    public static void setDataSourceType(String dataSourceType) {
+        CONTEXT_HOLDER.set(dataSourceType);
+    }
+
+    public static String getDataSourceType() {
+        return CONTEXT_HOLDER.get();
+    }
+
+    public static void clearDataSourceType() {
+        CONTEXT_HOLDER.remove();
+    }
+}
+```
+
+通过以上改进和确保 Spring 容器管理这些数据源，你可以放心地使用局部变量 `targetDataSources` 来配置动态数据源。只要这些数据源在 Spring 容器中被正确管理，它们就不会被 GC 回收。
+
+# 31. 那看样子我的配置完全没问题啊？为什么连接池总会连接超时，感觉被GC回收了Datasource一样
+你的配置看起来是正确的，Spring 容器应该正确管理这些数据源，确保它们不会被 GC 回收。如果你遇到连接池连接超时的问题，可能的原因有很多，包括但不限于：
+
+1. **数据库连接参数配置不当**：比如连接超时、连接测试查询等配置不正确。
+2. **数据库服务器负载**：数据库服务器本身可能负载过高，导致连接超时。
+3. **网络问题**：数据库服务器和应用服务器之间的网络可能存在问题。
+4. **连接池配置问题**：连接池的配置可能导致连接数不足或连接管理不当。
+
+以下是一些调试和改进建议，帮助你找到问题的根本原因：
+
+### 检查数据库服务器状态和日志
+
+首先，检查数据库服务器的状态和日志，看看是否有任何与连接相关的错误或警告。
+
+### 增加连接池配置日志
+
+你可以增加连接池的配置日志，查看连接池的状态和参数是否正确配置。
+
+### 测试独立的数据源连接
+
+测试单独的数据源连接，确保每个数据源配置和数据库服务器正常工作：
+
+```java
+@Bean
+public void testDataSourceConnections(@Qualifier("oracleDataSource") DataSource oracleDataSource,
+                                      @Qualifier("byteHouseDataSource") DataSource byteHouseDataSource) {
+    try (Connection oracleConnection = oracleDataSource.getConnection()) {
+        System.out.println("Oracle data source connection test successful.");
+    } catch (SQLException e) {
+        System.err.println("Oracle data source connection test failed: " + e.getMessage());
+    }
+
+    try (Connection byteHouseConnection = byteHouseDataSource.getConnection()) {
+        System.out.println("ByteHouse data source connection test successful.");
+    } catch (SQLException e) {
+        System.err.println("ByteHouse data source connection test failed: " + e.getMessage());
+    }
+}
+```
+
+### 使用连接池监控工具
+
+你可以使用连接池监控工具（例如 HikariCP 自带的监控功能）来监控连接池的状态。
+
+```java
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
+@Bean
+public HikariDataSource oracleDataSource(@Qualifier("oracleDataSourceProperties") DataSourceProperties properties) {
+    HikariConfig config = new HikariConfig();
+    config.setJdbcUrl(properties.getUrl());
+    config.setUsername(properties.getUsername());
+    config.setPassword(properties.getPassword());
+    // 设置HikariCP监控参数
+    config.setIdleTimeout(30000);
+    config.setMaxLifetime(600000);
+    config.setConnectionTimeout(30000);
+    config.setValidationTimeout(3000);
+    config.setMaximumPoolSize(10);
+    config.setMinimumIdle(5);
+    config.setPoolName("oracle-hikari");
+    config.setMetricRegistry(new MetricsRegistry());
+    return new HikariDataSource(config);
+}
+
+@Bean
+public HikariDataSource byteHouseDataSource(@Qualifier("byteHouseDataSourceProperties") DataSourceProperties properties) {
+    HikariConfig config = new HikariConfig();
+    config.setJdbcUrl(properties.getUrl());
+    config.setUsername(properties.getUsername());
+    config.setPassword(properties.getPassword());
+    // 设置HikariCP监控参数
+    config.setIdleTimeout(30000);
+    config.setMaxLifetime(600000);
+    config.setConnectionTimeout(30000);
+    config.setValidationTimeout(3000);
+    config.setMaximumPoolSize(10);
+    config.setMinimumIdle(5);
+    config.setPoolName("bytehouse-hikari");
+    config.setMetricRegistry(new MetricsRegistry());
+    return new HikariDataSource(config);
+}
+```
+
+### 检查和优化连接池配置
+
+确保连接池配置合理，避免因配置问题导致连接超时：
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:oracle:thin:@localhost:1521:orcl
+    username: your_oracle_username
+    password: your_oracle_password
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 30000
+      max-lifetime: 600000
+      connection-timeout: 30000
+      validation-timeout: 3000
+      connection-test-query: SELECT 1 FROM DUAL
+
+  bytehouse:
+    datasource:
+      url: jdbc:clickhouse://localhost:8123/default
+      username: your_bytehouse_username
+      password: your_bytehouse_password
+      hikari:
+        maximum-pool-size: 10
+        minimum-idle: 5
+        idle-timeout: 30000
+        max-lifetime: 600000
+        connection-timeout: 30000
+        validation-timeout: 3000
+        connection-test-query: SELECT 1
+```
+
+### 增加日志和监控
+
+增加更多的日志和监控，帮助你找到具体的超时原因：
+
+```java
+import org.springframework.jdbc.datasource.DelegatingDataSource;
+
+public class LoggingDataSource extends DelegatingDataSource {
+
+    public LoggingDataSource(DataSource targetDataSource) {
+        super(targetDataSource);
+    }
+
+    @Override
+    public Connection getConnection() throws SQLException {
+        long startTime = System.currentTimeMillis();
+        try {
+            Connection connection = super.getConnection();
+            long endTime = System.currentTimeMillis();
+            System.out.println("Connection acquired in " + (endTime - startTime) + " ms");
+            return connection;
+        } catch (SQLException e) {
+            long endTime = System.currentTimeMillis();
+            System.err.println("Failed to acquire connection in " + (endTime - startTime) + " ms: " + e.getMessage());
+            throw e;
+        }
+    }
+}
+```
+
+将 `LoggingDataSource` 包装到你的数据源中，查看连接获取时间：
+
+```java
+@Bean
+@Primary
+public DynamicDataSource dynamicDataSource(@Qualifier("oracleDataSource") DataSource oracleDataSource, 
+                                           @Qualifier("byteHouseDataSource") DataSource byteHouseDataSource) {
+    Map<Object, Object> targetDataSources = new HashMap<>(2);
+    targetDataSources.put(DataSourceNameEnum.ORACLE, new LoggingDataSource(oracleDataSource));
+    targetDataSources.put(DataSourceNameEnum.BYTE_HOUSE, new LoggingDataSource(byteHouseDataSource));
+    return new DynamicDataSource(new LoggingDataSource(oracleDataSource), targetDataSources);
+}
+```
+
+通过上述方法，你应该能够找到连接池超时的根本原因并解决它。如果问题依然存在，请提供更多详细信息，以便进一步诊断和帮助解决。
