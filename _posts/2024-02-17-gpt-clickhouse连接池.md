@@ -1413,3 +1413,315 @@ spring:
 ```
 
 通过合理配置连接池参数，确保数据库连接信息正确，并排除网络和防火墙等问题，可以有效避免连接超时问题。
+
+# 25. springboot默认的连接池是什么？如果连接池一直连接超时，是什么原因？是因为连接对象被消耗完了？还是其他原因呢
+Spring Boot 默认使用 HikariCP 作为其连接池。
+
+如果连接池一直连接超时，可能的原因有以下几种：
+
+1. **连接池耗尽**：连接池中的连接被消耗完了，没有可用的连接提供给新的请求。这通常是因为连接池的配置不当，连接数设置过少，或者应用程序的并发请求量过大。
+
+2. **数据库性能问题**：数据库服务器的性能问题，如CPU、内存、I/O瓶颈，可能导致查询执行缓慢，连接不能及时释放。
+
+3. **网络问题**：网络延迟或不稳定可能导致连接超时。
+
+4. **应用程序问题**：应用程序在处理数据库连接时没有正确关闭连接，导致连接泄漏。
+
+5. **配置问题**：连接池配置不当，比如超时时间设置过短或者连接池大小设置过小，都会导致连接超时。
+
+可以通过以下步骤来诊断和解决问题：
+
+1. **检查连接池配置**：
+   - 增加 `maximumPoolSize` 的值。
+   - 确认 `connectionTimeout` 配置适当。
+
+2. **监控数据库性能**：
+   - 查看数据库服务器的资源使用情况，确认是否存在瓶颈。
+   - 使用数据库的性能监控工具，检查慢查询。
+
+3. **优化应用程序**：
+   - 确保在应用程序中正确关闭数据库连接。
+   - 优化SQL查询，避免长时间执行的查询。
+
+4. **日志分析**：
+   - 查看应用程序和数据库的日志文件，查找是否有异常信息。
+
+Spring Boot 中的 HikariCP 配置示例如下：
+
+```yaml
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+```
+
+根据需要调整这些参数，可以帮助解决连接超时的问题。
+
+# 26. 相同的代码，部署在不同的环境上，比如dev和uat环境，结果dev环境是正常的，uat环境就一直连接超时，连接的数据库是同一个
+在相同的代码部署在不同的环境上，且连接的数据库是同一个，但出现连接超时的情况，可能的原因如下：
+
+1. **网络问题**：
+   - UAT 环境与数据库服务器之间的网络连接可能存在问题，比如网络延迟或不稳定。
+   - 可以使用网络诊断工具（如 ping, traceroute）来检查 UAT 环境到数据库服务器的网络状况。
+
+2. **环境配置问题**：
+   - 确认 UAT 环境中的配置与 dev 环境中的配置一致，特别是数据库连接池的配置。
+   - 检查操作系统和 JVM 参数配置，确保与 dev 环境一致。
+
+3. **资源限制**：
+   - UAT 环境的资源（如内存、CPU）是否不足，导致性能问题。
+   - 检查 UAT 环境的资源使用情况，确保没有其他进程占用大量资源。
+
+4. **数据库连接数限制**：
+   - 数据库服务器对来自不同 IP 地址的连接数可能有限制，导致 UAT 环境的连接被拒绝。
+   - 检查数据库服务器的连接数配置，确保允许足够的连接数。
+
+5. **防火墙和安全组**：
+   - UAT 环境的防火墙规则或安全组配置可能限制了对数据库服务器的访问。
+   - 确认防火墙和安全组配置，确保允许从 UAT 环境访问数据库服务器。
+
+6. **应用程序配置**：
+   - 确认应用程序在 UAT 环境中的配置与 dev 环境中一致，特别是数据库连接相关的配置。
+
+要诊断和解决这个问题，可以按照以下步骤进行排查：
+
+1. **检查网络连接**：
+   - 使用 `ping` 和 `traceroute` 工具检查 UAT 环境到数据库服务器的网络连通性和延迟。
+   - 检查网络设备（如路由器、防火墙）是否有阻塞。
+
+2. **比较环境配置**：
+   - 对比 dev 和 UAT 环境的配置文件，确保数据库连接池和其他相关配置一致。
+
+3. **监控资源使用情况**：
+   - 使用监控工具检查 UAT 环境的资源使用情况，确保没有资源瓶颈。
+
+4. **检查数据库配置**：
+   - 登录到数据库服务器，检查当前连接数和连接池配置，确保没有连接数限制问题。
+
+5. **日志分析**：
+   - 查看 UAT 环境的应用程序日志和数据库服务器日志，查找可能的错误信息或警告信息。
+
+通过以上步骤，应该能够找出导致 UAT 环境连接超时的问题并加以解决。
+
+# 27. 数据库服务器是同一个，但是数据库是不同的，有可能是数据库的问题吗
+是的，虽然数据库服务器是同一个，但如果连接的是不同的数据库，问题仍然有可能出在数据库本身。以下是一些可能的原因：
+
+1. **数据库配置差异**：
+   - 两个数据库的配置可能不同，例如连接数限制、查询超时设置等。
+   - 检查两个数据库的参数配置，确保它们在关键配置上是一致的。
+
+2. **数据库负载**：
+   - UAT 环境的数据库可能正在处理大量请求或运行一些耗资源的查询，导致连接超时。
+   - 检查 UAT 数据库的负载情况，确认是否有高负载或慢查询。
+
+3. **数据库索引和统计信息**：
+   - UAT 数据库可能缺少某些索引或统计信息，导致查询性能差。
+   - 确认 UAT 数据库中的索引和统计信息是否最新并且与开发环境中保持一致。
+
+4. **数据量和数据分布**：
+   - UAT 数据库的数据量可能比开发数据库大，或数据分布不同，影响查询性能。
+   - 比较两个数据库的数据量和数据分布，特别是表的大小和索引使用情况。
+
+5. **权限和角色配置**：
+   - UAT 数据库的用户权限配置可能与开发数据库不同，导致权限问题或性能问题。
+   - 检查 UAT 数据库用户的权限配置，确保其与开发数据库用户一致。
+
+6. **特定表或视图的锁定**：
+   - UAT 数据库中的某些表或视图可能被锁定，导致连接超时。
+   - 检查 UAT 数据库中是否有锁定的表或视图，并解决相关锁定问题。
+
+### 诊断步骤
+
+1. **检查数据库配置**：
+   - 对比两个数据库的配置文件（如 `my.cnf` 或 `my.ini`），确保关键参数一致。
+
+2. **监控数据库负载**：
+   - 使用数据库监控工具（如 MySQL Workbench, Performance Schema, 或其他数据库性能监控工具）查看 UAT 数据库的当前负载情况。
+
+3. **优化查询和索引**：
+   - 确认 UAT 数据库中的查询计划和索引使用情况，添加必要的索引并更新统计信息。
+
+4. **数据量和数据分布分析**：
+   - 比较两个数据库的数据量，特别是大表的数据量，确保它们在合理范围内。
+
+5. **权限检查**：
+   - 确认 UAT 数据库用户的权限配置与开发数据库用户一致，确保权限问题不影响性能。
+
+6. **查看锁定状态**：
+   - 使用查询查看 UAT 数据库中的锁定状态，例如：
+     ```sql
+     SHOW FULL PROCESSLIST;
+     SHOW ENGINE INNODB STATUS;
+     ```
+
+通过以上步骤，可以帮助诊断和解决 UAT 环境中数据库连接超时的问题。
+
+# 28. 如果应用程序连接了数据库，数据库有没有可能一直不释放这个连接呢？
+是的，数据库有可能一直不释放连接，尤其在以下情况下：
+
+1. **未正确关闭连接**：
+   - 应用程序在使用数据库连接后未正确关闭连接。这是导致连接泄漏的常见原因。
+
+2. **连接池配置问题**：
+   - 连接池配置不当，例如未设置最大连接数、连接超时等参数，可能导致连接一直被占用。
+
+3. **长时间执行的查询**：
+   - 某些查询执行时间过长，导致连接长时间被占用。
+
+4. **事务未提交或回滚**：
+   - 应用程序中存在未提交或未回滚的事务，导致连接一直处于占用状态。
+
+5. **连接池中连接未释放**：
+   - 连接池本身的问题，比如连接池没有正确检测和回收空闲连接。
+
+6. **数据库锁问题**：
+   - 数据库表或行被锁定，导致连接一直等待，无法释放。
+
+### 解决方法
+
+1. **确保正确关闭连接**：
+   - 在应用程序中，确保每次使用完数据库连接后，都调用 `close()` 方法关闭连接。使用 try-with-resources 或 finally 块来确保连接总是被关闭：
+     ```java
+     try (Connection conn = dataSource.getConnection()) {
+         // 使用连接进行数据库操作
+     } catch (SQLException e) {
+         // 处理异常
+     }
+     ```
+
+2. **配置连接池**：
+   - 配置连接池的最大连接数、空闲连接超时、连接回收等参数。例如，HikariCP 的配置：
+     ```yaml
+     spring:
+       datasource:
+         hikari:
+           maximum-pool-size: 10
+           connection-timeout: 30000
+           idle-timeout: 600000
+           max-lifetime: 1800000
+     ```
+
+3. **优化查询和事务管理**：
+   - 优化查询，确保它们在合理的时间内完成。
+   - 确保在使用事务时，及时提交或回滚：
+     ```java
+     try {
+         connection.setAutoCommit(false);
+         // 执行SQL操作
+         connection.commit();
+     } catch (SQLException e) {
+         connection.rollback();
+         throw e;
+     } finally {
+         connection.setAutoCommit(true);
+     }
+     ```
+
+4. **监控连接池**：
+   - 使用连接池自带的监控功能，检测空闲连接、活动连接等状态。
+   - 定期回收和验证连接池中的连接，确保连接的健康状态。
+
+5. **检查数据库锁和死锁**：
+   - 检查数据库中是否存在锁或死锁情况，使用数据库提供的工具或命令查看锁信息：
+     ```sql
+     SHOW FULL PROCESSLIST;
+     SHOW ENGINE INNODB STATUS;
+     ```
+
+6. **日志和监控**：
+   - 启用应用程序和数据库的日志，记录连接的打开和关闭情况，监控连接池的使用情况。
+
+通过以上方法，可以有效避免连接一直不释放的问题，确保应用程序稳定运行。
+
+# 29. springboot默认的连接池配置都是多少呢？比如连接超时时间，最大连接数等等，源码在哪里呢？如何分析源码
+Spring Boot 默认使用 HikariCP 作为其连接池，并且有一套默认配置。如果没有显式配置这些参数，HikariCP 会使用其默认值。以下是一些关键参数的默认值：
+
+1. **连接超时时间（connectionTimeout）**：
+   - 默认值：30秒（30000毫秒）
+
+2. **最大连接数（maximumPoolSize）**：
+   - 默认值：10
+
+3. **最小空闲连接数（minimumIdle）**：
+   - 默认值：与 `maximumPoolSize` 相同
+
+4. **空闲超时时间（idleTimeout）**：
+   - 默认值：10分钟（600000毫秒）
+
+5. **最大生命周期（maxLifetime）**：
+   - 默认值：30分钟（1800000毫秒）
+
+6. **连接测试查询（connectionTestQuery）**：
+   - 默认值：HikariCP 会自动选择适当的查询
+
+这些参数的默认值可以通过配置文件（如 `application.properties` 或 `application.yml`）进行覆盖。
+
+### HikariCP 默认配置源码分析
+
+HikariCP 的默认配置位于 `HikariConfig` 类中。要分析源码，可以按照以下步骤进行：
+
+1. **获取 HikariCP 源码**：
+   - HikariCP 源码托管在 GitHub 上，可以从 [HikariCP GitHub 仓库](https://github.com/brettwooldridge/HikariCP) 获取。
+
+2. **查找默认配置**：
+   - 在源码中，找到 `HikariConfig` 类。默认配置通常定义在静态初始化块或类变量中。
+
+3. **查看具体默认值**：
+   - 打开 `HikariConfig` 类，查看以下代码片段：
+
+```java
+public class HikariConfig {
+    public static final long CONNECTION_TIMEOUT = 30000;
+    public static final long VALIDATION_TIMEOUT = 5000;
+    public static final long IDLE_TIMEOUT = 600000;
+    public static final long MAX_LIFETIME = 1800000;
+    public static final int DEFAULT_POOL_SIZE = 10;
+
+    // 其他代码...
+}
+```
+
+### Spring Boot 自动配置源码分析
+
+Spring Boot 自动配置 HikariCP 的类是 `HikariDataSource`。你可以在 Spring Boot 源码中找到相关配置：
+
+1. **获取 Spring Boot 源码**：
+   - Spring Boot 源码托管在 GitHub 上，可以从 [Spring Boot GitHub 仓库](https://github.com/spring-projects/spring-boot) 获取。
+
+2. **查找自动配置类**：
+   - 在 Spring Boot 源码中，找到 `DataSourceConfiguration` 类，查看 `Hikari` 数据源的自动配置逻辑。
+
+3. **查看具体配置**：
+   - 打开 `HikariDataSourceConfiguration` 类，查看如何设置 HikariCP 的默认配置。
+
+```java
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnClass(HikariDataSource.class)
+@ConditionalOnMissingBean(DataSource.class)
+@EnableConfigurationProperties(HikariDataSourceProperties.class)
+public class HikariDataSourceConfiguration {
+
+    @Bean
+    @ConfigurationProperties(prefix = "spring.datasource.hikari")
+    public HikariDataSource dataSource(HikariDataSourceProperties properties) {
+        HikariDataSource dataSource = properties.initializeDataSourceBuilder().type(HikariDataSource.class).build();
+        // 其他配置代码...
+        return dataSource;
+    }
+}
+```
+
+通过上述方法，可以深入了解 HikariCP 和 Spring Boot 默认连接池配置及其源码。若要更改这些默认值，可以在 `application.properties` 或 `application.yml` 文件中进行配置：
+
+```yaml
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 20
+      connection-timeout: 25000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+```
