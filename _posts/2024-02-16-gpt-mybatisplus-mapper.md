@@ -331,6 +331,11 @@ public class UserTest {
 
 通过设置 `setMapUnderscoreToCamelCase` 为 `true`，MyBatis 在使用 `mapper.xml` 文件进行映射配置时，依然会自动处理 Java 实体类与数据库表字段之间的命名转换。这意味着你可以在 XML 映射文件中使用驼峰命名的实体类字段名，而 MyBatis 会自动将它们转换为下划线命名的数据库字段名，从而简化了映射配置的编写和维护工作。
 
+注意：实际上setMapUnderscoreToCamelCase设置为true，表示的是一个全局配置，它其实和mybatisplus中定义的java实体没什么关系，也就是，它并不是仅仅针对使用@TableName或者使用@TableField标注的实体类。
+总的来讲，这种自动将“_”映射为驼峰命名变量发生在所有statementId指定阶段，它会介入所有的CRUD操作。
+只要执行一个SQL语句时的入参对象（比如parameterType指定的入参实体或者是真实传递进去的入参实体），或者查询结果集指定的出参对象（比如resultType指定的出参类型等），当指定的SQL执行前或者执行完毕需要做这种参数映射时，这个全局配置就会自动介入。
+可以这么理解，这个全局配置就是在执行具体的StatementID前后进行参数映射或者结果映射阶段进行拦截处理的。
+
 # 5. mybatisplus在执行sql时候如何根据实体自动补上某个字段作为条件呢
 在 MyBatis-Plus 中，可以通过自定义全局拦截器或条件包装器来实现根据实体自动补上某个字段作为条件的功能。下面提供了几种方法来实现这一需求：
 
