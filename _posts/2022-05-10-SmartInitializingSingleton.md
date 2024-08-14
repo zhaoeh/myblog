@@ -233,3 +233,8 @@ public void preInstantiateSingletons() throws BeansException {
 从上面源码分析可以得出：     
 如果要在业务开发中使用SmartInitializingSingleton扩展点，需要特别注意实现这个接口的bean应该是非懒加载的单例bean；      
 执行时机是在所有的bean完成实例化、属性注入、相关初始化操作以及BeanPostProcessor的postProcessAfterInitialization方法执行完毕后，才被触发执行。      
+
+
+说了那么多，最后总结一下：
+SmartInitializingSingleton，在容器中所有的单例bean实例化完成，属性填充完成，初始化完成后，找出这些单例bean中类型是SmartInitializingSingleton的所有对象，遍历执行其中的 afterSingletonsInstantiated方法。   
+也就是说，一个SmartInitializingSingleton实例的afterSingletonsInstantiated方法在整个容器中只会被执行一次，当所有单例bean都处理完成后，执行一次该方法，如果有多个SmartInitializingSingleton实例，则每个实例的方法都会被执行一次！！！   
