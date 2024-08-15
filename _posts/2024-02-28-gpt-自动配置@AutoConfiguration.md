@@ -69,4 +69,19 @@ org.springframework.context.annotation.ConfigurationClassPostProcessor
 最后才是当前应用中通过@Import导入的外部配置类（这里就包括springboot自动配置类）。     
 
 这也从源码角度说明了，为什么springboot的自动配置类永远会在当前应用本身的bean定义注册完毕之后才进行处理，就是因为自动配置类是通过@Import注解导入的。    
-而导入的组件在流程中是最后才被处理的。       
+而导入的组件在流程中是最后才被处理的。   
+
+# 5. 自动配置类顺序和条件注解
+spring.factories中配置的所有的自动配置类，都会按照加载到JVM内存中的顺序（这个顺序有可能经过处理，注意上面的@AutoConfigureBefore和AutoConfigureAfter注解）挨个进行解析。     
+这里尤其要注意了，自动配置类的解析顺序严重自动配置中的条件注解。    
+而且还需要特别注意，自动配置类的解析顺序和容器中bean的实例化顺序（bean的注册顺序）没有必然的联系。    
+自动配置类的解析是按照配置类顺序进行解析，且只会解析一次，解析的过程中会将符合条件的class对象转换为对应的beanDefinition对象注册到spring容器中。    
+而bean的实例化顺序，则依赖于bean之间是否具备强依赖关系。    
+
+为什么强调这种区别？    
+有时候发现自动配置A中的a1对象命名已经进行实例化了，即spring容器中已经有了；    
+但是自动配置B中的b1对象有个@ConditionalOnBean(A1.class)，结果发现b1对象始终不会注册。      
+这里面的原因就是因为：自动配置B先于自动配置A被解析，解析时评估，此时容器中还没有a1的beanDefinition呢，因此直接将b1废弃了，即b1没有被转换成beanDefinition。    
+当a1被创建后注册到spring容器中后，b1始终都不会被创建（解析阶段就评估过了，连beanDefinition都没有，还创建个毛啊）。       
+
+这就说明了条件注解的评估大多数时候是在自动配置类的解析阶段进行评估的，因此，条件注解的评估结果和自动配置类的解析顺序之间存在严重的因果关系。   
