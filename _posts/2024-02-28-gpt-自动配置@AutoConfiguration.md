@@ -25,7 +25,7 @@ mindmap2: false
 ```java
 org.springframework.boot.autoconfigure.AutoConfigurationImportSelector
 ```
-在这个类中负责解析spring.factories文件中key为EnableAutoConfiguration的所有实现的全限定名，作为当前classpath下的所有自动配置类实现。    
+在这个类中负责解析spring.factories文件中key为 org.springframework.boot.autoconfigure.EnableAutoConfiguratio 的所有实现的全限定名，作为当前classpath下的所有自动配置类实现。    
 
 # 3. 解析classpath下的所有自动配置类，解析后的配置类顺序？   
 默认情况下，spring.factories文件中所有自动配置类实现的顺序，加载到内存中，就是容器启动过程中从classpath下扫描加载到的顺序。    
@@ -87,4 +87,39 @@ spring.factories中配置的所有的自动配置类，都会按照加载到JVM�
 这就说明了条件注解的评估大多数时候是在自动配置类的解析阶段进行评估的，因此，条件注解的评估结果和自动配置类的解析顺序之间存在严重的因果关系。   
 
 # 6. 请注意springboot版本对自动配置的影响
-在springboot 2.x版本中，自动配置都是基于扫描解析classpath下的META-INF中的spring.factories文件，找到其中的key为 EnableAutoConfiguration 的所有实现类的全限定名称。
+## 6.1 区别一：加载方式的变化
+在springboot 2.x版本中，自动配置都是基于扫描解析classpath下的META-INF中的spring.factories文件，找到其中的key为 org.springframework.boot.autoconfigure.EnableAutoConfiguration 的所有实现类的全限定名称。    
+在springboot 2.7版本和之后的版本中，提供了一种全新的方式进行自动配置类的加载解析，通过在 META-INF中创建一个spring文件夹，然后创建一个名称为 org.springframework.boot.autoconfigure.AutoConfiguration.imports 的文件，在这个文件中进行自动配置类全限定名称的编写即可。   
+
+## 6.2 加载方式源码的变更
+自动配置类的加载过程源码在  org.springframework.boot.autoconfigure.AutoConfigurationImportSelector 中。
+在springboot 2.7之前的版本中，解析自动配置类的源码如下：   
+```java
+protected List<String> getCandidateConfigurations(AnnotationMetadata metadata, AnnotationAttributes attributes) {
+    List<String> configurations = SpringFactoriesLoader.loadFactoryNames(this.getSpringFactoriesLoaderFactoryClass(), this.getBeanClassLoader());
+    Assert.notEmpty(configurations, "No auto configuration classes found in META-INF/spring.factories. If you are using a custom packaging, make sure that file is correct.");
+    return configurations;
+}
+```
+
+在springboot2.7到springboot3.0之间的版本，源码如下：
+```java
+protected List<String> getCandidateConfigurations(AnnotationMetadata metadata, AnnotationAttributes attributes) {
+    List<String> configurations = new ArrayList(SpringFactoriesLoader.loadFactoryNames(this.getSpringFactoriesLoaderFactoryClass(), this.getBeanClassLoader()));
+    ImportCandidates.load(AutoConfiguration.class, this.getBeanClassLoader()).forEach(configurations::add);
+    Assert.notEmpty(configurations, "No auto configuration classes found in META-INF/spring.factories nor in META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports. If you are using a custom packaging, make sure that file is correct.");
+    return configurations;
+}
+```
+发现在这个阶段，除了从spring.factories文件中解析目标自动配置类的全限定名称外，还提供了一种全新的方式，从META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports文件中进行自动配置类的查找。    
+
+而在随后的springboot3.x版本中，已经彻底废除了之前的spring.factories方式，完全使用 META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports 进行替代了，源码如下：   
+```java
+protected List<String> getCandidateConfigurations(AnnotationMetadata metadata, AnnotationAttributes attributes) {
+    List<String> configurations = ImportCandidates.load(AutoConfiguration.class, this.getBeanClassLoader()).getCandidates();
+    Assert.notEmpty(configurations, "No auto configuration classes found in META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports. If you are using a custom packaging, make sure that file is correct.");
+    return configurations;
+}
+```
+
+
