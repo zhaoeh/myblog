@@ -85,3 +85,6 @@ spring.factories中配置的所有的自动配置类，都会按照加载到JVM�
 当a1被创建后注册到spring容器中后，b1始终都不会被创建（解析阶段就评估过了，连beanDefinition都没有，还创建个毛啊）。       
 
 这就说明了条件注解的评估大多数时候是在自动配置类的解析阶段进行评估的，因此，条件注解的评估结果和自动配置类的解析顺序之间存在严重的因果关系。   
+
+# 6. 请注意springboot版本对自动配置的影响
+在springboot 2.x版本中，自动配置都是基于扫描解析classpath下的META-INF中的spring.factories文件，找到其中的key为 EnableAutoConfiguration 的所有实现类的全限定名称。
