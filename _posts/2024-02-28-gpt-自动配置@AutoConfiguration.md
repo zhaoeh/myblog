@@ -112,6 +112,7 @@ protected List<String> getCandidateConfigurations(AnnotationMetadata metadata, A
 }
 ```
 发现在这个阶段，除了从spring.factories文件中解析目标自动配置类的全限定名称外，还提供了一种全新的方式，从META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports文件中进行自动配置类的查找。    
+这很明显是处于一个过渡版本。因为springboot官方已经宣布了，将从springboot 3.x版本开始全面废除spring.factories的方式进行自动配置类的配置，而改用META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports的方式。   
 
 而在随后的springboot3.x版本中，已经彻底废除了之前的spring.factories方式，完全使用 META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports 进行替代了，源码如下：   
 ```java
