@@ -123,4 +123,6 @@ protected List<String> getCandidateConfigurations(AnnotationMetadata metadata, A
 }
 ```
 
+请注意：在springboot 3.x中只是对自动配置类的方式进行了spring.factories废除，其他的配置依旧保持在spring.factories文件中进行配置，比如 org.springframework.context.ApplicationContextInitializer 的配置等，依旧需要在spring.factories中。   
+
 
