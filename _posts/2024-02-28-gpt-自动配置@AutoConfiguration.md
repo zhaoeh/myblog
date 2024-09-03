@@ -58,8 +58,10 @@ org.springframework.context.annotation.ConfigurationClassPostProcessor
 上面那个类是入口类，本质上是一个实现了 org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor 接口的实现类。   
 我们知道，org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor接口是spring容器启动早期的一个接口，它比BeanFactoryPostProcessor执行时机还早。    
 主要用于向spring容器中遍历的注册每一个符合规则的BeanDefinition对象。      
-在ConfigurationClassPostProcessor中，主要委托了 org.springframework.context.annotation.ConfigurationClassParser 对象去具体的解析对应的@ComponentScan、@Component、@Import等注解。        
+
+在ConfigurationClassPostProcessor中，主要委托了一个default访问级别的 org.springframework.context.annotation.ConfigurationClassParser 对象，负责具体的解析对应的@ComponentScan、@Component、@Import等注解。        
 想要了解这些注解被解析的顺序，可以详细阅读org.springframework.context.annotation.ConfigurationClassParser的源码。      
+这个类被设计为default级别，意味着只允许同包级别的类进行调用。说白了就是不对外部暴露。      
 
 这个类的核心流程是：    
 1.处理@ComponentScan，得到一个扫描范围。   
