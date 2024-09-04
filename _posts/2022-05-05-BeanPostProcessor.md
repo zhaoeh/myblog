@@ -154,7 +154,7 @@ getOrder 方法的返回值越小的 BeanPostProcessor 对象，它所实现的�
         }
 ```
 通过@Bean注册的 BeanDefinition ，其中目标bean的类型一定是方法中定义的返回值的类型，而不是方法返回对象的实际子类型。    
-这个其他方式注册bean是有区别的。   
+这和其他方式注册bean是有区别的。   
 其他方式是注册bean，都是直接拿到class对象，那么直接就能确定这个bean的类型。    
 但是@Bean的bean，它的类型和bean的实例是分开的，类型通过方法的返回类型确定，实例通过方法体去构建。    
 因此，如果尝试自动注入上面的RabbitAdmin实例，请注意：   
