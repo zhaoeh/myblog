@@ -244,7 +244,7 @@ AnnotatedBeanDefinitionReader：
         this.registry = registry;
         
         // 初始化一个对候选BeanDefinition的过滤策略,ConditionEvaluator对象是一个条件评估器
-        // 各种基于@Conditional注解扩展的条件注解，就是通过这个对象去解析的
+        // 各种基于 @Conditional 注解扩展的条件注解，就是通过这个对象去解析的
         // 和其他属性一样，该对象在 AnnotatedBeanDefinitionReader 构造器中先被初始化，目的是用于后续通过它去评估BeanDefinition的条件是否达到注册的标准
         this.conditionEvaluator = new ConditionEvaluator(registry, environment, (ResourceLoader)null);
         
@@ -525,6 +525,9 @@ loader.load();
         // 此时就是启动类被转换为beanDefinition对象了
         AnnotatedGenericBeanDefinition abd = new AnnotatedGenericBeanDefinition(beanClass);
         if (!this.conditionEvaluator.shouldSkip(abd.getMetadata())) {
+            // shouldSkip方法：这个方法底层其实就是在解析每个源对象上的@Conditional注解，通过它去评估当前BeanDefinition是否应该被注册到spring容器中
+            // 传入当前的beanDefinition对象，获取其中的元数据metadata，传递给条件评估器，去判断这个beanDefinition是否应该被注册到容器中
+            // 只有当返回结果为“false”时，即表示不应该被跳过时，才进行最终的BeanDefinition的注册
             abd.setInstanceSupplier(supplier);
             
             // 通过 scopeMetadataResolver 解析器，解析当前beanDefinition的scope注解元信息
