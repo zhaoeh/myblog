@@ -604,3 +604,10 @@ org.springframework.context.annotation.internalConfigurationAnnotationProcessor
 -  springboot无外乎就是借助spring框架内部提供的钩子扩展机制，在ApplicationContext容器对象构建完毕后，容器正式refresh之前，借助这些扩展机制提前往spring容器中注册了几个BeanDefinition。
 -  在springboot阶段（ApplicationContext创建之后，refresh正式进入spring生命周期之前）注册的这些BeanDefinition对象（就是上面分析的几种内置的Processors和启动类本身被转换后的BeanDefinition），在后续的spring容器启动阶段发挥着至关重要的作用。  
 
+# 4. 依赖springboot阶段注册的启动类和Processors处理器，开始正式进入spring的生命周期
+```java
+this.refreshContext(context);
+```
+## 4.1 回顾下refresh()方法的整体流程
+
+
