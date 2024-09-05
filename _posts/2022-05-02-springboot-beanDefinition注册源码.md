@@ -37,6 +37,8 @@ springboot的启动阶段中，关于bean的管理，主要分为两个大阶段
     -  主要逻辑是解析启动类上的注解，请注意，spring框架底层在解析某个元素上面的注解时，往往都是解析出复合注解，即直接解析出目标元素上标注的所有注解，以及注解上标注的所有注解，简而言之，就是获取到目标元素的所有注解，从中检索出想要的主要。
     -  @SpringBootApplication注解是个复合注解，其中很重要的一个注解是@SpringBootConfiguration，而@SpringBootConfiguration注解也是个复合注解，其中很重要的一个注解是@Configuration。
     -  因此可以看出，run方法传入了当前启动类的class对象进去，后续会在容器启动过程中解析出这个class对象上的@Configuration注解，从而表示启动类是一个java配置类。
+    -  @Configuration注解必须着重强调一下，它本身也是一个复合注解，它上面有标注@Component，就和@Controller、@Service注解一样，都是复合注解，这意味着配置类本身也是一个组件
+    -  基于上面的原因，后面不要再往同一个类上面既标注了@Component，又标注了@Configuration，这种尽管可以，但是完全没有必要。
  -  @SpringBootApplication中还标注了@ComponentScan注解，主要引入了对应的Filter。   
  -  run方法的主体流程可以参考上一篇文章。核心阶段主要有如下：  
     -  this.prepareContext(bootstrapContext, context, environment, listeners, applicationArguments, printedBanner);
