@@ -13,8 +13,13 @@ mindmap2: false
 
 # 1. springboot启动流程简单回顾
 springboot的启动阶段中，关于bean的管理，主要分为两个大阶段：   
-1.扫描得到一批class，将其转换为对应的BeanDefinition对象，然后注册到spring容器中。      
-2.等到容器中的所有期望管理的bean都被转换为BeanDefinition对象并注册到容器后，开始根据BeanDefinition去实例化对应的目标对象，同时组装目标对象之间的依赖关系等，正式进入bean的实例化、属性填充、初始化等阶段。      
+1.将指定范围内的class转换为BeanDefinition，并注册到spring容器。
+-  扫描得到一批class，将其转换为对应的BeanDefinition对象，然后注册到spring容器中。
+
+2.遍历容器中的所有BeanDefinition，进入bean的实例化阶段并组装bean之间的依赖关系。
+-  等到容器中的所有期望管理的bean都被转换为BeanDefinition对象并注册到容器后，开始根据BeanDefinition去实例化对应的目标对象，同时组装目标对象之间的依赖关系等，正式进入bean的实例化、属性填充、初始化等阶段。      
+
+
 本文优先分析第一个大阶段，开始之前，先回顾一下springboot启动的大致流程。   
 
 -  始于启动类，注意启动类是个main方法，上面标注了@SpringBootApplication注解。
@@ -23,7 +28,7 @@ springboot的启动阶段中，关于bean的管理，主要分为两个大阶段
     -  @SpringBootApplication注解是个复合注解，其中很重要的一个注解是@SpringBootConfiguration，而@SpringBootConfiguration注解也是个复合注解，其中很重要的一个注解是@Configuration。
     -  因此可以看出，run方法传入了当前启动类的class对象进去，后续会在容器启动过程中解析出这个class对象上的@Configuration注解，从而表示启动类是一个java配置类。
  -  @SpringBootApplication中还标注了@ComponentScan注解，主要引入了对应的Filter。   
- -  run方法的主体流程可以参考上一篇文章。核心阶段主要有如下：
+ -  run方法的主体流程可以参考上一篇文章。核心阶段主要有如下：  
     -  this.prepareContext(bootstrapContext, context, environment, listeners, applicationArguments, printedBanner);
     -  this.refreshContext(context);
     -  this.afterRefresh(context, applicationArguments);        
