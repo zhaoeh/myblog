@@ -243,7 +243,9 @@ AnnotatedBeanDefinitionReader：
         // 绑定beanDefinition注册器
         this.registry = registry;
         
-        // 初始化一个对候选BeanDefinition的过滤策略
+        // 初始化一个对候选BeanDefinition的过滤策略,ConditionEvaluator对象是一个条件评估器
+        // 各种基于@Conditional注解扩展的条件注解，就是通过这个对象去解析的
+        // 和其他属性一样，该对象在 AnnotatedBeanDefinitionReader 构造器中先被初始化，目的是用于后续通过它去评估BeanDefinition的条件是否达到注册的标准
         this.conditionEvaluator = new ConditionEvaluator(registry, environment, (ResourceLoader)null);
         
         // 调用了一个工具类  AnnotationConfigUtils，传入了注册器，向容器中优先注册了一堆Processors
