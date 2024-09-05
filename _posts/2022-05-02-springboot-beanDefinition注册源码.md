@@ -599,6 +599,8 @@ org.springframework.context.annotation.internalConfigurationAnnotationProcessor
 ```
 这个beanName注册了一个 ConfigurationClassPostProcessor ，它是spring容器提供的一个处理器，专门用来负责处理配置类的一个强大的处理器。     
 
--  可以看出，springboot就是搭建一同体系，对框架进行整合。  
--  springboot几乎自己不负责执行任何核心流程，都是深度整合spring，借助spring本身提供的各种钩子实现、各种处理器等处理具体的事务。   
+-  可以看出，springboot就是搭建一套体系，对spring框架进行整合。  
+-  springboot几乎自己不负责执行任何核心流程，都是深度整合spring，借助spring本身提供的各种钩子实现、各种处理器等处理具体的事务。
+-  springboot无外乎就是借助spring框架内部提供的钩子扩展机制，在ApplicationContext容器对象构建完毕后，容器正式refresh之前，借助这些扩展机制提前往spring容器中注册了几个BeanDefinition。
+-  在springboot阶段（ApplicationContext创建之后，refresh正式进入spring生命周期之前）注册的这些BeanDefinition对象（就是上面分析的几种内置的Processors和启动类本身被转换后的BeanDefinition），在后续的spring容器启动阶段发挥着至关重要的作用。  
 
