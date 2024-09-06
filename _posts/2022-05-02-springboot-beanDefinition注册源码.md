@@ -20,7 +20,7 @@ mindmap2: false
 -  等到容器中的所有期望管理的bean都被转换为BeanDefinition对象并注册到容器后，开始根据BeanDefinition去实例化对应的目标对象，同时组装目标对象之间的依赖关系等，正式进入bean的实例化、属性填充、初始化等阶段。      
 
 请注意，上述两个阶段中，阶段1整体执行完毕之后，即所有期望的BeanDefinition注册到容器之后，才会整体进入阶段2进行目标bean的实例化操作。    
-然而，在阶段1中，spring容器也会优先从容器中根据BeanDefinition，提前实例化一些内部的bean实例处理，比如那一堆processor和其他的组件等，提前实例化的目的是为了调用这些组件对象中的某些方法逻辑，替容器完成一些事情。    
+然而，在阶段1中，spring容器也会优先从容器中根据BeanDefinition，提前实例化一些内部的bean实例对象作为处理器，比如会优先实例化一部分processor和其他的组件等，提前实例化的目的是为了调用这些组件对象中的某些方法逻辑，替容器完成一些重要的事情。    
 
 ***关键在于如何理解getBean()方法***   
 请注意，spring容器启动的任何阶段，只要通过beanFactory调用了getBean()方法，它实际上就是在触发spring去管理目标bean(实例化目标bean以及组装依赖关系)。    
@@ -34,9 +34,9 @@ mindmap2: false
 
 -  始于启动类，注意启动类是个main方法，上面标注了@SpringBootApplication注解。
 -  run方法中传入了当前启动类的class对象，传入的这个对象在后续有至关重要的作用，这个class对象将作为springboot启动时扫描当前容器的入口。
-    -  主要逻辑是解析启动类上的注解，请注意，spring框架底层在解析某个元素上面的注解时，往往都是解析出复合注解，即直接解析出目标元素上标注的所有注解，以及注解上标注的所有注解，简而言之，就是获取到目标元素的所有注解，从中检索出想要的主要。
-    -  @SpringBootApplication注解是个复合注解，其中很重要的一个注解是@SpringBootConfiguration，而@SpringBootConfiguration注解也是个复合注解，其中很重要的一个注解是@Configuration。
-    -  因此可以看出，run方法传入了当前启动类的class对象进去，后续会在容器启动过程中解析出这个class对象上的@Configuration注解，从而表示启动类是一个java配置类。
+    -  主要逻辑是解析启动类上的注解，请注意，spring框架底层在解析某个元素上面的注解时，往往都是解析出目标对象上的复合注解，即直接解析出目标元素上标注的所有注解，以及注解上递归标注的所有注解，简而言之，就是获取到目标元素的所有注解，从中检索出想要的注解（spring这一套解析复合注解的能力很强大，基本上等同于解决了java中注解不能够继承的限制，相当于一个注解可以继承另外一个注解，从而达到注解的嵌套以及属性的继承与覆盖）。
+    -  @SpringBootApplication注解是个复合注解，其中很重要的一个注解是 @SpringBootConfiguration ，而 @SpringBootConfiguration 注解也是个复合注解，其中很重要的一个注解是 @Configuration。
+    -  因此可以看出，run方法传入了当前启动类的class对象进去，后续会在容器启动过程中解析出这个class对象上的 @Configuration，以及其他所有注解，从而判断启动类是不是一个java配置类。
  -  @SpringBootApplication中还标注了@ComponentScan注解，主要引入了对应的Filter。   
  -  run方法的主体流程可以参考上一篇文章。核心阶段主要有如下：  
     -  this.prepareContext(bootstrapContext, context, environment, listeners, applicationArguments, printedBanner);
@@ -642,3 +642,272 @@ this.refreshContext(context);
 ## 4.1 回顾下refresh()方法的整体流程
 
 
+# 5. 在容器启动阶段回调执行处理器-ConfigurationClassPostProcessor
+请注意，这个处理器至关重要，负责容器中几乎所有BeanDefinition的注册。   
+尽管它的名称叫做“ConfigurationClassPostProcessor”，表示它用于处理“配置类”，但是并不意味着它只处理“@Configuration”标注的类。     
+言外之意，在spring中，哪些类才称得上是配置类？这只有通过源码才能窥探出来。   
+
+
+# 6. ConfigurationClassUtils-处理配置类的工具
+
+***关于ConfigurationClassUtils工具类的部分解释***
+
+`CONFIGURATION_CLASS_ATTRIBUTE` 是 Spring 框架内部用于区分 Bean 定义是完全配置类（`full`）还是部分配置类（`lite`）的属性。
+
+### 属性解释：
+
+1. **`full`**：表示该类是一个完整的配置类，也就是被 `@Configuration` 注解标注的类。  
+   完整的配置类具有以下特性：
+   - 它会通过 CGLIB 动态代理进行增强。
+   - 该类中的 `@Bean` 方法会被代理，以确保这些方法不会被多次调用，而是以单例模式创建 bean（即每次调用 `@Bean` 方法时返回的是相同的实例）。
+   - 通常是用于完全声明性配置，用于定义并管理 Bean 的生命周期。
+
+   示例：
+   ```java
+   @Configuration
+   public class AppConfig {
+       @Bean
+       public MyBean myBean() {
+           return new MyBean();
+       }
+   }
+   ```
+
+2. **`lite`**：表示该类是部分配置类，即它可能不是通过 `@Configuration` 注解标注的，而是通过 `@Component`、`@Service`、`@Controller`、`@Repository` 等其他注解标注的类，或者是包含 `@Bean` 方法但没有 `@Configuration` 注解的类。
+   - 部分配置类不会进行 CGLIB 代理增强，`@Bean` 方法在每次调用时都会创建一个新的实例（除非明确地进行其他处理，如将该 Bean 声明为单例）。
+   - 这些类可以包含 `@Bean` 方法，但它们通常不用于全面的配置管理，更多是组件或业务逻辑类。
+
+   示例：
+   ```java
+   @Component
+   public class SomeComponent {
+       @Bean
+       public OtherBean otherBean() {
+           return new OtherBean();
+       }
+   }
+   ```
+
+### `CONFIGURATION_CLASS_ATTRIBUTE` 的作用：
+
+- Spring 会在内部为每个 `BeanDefinition` 设置一个 `CONFIGURATION_CLASS_ATTRIBUTE`，用来标记这个 `BeanDefinition` 是 `full` 还是 `lite` 类型。
+- 这个属性是通过 `ConfigurationClassPostProcessor` 解析配置类时设置的。
+- 这个标志位的主要作用是决定 Spring 容器是否对该类进行代理处理。
+
+### 如何区分 `full` 和 `lite`？
+
+- **`full`**：当类上有 `@Configuration` 注解时，Spring 将其标记为 `full`，并通过 CGLIB 动态代理增强。
+- **`lite`**：当类上没有 `@Configuration` 注解但包含一个或多个 `@Bean` 方法，或是其他 Spring 组件类（如 `@Component`、`@Service` 等）时，Spring 将其标记为 `lite`，并不会代理该类。
+
+### 具体应用场景：
+
+1. **`@Configuration` 完整配置类（full）**：
+   - 通过 CGLIB 代理，确保 `@Bean` 方法只调用一次，避免重复创建单例 Bean。
+   - 主要用于显式定义 Spring 应用的配置。
+
+2. **`@Component` 或其他组件类（lite）**：
+   - 没有进行代理，所以 `@Bean` 方法在每次调用时都会生成新的实例，除非配置了作用域。
+   - 用于普通组件、业务类的声明，也可以定义 `@Bean` 方法，但没有 `@Configuration` 类的特性。
+
+### 总结：
+
+- `CONFIGURATION_CLASS_ATTRIBUTE` 属性是 Spring 内部使用的，用于标记 Bean 定义是完整配置类（`full`）还是部分配置类（`lite`）。
+- `full` 类通常是使用 `@Configuration` 注解标注的类，并会被代理以管理单例 Bean 的创建。
+- `lite` 类通常是普通组件类，不会进行代理增强，每次调用 `@Bean` 方法都会创建新的实例。
+
+***源码如下，注释已经标注。***
+```java
+package org.springframework.context.annotation;
+
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.aop.framework.AopInfrastructureBean;
+import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
+import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.beans.factory.support.AbstractBeanDefinition;
+import org.springframework.cglib.proxy.Enhancer;
+import org.springframework.context.event.EventListenerFactory;
+import org.springframework.core.Conventions;
+import org.springframework.core.annotation.Order;
+import org.springframework.core.type.AnnotationMetadata;
+import org.springframework.core.type.classreading.MetadataReader;
+import org.springframework.core.type.classreading.MetadataReaderFactory;
+import org.springframework.lang.Nullable;
+import org.springframework.stereotype.Component;
+
+public abstract class ConfigurationClassUtils {
+
+    // spring容器内部定义了两个常量，专门用于将其设置到每个beanDefinition对象中，目的是为了标识目标BeanDefinition的“配置类”标记
+    // full 标识目标类是一个“完整配置类”
+    static final String CONFIGURATION_CLASS_FULL = "full";
+    // lite 标识某表类是一个“部分配置类”
+    static final String CONFIGURATION_CLASS_LITE = "lite";
+    static final String CANDIDATE_ATTRIBUTE = Conventions.getQualifiedAttributeName(ConfigurationClassPostProcessor.class, "candidate");
+    static final String CONFIGURATION_CLASS_ATTRIBUTE = Conventions.getQualifiedAttributeName(ConfigurationClassPostProcessor.class, "configurationClass");
+    static final String ORDER_ATTRIBUTE = Conventions.getQualifiedAttributeName(ConfigurationClassPostProcessor.class, "order");
+    private static final Log logger = LogFactory.getLog(ConfigurationClassUtils.class);
+
+    // 配置类候选者指标：从这可以看出，一个类有Component注解、ComponentScan注解、Import注解、ImportResource注解，都被是为配置类的候选者指标。
+    // 当然判断一个类是不是“配置类”，下面的方法有明确的逻辑。
+    private static final Set<String> candidateIndicators = Set.of(Component.class.getName(), ComponentScan.class.getName(), Import.class.getName(), ImportResource.class.getName());
+
+    public ConfigurationClassUtils() {
+    }
+
+    public static Class<?> initializeConfigurationClass(Class<?> userClass) {
+        Class<?> configurationClass = (new ConfigurationClassEnhancer()).enhance(userClass, (ClassLoader)null);
+        Enhancer.registerStaticCallbacks(configurationClass, ConfigurationClassEnhancer.CALLBACKS);
+        return configurationClass;
+    }
+
+    // 判断一个BeanDefinition是否是配置类
+    static boolean checkConfigurationClassCandidate(BeanDefinition beanDef, MetadataReaderFactory metadataReaderFactory) {
+        // 获取beanDefinition描述的真实的类名称
+        String className = beanDef.getBeanClassName();
+
+        // 一个大条件：只有当beanClassName不为null，且 FactoryMethodName 为null，才进行进一步的判断
+        // 意味着，@Bean方式注册的bean，将不被认为是一个配置类；通过其他工厂方法注册的bean，也不被认为是一个配置类
+        // 总而言之：只有通过普通方式（@Configuration、@Component等）注册的bean才有可能是一个配置类
+        if (className != null && beanDef.getFactoryMethodName() == null) {
+            AnnotationMetadata metadata;
+            label70: {
+                if (beanDef instanceof AnnotatedBeanDefinition) {
+                    AnnotatedBeanDefinition annotatedBd = (AnnotatedBeanDefinition)beanDef;
+                    if (className.equals(annotatedBd.getMetadata().getClassName())) {
+                        metadata = annotatedBd.getMetadata();
+                        break label70;
+                    }
+                }
+
+                if (beanDef instanceof AbstractBeanDefinition) {
+                    AbstractBeanDefinition abstractBd = (AbstractBeanDefinition)beanDef;
+                    if (abstractBd.hasBeanClass()) {
+                        Class<?> beanClass = abstractBd.getBeanClass();
+                        if (!BeanFactoryPostProcessor.class.isAssignableFrom(beanClass) && !BeanPostProcessor.class.isAssignableFrom(beanClass) && !AopInfrastructureBean.class.isAssignableFrom(beanClass) && !EventListenerFactory.class.isAssignableFrom(beanClass)) {
+                            metadata = AnnotationMetadata.introspect(beanClass);
+                            break label70;
+                        }
+
+                        return false;
+                    }
+                }
+
+                try {
+                    // 获取目标类的注解元信息
+                    MetadataReader metadataReader = metadataReaderFactory.getMetadataReader(className);
+                    metadata = metadataReader.getAnnotationMetadata();
+                } catch (IOException var7) {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("Could not find class file for introspecting configuration annotations: " + className, var7);
+                    }
+                    // 获取注解失败，则直接返回false
+                    return false;
+                }
+            }
+
+            // 优先获取目标BeanDefinition描述的class上的 Configuration 注解相关的所有属性值
+            Map<String, Object> config = metadata.getAnnotationAttributes(Configuration.class.getName());
+            // 如果config属性不为null，且proxyBeanMethods属性值不为false
+            // 说白了就是目标beanDefinition上有@Configuration注解，且注解中的proxyBeanMethods成员值不为false
+            // 这种类就是“完整配置类”，设置 CONFIGURATION_CLASS_ATTRIBUTE 的属性为 “full”
+            if (config != null && !Boolean.FALSE.equals(config.get("proxyBeanMethods"))) {
+                beanDef.setAttribute(CONFIGURATION_CLASS_ATTRIBUTE, "full");
+            } else {
+                // 否则，再次进行判断
+                // 如果不存在 @Configuration 注解，且 CANDIDATE_ATTRIBUTE 属性不为true，且isConfigurationCandidate(metadata)返回false
+                // 则直接返回false，认为不是一个配置类
+                if (config == null && !Boolean.TRUE.equals(beanDef.getAttribute(CANDIDATE_ATTRIBUTE)) && !isConfigurationCandidate(metadata)) {
+                    return false;
+                }
+
+                // 否则认为是一个“部分配置类”
+                beanDef.setAttribute(CONFIGURATION_CLASS_ATTRIBUTE, "lite");
+            }
+
+            // 获取配置类的order值，设置到 beanDefinition 属性中
+            Integer order = getOrder(metadata);
+            if (order != null) {
+                beanDef.setAttribute(ORDER_ATTRIBUTE, order);
+            }
+
+            // 返回true
+            return true;
+        } else {
+
+            // 大条件不满足：直接返回false
+            return false;
+        }
+    }
+
+    // 再看下这个方法，进一步判断某个类是不是“配置类候选者”
+    static boolean isConfigurationCandidate(AnnotationMetadata metadata) {
+        if (metadata.isInterface()) {
+            // 如果一个类元是接口，则直接返回false
+            return false;
+        } else {
+
+            // 否则，遍历上面的指标（Component注解、ComponentScan注解、Import注解、ImportResource注解）
+            Iterator var1 = candidateIndicators.iterator();
+
+            String indicator;
+            do {
+                // 当指标遍历完成后，还没有匹配上，则返回 hasBeanMethods 方法的执行结果
+                if (!var1.hasNext()) {
+                    return hasBeanMethods(metadata);
+                }
+
+                indicator = (String)var1.next();
+                // 当前的指标元素不存在时，一直迭代
+                // 意味着如果存在当前指标，则循环终止
+            } while(!metadata.isAnnotated(indicator));
+
+            // 如果上述循环没有返回结果，则返回true，认为是一个配置类
+            return true;
+        }
+    }
+
+    // hasBeanMethods方法：很简单，判断目标元素是否存在@Bean标注的工厂方法，只要存在，就认为是配置类
+    static boolean hasBeanMethods(AnnotationMetadata metadata) {
+        try {
+            return metadata.hasAnnotatedMethods(Bean.class.getName());
+        } catch (Throwable var2) {
+            if (logger.isDebugEnabled()) {
+                Log var10000 = logger;
+                String var10001 = metadata.getClassName();
+                var10000.debug("Failed to introspect @Bean methods on class [" + var10001 + "]: " + var2);
+            }
+
+            return false;
+        }
+    }
+
+    @Nullable
+    public static Integer getOrder(AnnotationMetadata metadata) {
+        Map<String, Object> orderAttributes = metadata.getAnnotationAttributes(Order.class.getName());
+        return orderAttributes != null ? (Integer)orderAttributes.get("value") : null;
+    }
+
+    public static int getOrder(BeanDefinition beanDef) {
+        Integer order = (Integer)beanDef.getAttribute(ORDER_ATTRIBUTE);
+        return order != null ? order : 2147483647;
+    }
+}
+```
+上述工具类主要逻辑如下：   
+-  判断一个类是否是配置类。
+-  配置类的标准是：
+  -  存在@Configuration注解的类，是“完整配置类”，直接返回true
+  -  不存在 @Configuration注解 ，但存在 @Component注解、@ComponentScan注解、@Import注解、@ImportResource注解 之一的，认为是“部分配置类”，直接返回true
+  -  不存在上述注解的，但是有@Bean标注的工厂方法的，也认为是“部分配置类”，直接返回true
+- 其他场景统一返回false。
+
+从这里就可以看到，一个类被spring认为是“配置类”的标准很明确：
+-  如果一个类有@Configuration注解，或者间接标注了@Configuration注解，则是“完整配置类”
+-  一个类有@Controller、@Service、@Component、@Import、@ComponentScan、@ImportResource等，则是“部分配置类”
+-  一个类没有spring的相关bean注解，但存在@Bean工厂方法，也认为是“部分配置类”；这一点很重要，意味着“@Bean”注解可以标注在一个普通类上，这个类可以不存在任何spring的bean管理注解。
