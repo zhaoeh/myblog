@@ -1237,7 +1237,7 @@ public boolean ignoreInsert(List<Column> columns, String tenantIdColumn) {
 
 希望这些解释能够帮助你更好地理解 `ignoreInsert` 方法的工作原理。如果还有其他问题，欢迎继续讨论。
 
-# 13. 多租户这个回调，实在MetaObjectHandler之前还是之后处理的呢
+# 13. 多租户这个回调，是在MetaObjectHandler之前还是之后处理的呢
 在 MyBatis-Plus 中，多租户功能通过 `TenantLineInnerInterceptor` 实现。在插入操作中，MyBatis-Plus 的多租户处理机制会通过 `TenantLineHandler` 进行相应处理。
 
 具体来说，多租户处理会在 SQL 生成和执行过程中进行。至于处理的顺序问题，`ignoreInsert` 的调用是在 MyBatis-Plus 处理 SQL 的过程中执行的，而 MetaObjectHandler 通常用于处理实体类在插入和更新操作时的字段自动填充。
@@ -1364,6 +1364,61 @@ public class MyTenantLineHandler implements TenantLineHandler {
 - `TenantLineInnerInterceptor` 在最终 SQL 执行前对 SQL 进行改写，以加入租户信息。
 
 希望这些信息能帮助你更好地理解 MyBatis-Plus 多租户处理和 `MetaObjectHandler` 的执行顺序。如果还有其他问题，请随时提问。
+
+***请尤其注意，mybatisplus的多租户拦截器会在执行任意“增删改查”sql前，对sql进行拦截处理，加上指定的多租户字段，除非在钩子实现中指定了需要忽略的表***
+MyBatis-Plus 在启用多租户功能（通过 `TenantLineHandler`）时，会自动在 **所有 SQL 操作（包括 `select`、`update`、`delete` 以及 `insert`）** 中处理租户字段。这意味着在 `insert` 操作时，MyBatis-Plus 也会自动为租户字段赋值。
+
+当你配置了 `TenantLineHandler`，它不仅会在查询和更新操作中自动加上租户条件，还会在插入数据时自动处理租户字段。也就是说，如果你的表中有租户字段（如 `tenant_id`），MyBatis-Plus 会在执行 `insert` 之前根据 `TenantLineHandler` 的逻辑自动将当前的租户 ID 添加到插入的数据中。
+
+### 为什么会自动填充 `tenantId`？
+
+当你使用 MyBatis-Plus 的多租户功能时，`TenantLineHandler` 的实现会在处理 SQL 语句之前，自动对 SQL 进行改写。对于 `insert` 操作，MyBatis-Plus 会在你插入的数据中加入租户字段（例如 `tenantId`），所以你在调试时发现了这个行为。
+
+### 具体原理
+
+`TenantLineHandler` 实现的作用是在 SQL 被执行之前，对 SQL 进行修改，确保多租户字段（例如 `tenant_id`）正确地加入到查询条件或插入数据中。具体原理如下：
+
+1. **查询、更新、删除操作**：MyBatis-Plus 会在 SQL 语句的 `where` 部分加入租户条件，以确保只对当前租户的数据进行操作。
+   
+2. **插入操作**：当执行 `insert` 时，MyBatis-Plus 会在生成的 SQL 中自动将租户字段添加到插入的数据中。
+
+这意味着你不需要显式地在业务代码中手动设置租户字段，`TenantLineHandler` 会自动完成这项工作。
+
+### 示例：
+
+假设你有以下租户表结构：
+
+```sql
+CREATE TABLE user (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255),
+    tenant_id BIGINT
+);
+```
+
+当配置了 `TenantLineHandler` 后，执行插入操作时，即使你在实体类中没有显式设置 `tenant_id`，MyBatis-Plus 也会自动为该字段赋值。
+
+```java
+User user = new User();
+user.setName("John");
+// 没有显式设置 tenant_id
+
+userMapper.insert(user);
+```
+
+在执行时，MyBatis-Plus 会自动在 `insert` 语句中填充 `tenant_id` 字段。
+
+生成的 SQL 类似于：
+
+```sql
+INSERT INTO user (name, tenant_id) VALUES ('John', 123); -- 123 是当前的租户ID
+```
+
+### 结论
+
+你观察到的现象是正确的：配置了 `TenantLineHandler` 后，MyBatis-Plus 会在 `insert` 时自动添加租户字段 `tenantId`，无需手动设置。这是 MyBatis-Plus 为了支持多租户自动处理的行为。
+
+如果你有其他自定义的逻辑或者特殊需求，可以结合 `MetaObjectHandler` 或手动处理租户字段。
 
 # 14. mybatisplus的LambdaQuery如何指定and或者or
 在MyBatis Plus的LambdaQuery中，可以通过`and`和`or`方法来指定条件的连接方式。这两个方法分别表示使用"AND"和"OR"来连接条件。
