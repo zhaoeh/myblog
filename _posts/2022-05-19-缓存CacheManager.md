@@ -589,3 +589,10 @@ public User getUserById(String userId) {
 - `CacheManager` 提供了统一的接口，屏蔽了不同缓存技术的差异，便于操作和扩展。
 
 # 9. CacheManager自动配置源码解析
+***首先说下结论***
+（1）CacheManager自动配置的首要前提条件是：容器中启动类或者其他被引入的配置类上，需要标注注解@EnableCaching。 如果没有@EnableCaching注解，则  
+（2）如果不配置 spring.cache.type，自动配置将根据条件自动创建一个CacheManager对象。这个对象大多数情况下都是SimpleCacheManager类型的；除非在解析过程中，其他类的条件优先被满足，则会实例化第一个被满足条件的CacheManager。      
+（3）如果配置了spring.cache.type，自动配置将创建指定类型的CacheManager对象，同时要想成功创建目标对象，还必须满足一些其他条件，比如容器中不存在CacheManager实例的情况下，classpath下必须存在目标类型的类等。      
+（4）如果手动想容器中注册了CacheManager实例，那么自动配置将失效。请注意，spring.cache.type等配置只对自动配置有影响，如果是手动配置的CacheManager实例，那么将和spring.cache配置毫无关系。      
+
+***下面将从CacheManager的自动配置源码详细解读***
