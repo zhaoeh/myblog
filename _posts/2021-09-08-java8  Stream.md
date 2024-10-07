@@ -472,7 +472,7 @@ resultList:[{name=Tom,age=24,country=美国,sex=M}, {name=Harley,age=22,country=
 ```youtrack
 resultStr:欧阳雪---TOM---HARLEY---向天笑---李康---小梅---何雪---李康
 ```
-进一步理解joining方法：
+### 进一步理解joining方法：
 在 Java 8 中，你可以使用 `Stream` API 和 `Collectors.joining()` 来将 `List` 中的元素拼接成一个字符串，并且可以控制分隔符（如逗号 `,`），而且最后一个元素不需要分隔符。
 
 以下是实现示例：
