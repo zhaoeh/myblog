@@ -472,6 +472,53 @@ resultList:[{name=Tom,age=24,country=美国,sex=M}, {name=Harley,age=22,country=
 ```youtrack
 resultStr:欧阳雪---TOM---HARLEY---向天笑---李康---小梅---何雪---李康
 ```
+进一步理解joining方法：
+在 Java 8 中，你可以使用 `Stream` API 和 `Collectors.joining()` 来将 `List` 中的元素拼接成一个字符串，并且可以控制分隔符（如逗号 `,`），而且最后一个元素不需要分隔符。
+
+以下是实现示例：
+
+```java
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> list = Arrays.asList("apple", "banana", "orange", "grape");
+
+        // 使用 Collectors.joining(",") 进行拼接
+        String result = list.stream()
+                            .collect(Collectors.joining(","));
+        
+        System.out.println(result);
+    }
+}
+```
+
+### 代码说明：
+1. **`list.stream()`**：将 `List` 转换为流。
+2. **`Collectors.joining(",")`**：将流中的元素用 `,` 拼接起来，默认最后一个元素不会加上额外的 `,`。
+
+### 输出结果：
+```
+apple,banana,orange,grape
+```
+
+### 其他可选拼接方式：
+- 你还可以自定义分隔符、前缀和后缀：
+```java
+String result = list.stream()
+                    .collect(Collectors.joining(",", "[", "]"));
+System.out.println(result);
+```
+
+输出：
+```
+[apple,banana,orange,grape]
+```
+
+这种方式可以优雅地将列表中的元素拼接起来，同时确保最后一个元素不会多余加上分隔符。
+
 ## 3.7 Stream的distinct方法
 对目标Stream进行结果去重复。   
 （1）distinct方法返回一个新的Stream，不会影响源Stream。   
@@ -533,6 +580,58 @@ IntStream、LongStream 和 DoubleStream 等流的类中，有个非常有用的�
 求和：169
 求平均值：21.125
 ```
+
+### mapToInt方法实际操作：Map中有多个key-value，其中每一个value是一个List,现在想通过java8立即得到整个map中所有value的size，注意是将所有value聚合后的list的总size。该怎么操作呢？   
+在 Java 8 中，可以使用 `Stream` API 来实现这个需求。你可以将 `Map` 中所有 `List` 类型的 `value` 聚合起来，计算出这些 `List` 的元素总数。
+
+具体步骤如下：
+1. 获取 `Map` 中所有 `value`，即 `List` 的集合。
+2. 使用 `Stream` 展开每个 `List` 并计算其大小。
+3. 最终将这些 `List` 的大小累加，得到总数。
+
+以下是实现代码示例：
+
+```java
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class Main {
+    public static void main(String[] args) {
+        // 创建一个包含 List 作为 value 的 Map
+        Map<String, List<Integer>> map = new HashMap<>();
+        map.put("list1", Arrays.asList(1, 2, 3));
+        map.put("list2", Arrays.asList(4, 5));
+        map.put("list3", Arrays.asList(6, 7, 8, 9));
+
+        // 使用 Stream API 计算所有 List 的总大小
+        int totalSize = map.values().stream()
+                .mapToInt(List::size) // 计算每个 List 的大小
+                .sum(); // 汇总所有大小
+
+        System.out.println("Total size of all lists: " + totalSize);
+    }
+}
+```
+
+### 代码说明：
+1. `map.values().stream()`：获取 `Map` 中所有 `value`（即 `List`）并将其转换为流。
+2. `mapToInt(List::size)`：将每个 `List` 的大小映射为整数。
+3. `sum()`：将所有 `List` 的大小累加，得到总的元素数量。
+
+### 输出结果：
+```
+Total size of all lists: 9
+```
+
+### 优点：
+- 代码简洁，利用流式 API 实现复杂操作。
+- 可以轻松处理 `Map` 中多个 `List` 的聚合需求。
+
+这种写法不仅简洁，还能很好地扩展到更多的聚合操作。
+
+
 ## 3.9 Stream的limit方法
 limit()：Stream的方法，对上游数据流进行截取。   
 同样，它返回一个新的Stream。   
@@ -614,7 +713,64 @@ anyMatch()：上游Stream各个元素是否任意匹配指定的规则。
 ```youtrack
 是否匹配：true
 ```
-## 3.14 综合案例
+
+## 3.14 IntStream 代替传统的for循环
+在 Java 8 中，`IntStream` 提供了一种优雅的方式来替代传统的 `for` 循环。它可以通过流式 API 执行固定次数的操作。使用 `IntStream.range()` 或 `IntStream.rangeClosed()`，我们可以轻松地执行指定次数的循环操作，并结合 `Stream` API 来编写更加简洁的代码。
+
+以下是一个使用 `IntStream` 替代传统 `for` 循环的示例：
+
+### 传统的 `for` 循环：
+```java
+for (int i = 0; i < 5; i++) {
+    System.out.println("Iteration: " + i);
+}
+```
+
+### 使用 `IntStream` 替代：
+```java
+import java.util.stream.IntStream;
+
+public class Main {
+    public static void main(String[] args) {
+        IntStream.range(0, 5).forEach(i -> System.out.println("Iteration: " + i));
+    }
+}
+```
+
+### 代码说明：
+1. **`IntStream.range(0, 5)`**：生成一个从 0（含）到 5（不含）的整型流，相当于 `for (int i = 0; i < 5; i++)`。
+2. **`forEach()`**：对每个流中的元素执行指定的操作，类似于 `for` 循环体内的代码。
+
+### `range` 与 `rangeClosed` 的区别：
+- **`IntStream.range(start, end)`**：生成的流范围是 `[start, end)`，即不包含 `end`。
+- **`IntStream.rangeClosed(start, end)`**：生成的流范围是 `[start, end]`，即包含 `end`。
+
+### 复杂操作示例：
+除了简单的迭代输出外，还可以进行更复杂的操作，比如累加求和或多线程并行执行：
+
+#### 累加求和：
+```java
+int sum = IntStream.range(1, 11).sum(); // 计算1到10的和
+System.out.println("Sum: " + sum); // 输出: Sum: 55
+```
+
+#### 并行执行任务：
+```java
+IntStream.range(0, 5).parallel().forEach(i -> {
+    System.out.println("Parallel Task: " + i + " - " + Thread.currentThread().getName());
+});
+```
+这里使用 `parallel()` 可以将循环任务并行化，充分利用多核 CPU。
+
+### 优点：
+1. **简洁优雅**：相比传统的 `for` 循环，流式 API 更加简洁可读。
+2. **并行化**：通过 `parallel()` 轻松实现多线程并行执行，提高性能。
+3. **函数式编程风格**：使用 `forEach()` 等函数式接口，使代码更具表达性。
+
+这类写法不仅使代码简洁清晰，还能帮助开发者更好地利用 Java 8 的函数式编程能力。
+
+
+## 3.15 综合案例
 ```java
     @Test
     public void testStream_zonghe() {
@@ -842,13 +998,94 @@ public class CollectorsRun {
     }
 ```
 
-## 4.7 
-```java
-    @Test
-    public void testCollectors_collectingAndThen() {
+## 4.7 Collectors.collectingAndThen方法详解
+`Collectors.collectingAndThen` 是 Java 8 中 `Collectors` 类的一个静态方法，它用于对收集器的结果进行进一步处理或转换。具体来说，它可以在使用一个收集器收集数据后，执行一个额外的转换操作。
 
-    }
+### 方法签名：
+```java
+public static <T, A, R, RR> Collector<T, A, RR> collectingAndThen(
+    Collector<T, A, R> downstream, 
+    Function<R, RR> finisher
+)
 ```
+
+### 参数说明：
+1. **`downstream`**：一个收集器，用于收集数据，通常是已有的内置收集器，比如 `Collectors.toList()`、`Collectors.toSet()` 等。
+2. **`finisher`**：一个 `Function`，用于对收集器生成的结果进行最终处理或转换。
+
+### 返回值：
+返回一个新的 `Collector`，该收集器先执行 `downstream` 收集数据，然后对结果应用 `finisher` 函数来生成最终的输出。
+
+### 场景和用法：
+`collectingAndThen` 常用于当你想对已有的 `Collector` 进行进一步的处理时。例如，将一个 `List` 通过 `Collectors.toList()` 收集起来后，再将其转换为不可修改的 `List`。
+
+### 示例 1：将 `List` 转换为不可修改的 `List`
+
+```java
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> list = Arrays.asList("apple", "banana", "orange", "grape");
+
+        // 使用 Collectors.collectingAndThen 收集 List 并转换为不可修改的 List
+        List<String> unmodifiableList = list.stream()
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toList(),          // 下游收集器：收集到 List
+                        Collections::unmodifiableList // 转换函数：将 List 转换为不可修改的 List
+                ));
+
+        System.out.println(unmodifiableList);
+
+        // 尝试修改不可修改的 List 会抛出异常
+        // unmodifiableList.add("new fruit"); // 会抛出 UnsupportedOperationException
+    }
+}
+```
+
+### 代码解释：
+1. **`Collectors.toList()`**：这是一个下游收集器，将流中的元素收集到一个 `List` 中。
+2. **`Collections::unmodifiableList`**：这是一个转换函数（`finisher`），将 `List` 转换为不可修改的 `List`。
+3. **`Collectors.collectingAndThen()`**：它将上述两个步骤组合在一起，先收集元素到 `List`，然后将 `List` 转换为不可修改的 `List`。
+
+### 示例 2：收集元素并计算结果（例如统计 `List` 中元素的个数）
+
+```java
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> list = Arrays.asList("apple", "banana", "orange", "grape");
+
+        // 使用 Collectors.collectingAndThen 收集 List 并计算 List 的大小
+        int size = list.stream()
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toList(),  // 下游收集器：收集到 List
+                        List::size           // 转换函数：对 List 计算大小
+                ));
+
+        System.out.println("List size: " + size);
+    }
+}
+```
+
+### 代码解释：
+1. **`Collectors.toList()`**：将流中的元素收集到 `List` 中。
+2. **`List::size`**：将收集到的 `List` 进一步处理，获取它的大小。
+
+### `collectingAndThen` 的使用场景：
+- **转换收集后的结果**：在数据收集完成后，对结果进行一些不可变的操作或转换。例如将 `Set` 转换为不可修改的 `Set`，或者将收集到的 `List` 转换为某种特定类型的集合。
+- **计算最终的统计数据**：你可以先收集数据，然后对收集到的结果进行计算或统计（如求总和、求大小等）。
+- **不可变集合**：常用于确保收集后的集合是不可修改的。
+
+### 小结：
+`Collectors.collectingAndThen` 提供了一种灵活的方式，可以在使用收集器收集数据后立即对结果进行进一步的处理或转换。它结合了函数式编程的思想，将数据收集和后续处理分离，提高了代码的可读性和可维护性。
+
 ## 4.8 Collectors.counting()
 ```java
     // 计算Stream数据流中元素的个数。
