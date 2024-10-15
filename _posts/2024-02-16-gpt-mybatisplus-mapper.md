@@ -2604,3 +2604,210 @@ ORDER BY (salary * 1.1) DESC;
 ### 结论
 
 使用别名或原始列名取决于具体的需求和团队的编码规范。使用别名可以提高可读性和便捷性，而直接使用原始列名或表达式可以确保最大兼容性。在实际项目中，选择哪种方式取决于团队的风格指南和对代码可维护性的需求。
+
+
+# 30. spring的aop如何对mybatisplus的mapper接口进行拦截呢？最好是通过mapper接口上标注注解的方式进行拦截
+在 Spring AOP 中拦截 MyBatis-Plus 的 Mapper 接口，特别是通过注解的方式来进行拦截，可以帮助你在方法执行前后执行一些自定义逻辑，比如日志记录、性能监控、安全检查等。以下是如何实现这一目标的详细步骤：
+
+### 1. 定义自定义注解
+
+首先，你需要定义一个自定义注解，这个注解将用来标记需要拦截的 Mapper 接口方法。
+
+```java
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+public @interface CustomAnnotation {
+    String value() default "";
+}
+```
+
+### 2. 在 Mapper 接口中使用注解
+
+在你的 MyBatis-Plus Mapper 接口中，使用你定义的注解标记需要拦截的方法。
+
+```java
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Select;
+
+public interface UserMapper extends BaseMapper<User> {
+
+    @CustomAnnotation("someValue")
+    @Select("SELECT * FROM user WHERE id = #{id}")
+    User getUserById(int id);
+}
+```
+
+### 3. 创建 AOP 切面
+
+接下来，创建一个 AOP 切面，用于拦截标记了自定义注解的方法。
+
+```java
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.After;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.annotation.Pointcut;
+import org.springframework.stereotype.Component;
+
+@Aspect
+@Component
+public class CustomAspect {
+
+    @Pointcut("@annotation(customAnnotation)")
+    public void pointcut(CustomAnnotation customAnnotation) {
+    }
+
+    @Before("pointcut(customAnnotation)")
+    public void beforeAdvice(JoinPoint joinPoint, CustomAnnotation customAnnotation) {
+        // 在方法执行之前
+        System.out.println("Before advice: " + joinPoint.getSignature() + " with annotation value: " + customAnnotation.value());
+    }
+
+    @After("pointcut(customAnnotation)")
+    public void afterAdvice(JoinPoint joinPoint, CustomAnnotation customAnnotation) {
+        // 在方法执行之后
+        System.out.println("After advice: " + joinPoint.getSignature() + " with annotation value: " + customAnnotation.value());
+    }
+}
+```
+
+### 4. 配置 Spring Boot
+
+确保你的 Spring Boot 应用程序配置了 AOP。通常，Spring Boot 的自动配置已经包含了对 AOP 的支持。你可以在主应用程序类上添加 `@EnableAspectJAutoProxy` 注解来启用 AOP。
+
+```java
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
+
+@SpringBootApplication
+@EnableAspectJAutoProxy
+public class MyApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(MyApplication.class, args);
+    }
+}
+```
+
+### 5. 验证拦截
+
+启动你的 Spring Boot 应用程序，并调用使用了 `@CustomAnnotation` 注解的方法。你应该能够在控制台看到由切面输出的日志，这表明 AOP 成功地拦截了方法调用。
+
+### 总结
+
+1. **定义注解**：创建一个自定义注解来标记需要拦截的 MyBatis-Plus Mapper 方法。
+2. **应用注解**：在 Mapper 接口的方法上使用自定义注解。
+3. **创建切面**：编写一个 AOP 切面，使用 `@Aspect` 注解，并在切面中定义 `@Before` 和 `@After` 逻辑来拦截方法调用。
+4. **启用 AOP**：确保在 Spring Boot 应用程序中启用了 AOP 支持。
+5. **验证**：测试并确认拦截功能正常工作。
+
+这种方法可以帮助你对 MyBatis-Plus Mapper 接口中的方法进行灵活的拦截和处理。
+
+# 31. 我的意思是，是否支持在mapper接口上标注注解，而不是在mapper的某个方法上标注注解进行拦截
+明白了，你想要在 MyBatis-Plus 的 Mapper 接口上使用注解来进行 AOP 拦截，而不仅仅是在 Mapper 的方法上使用注解。要实现这种功能，虽然 Spring AOP 不直接支持在接口上标注注解进行拦截，但可以通过一些间接的方式来实现。
+
+### 方案概述
+
+1. **使用接口上的注解标识**：在 Mapper 接口上定义一个自定义注解。
+2. **通过 AOP 处理接口注解**：编写一个 AOP 切面，用于拦截所有 Mapper 方法的调用，并检查接口上是否存在自定义注解。
+3. **使用 Spring AOP 提供的 `@Pointcut` 和 `@Around`**：创建切面来处理方法调用和接口上的注解。
+
+### 具体实现步骤
+
+#### 1. 定义接口级别的注解
+
+```java
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)  // 这个注解应用于接口类
+public @interface InterfaceLevelAnnotation {
+    String value() default "";
+}
+```
+
+#### 2. 在 Mapper 接口上使用注解
+
+```java
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Select;
+
+@InterfaceLevelAnnotation("interfaceLevel")
+public interface UserMapper extends BaseMapper<User> {
+
+    @Select("SELECT * FROM user WHERE id = #{id}")
+    User getUserById(int id);
+}
+```
+
+#### 3. 创建 AOP 切面
+
+切面需要通过 `@Pointcut` 来拦截所有 Mapper 接口方法的调用，并检查这些接口是否被指定的注解标记。
+
+```java
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Pointcut;
+import org.aspectj.lang.annotation.Before;
+import org.springframework.stereotype.Component;
+
+import java.lang.reflect.Method;
+
+@Aspect
+@Component
+public class InterfaceAnnotationAspect {
+
+    @Pointcut("execution(* com.example.mapper..*(..))")  // Adjust the package path as needed
+    public void mapperMethods() {
+    }
+
+    @Before("mapperMethods()")
+    public void beforeMethod(JoinPoint joinPoint) throws Throwable {
+        // 获取当前方法的类
+        Class<?> targetClass = joinPoint.getTarget().getClass();
+        
+        // 检查接口上是否存在自定义注解
+        if (targetClass.isInterface()) {
+            InterfaceLevelAnnotation annotation = targetClass.getAnnotation(InterfaceLevelAnnotation.class);
+            if (annotation != null) {
+                System.out.println("Interface annotation found: " + annotation.value());
+            }
+        }
+    }
+}
+```
+
+#### 4. 确保 AOP 配置
+
+确保你的 Spring Boot 应用程序启用了 AOP：
+
+```java
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
+
+@SpringBootApplication
+@EnableAspectJAutoProxy
+public class MyApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(MyApplication.class, args);
+    }
+}
+```
+
+### 总结
+
+- **定义接口注解**：在接口上定义一个注解，并在需要拦截的 Mapper 接口上使用该注解。
+- **编写 AOP 切面**：创建一个 AOP 切面来拦截所有 Mapper 方法，并检查其所属接口是否具有指定的注解。
+- **启用 AOP**：确保 Spring Boot 配置了 AOP 支持。
+
+这种方法允许你在 MyBatis-Plus 的 Mapper 接口上使用注解来触发特定的 AOP 逻辑，虽然需要通过间接方式实现，但能够达到在接口层面上进行拦截的目的。
