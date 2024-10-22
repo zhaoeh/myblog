@@ -246,8 +246,8 @@ public class MapOptionalExample {
 - 使用 `HashMap` 或其他支持 `null` 的实现，如果必须存储 `null` 值。
 - 或者考虑使用 `Optional` 来优雅地处理可能为空的值。
 
-  # 5. 还有其他方式吗？
-  除了使用 `HashMap` 或 `Optional` 之外，处理 `null` 值的方式还有几种可选方法。这里介绍几种处理方案，根据实际场景可以灵活选择。
+# 5. 还有其他方式吗？
+除了使用 `HashMap` 或 `Optional` 之外，处理 `null` 值的方式还有几种可选方法。这里介绍几种处理方案，根据实际场景可以灵活选择。
 
 ### 1. 使用 `Stream` 和 `Collectors` 构建 Map
 
@@ -496,8 +496,8 @@ public class HashMapNullKeyExample {
 - 当多次 `put(null, value)` 时，后面的值会覆盖之前的值。
 - 允许多个值为 `null`，即 `null` 可以作为 `HashMap` 中的值存在多个。
 
-  # 8. List.of中的，也不能为null是吧？
-  是的，`Java 9` 引入的 `List.of()` **不允许包含 `null` 元素**。如果你尝试在 `List.of()` 中传入 `null`，将会抛出 `NullPointerException`。
+# 8. List.of中的，也不能为null是吧？
+是的，`Java 9` 引入的 `List.of()` **不允许包含 `null` 元素**。如果你尝试在 `List.of()` 中传入 `null`，将会抛出 `NullPointerException`。
 
 ### 示例
 
@@ -570,4 +570,115 @@ public class ArraysAsListExample {
 - 如果你需要允许 `null` 值，可以使用 `ArrayList` 或 `Arrays.asList()`。
 - `List.of()` 创建的列表是不可变的，而 `ArrayList` 是可变的，可以动态添加、删除和修改元素。
 
-  # 9. 
+# 9. java中如何优雅的获取list或者map的size？要避免空指针，请给出所有方式，最好是开源的东西（获取集合的大小）。
+在 Java 中优雅地获取 `List` 或 `Map` 的大小，并避免空指针异常，可以使用多种方式。以下是几种常见的方式：
+
+### 1. 手动判空检查
+直接对 `List` 或 `Map` 进行判空，防止 `NullPointerException`：
+
+```java
+List<String> list = null;
+int size = (list == null) ? 0 : list.size();
+
+Map<String, String> map = null;
+int mapSize = (map == null) ? 0 : map.size();
+```
+
+### 2. 使用 `Optional`（Java 8+）
+`Optional` 提供了一个更加优雅的方式来处理可能为 `null` 的对象：
+
+```java
+import java.util.Optional;
+
+List<String> list = null;
+int size = Optional.ofNullable(list).map(List::size).orElse(0);
+
+Map<String, String> map = null;
+int mapSize = Optional.ofNullable(map).map(Map::size).orElse(0);
+```
+
+### 3. 使用 Apache Commons Collections
+`Apache Commons Collections` 是一个非常流行的开源库，提供了一些常用的集合工具类，其中就包括处理 `null` 集合的 `CollectionUtils` 和 `MapUtils`：
+
+- **Maven 依赖**：
+  ```xml
+  <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-collections4</artifactId>
+      <version>4.4</version>
+  </dependency>
+  ```
+
+- **使用示例**：
+  ```java
+  import org.apache.commons.collections4.CollectionUtils;
+  import org.apache.commons.collections4.MapUtils;
+
+  List<String> list = null;
+  int size = CollectionUtils.size(list);
+
+  Map<String, String> map = null;
+  int mapSize = MapUtils.size(map);
+  ```
+
+`CollectionUtils.size()` 和 `MapUtils.size()` 方法都能在集合为 `null` 时返回 0，避免空指针异常。
+
+### 4. 使用 Guava 库
+`Google Guava` 也是一个流行的开源库，提供了 `Iterables.size()` 和 `Maps.size()` 方法来优雅地获取集合大小：
+
+- **Maven 依赖**：
+  ```xml
+  <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>31.0.1-jre</version>
+  </dependency>
+  ```
+
+- **使用示例**：
+  ```java
+  import com.google.common.collect.Iterables;
+  import com.google.common.collect.Maps;
+
+  List<String> list = null;
+  int size = Iterables.size(list == null ? Collections.emptyList() : list);
+
+  Map<String, String> map = null;
+  int mapSize = Maps.size(map == null ? Collections.emptyMap() : map);
+  ```
+
+`Guava` 的方式相比原生判空稍微简洁，但仍然需要处理 `null` 值。
+
+### 5. Spring Framework 中的 `CollectionUtils`
+如果你在使用 Spring 框架，也可以利用 `CollectionUtils` 类，它可以处理 `null` 并返回安全的结果：
+
+- **Maven 依赖**：
+  ```xml
+  <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-core</artifactId>
+      <version>5.3.10</version>
+  </dependency>
+  ```
+
+- **使用示例**：
+  ```java
+  import org.springframework.util.CollectionUtils;
+
+  List<String> list = null;
+  int size = CollectionUtils.isEmpty(list) ? 0 : list.size();
+
+  Map<String, String> map = null;
+  int mapSize = CollectionUtils.isEmpty(map) ? 0 : map.size();
+  ```
+
+### 总结
+根据项目需求，可以选择以下几种方式：
+
+1. **原生手动判空**：适合不依赖第三方库的小项目。
+2. **Optional**：简洁、优雅，适合 Java 8 及以上版本。
+3. **Apache Commons Collections**：轻量且常用的工具类，适合处理较多集合操作的场景。
+4. **Guava**：强大的 Google 库，适合复杂集合操作及其他高级功能。
+5. **Spring CollectionUtils**：在 Spring 环境下非常常用的工具类。
+
+这些方法都可以帮助避免空指针问题，根据你的实际项目情况选择合适的方案。
