@@ -876,3 +876,442 @@ public class ProductController {
 ```
 
 通过这种方式，你可以有效地校验 `BigDecimal` 字段的值，确保其只包含数字并且符合特定的格式。
+
+# 22. 实现ConstraintValidator接口，传入了自定义注解，这个具体操作是什么意思？
+实现 `ConstraintValidator` 接口是为了自定义注解的验证逻辑。在Java中，可以通过自定义注解来添加验证规则，例如验证一个字符串是否符合特定格式、验证一个对象的属性是否满足一定条件等。而实现 `ConstraintValidator` 接口则是定义这些验证规则的具体逻辑。
+
+具体操作步骤如下：
+
+1. **创建自定义注解：** 首先，定义一个自定义注解，用于标记需要验证的字段或方法参数。
+   
+   ```java
+   import javax.validation.Constraint;
+   import javax.validation.Payload;
+   import java.lang.annotation.ElementType;
+   import java.lang.annotation.Retention;
+   import java.lang.annotation.RetentionPolicy;
+   import java.lang.annotation.Target;
+   
+   @Target({ElementType.FIELD, ElementType.PARAMETER})
+   @Retention(RetentionPolicy.RUNTIME)
+   @Constraint(validatedBy = MyValidator.class) // 指定验证器类
+   public @interface MyCustomConstraint {
+       String message() default "Invalid value"; // 验证失败时的默认消息
+       Class<?>[] groups() default {};
+       Class<? extends Payload>[] payload() default {};
+   }
+   ```
+
+   在上面的例子中，`MyCustomConstraint` 是一个自定义的注解，通过 `@Constraint(validatedBy = MyValidator.class)` 指定了验证器类为 `MyValidator`。
+
+2. **实现 ConstraintValidator 接口：** 创建一个实现了 `ConstraintValidator` 接口的验证器类，来定义具体的验证逻辑。
+   
+   ```java
+   import javax.validation.ConstraintValidator;
+   import javax.validation.ConstraintValidatorContext;
+   
+   public class MyValidator implements ConstraintValidator<MyCustomConstraint, String> {
+       
+       @Override
+       public void initialize(MyCustomConstraint constraintAnnotation) {
+           // 初始化方法，可以获取注解中的属性值
+       }
+   
+       @Override
+       public boolean isValid(String value, ConstraintValidatorContext context) {
+           // 实现验证逻辑，返回 true 表示验证通过，返回 false 表示验证失败
+           if (value == null) {
+               return false; // 例如，简单示例，字符串不允许为 null
+           }
+           return value.startsWith("prefix"); // 自定义具体的验证逻辑
+       }
+   }
+   ```
+
+   在 `MyValidator` 类中，通过实现 `isValid` 方法来编写具体的验证逻辑。在这个例子中，假设验证一个字符串是否以 "prefix" 开头。
+
+3. **在使用注解的地方使用验证器：** 在需要验证的地方，例如一个方法参数或者一个类的字段，使用自定义的注解进行标记。
+
+   ```java
+   public class MyClass {
+       
+       public void myMethod(@MyCustomConstraint String input) {
+           // 方法体
+       }
+   }
+   ```
+
+   在上述例子中，`@MyCustomConstraint` 注解标记了 `input` 参数，表示需要对其进行验证。
+
+通过以上步骤，就可以实现自定义注解与验证器，用于在应用中添加特定的验证逻辑，以确保数据的正确性和一致性。
+
+# 23. 这种实现，会获取目标实体上的自定义注解吗？这个自定义注解是标注在目标实体类上？还是标注在目标实体字段上呢？它怎么拦截这个注解呢？
+在实现 `ConstraintValidator` 接口时，验证器类是针对自定义注解的具体实现，用于验证标注了该注解的目标实体的字段或方法参数。
+
+具体回答您的问题：
+
+1. **获取目标实体上的自定义注解：** 在验证器类中，可以通过实现 `initialize` 方法来获取自定义注解中的属性值，例如可以获取注解上定义的消息内容、分组等信息。这些信息是通过 `ConstraintValidator` 接口中的 `initialize` 方法提供的 `constraintAnnotation` 参数获取的。
+
+2. **自定义注解标注位置：** 自定义注解可以标注在目标实体类的字段上，也可以标注在方法参数上，取决于您的需求。在实际使用中，根据需要选择将注解标注在字段或方法参数上。
+
+3. **拦截与处理：** 拦截与处理的具体过程由框架完成，一般情况下，在使用了 `@Valid` 或类似的验证标记后，框架会根据注解和相应的验证器来验证目标实体。验证器类实现了 `ConstraintValidator` 接口，框架会在需要验证的时候调用其中的 `isValid` 方法进行验证，从而拦截验证操作并进行处理。
+
+总结来说，验证器类的实现不直接获取目标实体上的自定义注解，而是通过框架调用初始化方法和验证方法来处理标注了自定义注解的目标实体字段或方法参数。验证器类本身并不主动拦截实体上的注解，而是被框架调用以验证标注了注解的实体。
+
+# 24. 我的意思是，MyCustomConstraint 注解可以标注在目标类上吗？如果可以，会被自定义校验器拦截到吗？
+对于 `ConstraintValidator` 接口和自定义注解的使用，通常情况下：
+
+1. **自定义注解标注位置：** 自定义注解可以标注在目标类的字段、方法参数、方法上，甚至可以标注在目标类本身上，具体取决于您的需求和设计。例如，您可以创建一个自定义注解，并将其标注在类级别，以指定类级别的验证规则或元数据。
+
+   ```java
+   @Target({ElementType.TYPE, ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER})
+   @Retention(RetentionPolicy.RUNTIME)
+   @Constraint(validatedBy = MyValidator.class)
+   public @interface MyCustomConstraint {
+       String message() default "Invalid value";
+       Class<?>[] groups() default {};
+       Class<? extends Payload>[] payload() default {};
+   }
+   ```
+
+   在上述示例中，`@MyCustomConstraint` 注解可以标注在类（`ElementType.TYPE`）、字段（`ElementType.FIELD`）、方法（`ElementType.METHOD`）或方法参数（`ElementType.PARAMETER`）上。
+
+2. **自定义校验器拦截与处理：** 如果 `@MyCustomConstraint` 注解标注在目标类上（`ElementType.TYPE`），则使用 `ConstraintValidator` 实现的自定义校验器（例如 `MyValidator` 类）可以拦截到并处理这个注解。在这种情况下，验证器类 `MyValidator` 可以实现对类级别的验证逻辑，例如检查整个类的一致性或特定字段之间的关系。
+
+   ```java
+   public class MyValidator implements ConstraintValidator<MyCustomConstraint, Object> {
+       
+       @Override
+       public void initialize(MyCustomConstraint constraintAnnotation) {
+           // 初始化方法，可以获取注解中的属性值
+       }
+   
+       @Override
+       public boolean isValid(Object value, ConstraintValidatorContext context) {
+           // 实现验证逻辑，返回 true 表示验证通过，返回 false 表示验证失败
+           // 可以在这里处理类级别的验证逻辑
+           return true; // 简单示例，总是返回 true
+       }
+   }
+   ```
+
+   在 `MyValidator` 的 `isValid` 方法中，您可以编写验证逻辑，包括处理类级别的验证需求。框架在验证目标类时会调用 `MyValidator` 类的 `isValid` 方法来执行验证逻辑，从而处理标注在目标类上的 `@MyCustomConstraint` 注解。
+
+因此，自定义注解可以标注在目标类上，而自定义校验器可以拦截并处理这些标注，实现相应的验证逻辑。
+
+# 25. 也就是说，自定义注解实际上可以标注在目标类、目标字段、目标方法上，都可以被自定义校验器拦截到对吗？
+确实，自定义注解可以标注在目标类、目标字段、目标方法等位置上，并且可以被相应的自定义校验器拦截到。这意味着，您可以根据具体的业务需求和验证场景，选择将自定义注解标注在合适的位置上，并实现对应的校验器来处理这些注解。
+
+具体来说：
+
+- **目标类（ElementType.TYPE）：** 如果您的自定义注解标注在类上（目标类），则可以使用 `ConstraintValidator` 实现类来处理类级别的验证逻辑。
+  
+- **目标字段（ElementType.FIELD）和目标方法参数（ElementType.PARAMETER）：** 如果注解标注在字段或方法参数上，则相应的验证器可以处理针对字段或参数的验证逻辑。
+
+- **目标方法（ElementType.METHOD）：** 注解还可以标注在方法上，允许您在方法执行前对参数进行验证，确保满足特定的条件或格式。
+
+通过这种方式，自定义注解和验证器的结合可以实现非常灵活和精确的数据验证和业务逻辑控制，有助于提高代码的可读性、可维护性和安全性。
+
+# 26. 如果自定义注解标注在类上，通过自定义校验器实现拦截，那么message会使用自定义注解中的message吗？自定义注解中的group是不是就没法实现分组了呢？
+当自定义注解标注在类上，并且通过自定义校验器实现拦截时，关于 `message` 和 `groups` 的处理如下：
+
+1. **Message 使用：** 
+   - 如果自定义注解中定义了 `message` 属性，并且在校验器的 `isValid` 方法中未覆盖或修改 `ConstraintValidatorContext` 的默认消息，那么将会使用自定义注解中指定的 `message`。这样做可以为不同的验证场景提供特定的错误消息。
+
+2. **Groups 使用：**
+   - `groups` 属性是用于定义验证分组的，允许您将验证器的逻辑分为不同的组别，每个组别可以根据需要执行不同的验证逻辑。例如，某些验证场景可能需要执行一组验证规则，而另一些验证场景则需要执行另一组。
+   - 自定义校验器通过 `initialize` 方法可以获取注解中的 `groups` 属性，并根据这些分组执行相应的验证逻辑。这样可以实现灵活的验证控制，根据不同的分组执行不同的验证逻辑。
+
+总结：
+- `message` 属性可以在自定义注解中定义，并且可以被自定义校验器使用。
+- `groups` 属性在自定义注解中定义，可以用于定义不同的验证分组，从而实现根据分组执行不同的验证逻辑。
+
+因此，即使自定义注解标注在类上，并通过自定义校验器实现拦截，仍然可以有效地利用 `message` 和 `groups` 属性来实现详细和分组的验证需求。
+
+# 27. 获取groups分组，必须由自定义校验器显式是西安分组逻辑吗？
+在 Java 中使用 Bean Validation（例如通过 Hibernate Validator）时，分组验证是一种非常有用的功能，可以根据不同的场景应用不同的验证规则。分组验证允许您定义一组验证规则，并根据需要显式地指定要执行哪些分组的验证。
+
+### 使用分组验证的步骤：
+
+1. **定义自定义注解：** 在自定义注解中，定义 `groups` 属性，用于指定哪些分组应用该验证规则。
+
+   ```java
+   import javax.validation.Constraint;
+   import javax.validation.Payload;
+   import java.lang.annotation.ElementType;
+   import java.lang.annotation.Retention;
+   import java.lang.annotation.RetentionPolicy;
+   import java.lang.annotation.Target;
+
+   @Target({ElementType.TYPE, ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER})
+   @Retention(RetentionPolicy.RUNTIME)
+   @Constraint(validatedBy = MyValidator.class)
+   public @interface MyCustomConstraint {
+       String message() default "Invalid value"; // 默认错误消息
+       Class<?>[] groups() default {}; // 默认分组为空
+
+       Class<? extends Payload>[] payload() default {};
+   }
+   ```
+
+2. **实现 ConstraintValidator 接口：** 创建一个实现 `ConstraintValidator` 接口的验证器类，处理具体的验证逻辑。
+
+   ```java
+   import javax.validation.ConstraintValidator;
+   import javax.validation.ConstraintValidatorContext;
+
+   public class MyValidator implements ConstraintValidator<MyCustomConstraint, Object> {
+
+       @Override
+       public void initialize(MyCustomConstraint constraintAnnotation) {
+           // 初始化方法，可以获取注解中的属性值，例如 groups
+           Class<?>[] groups = constraintAnnotation.groups();
+           // 这里可以根据 groups 做一些初始化逻辑
+       }
+
+       @Override
+       public boolean isValid(Object value, ConstraintValidatorContext context) {
+           // 实现验证逻辑，根据需要执行分组的验证
+           // 例如，根据 groups 来决定执行哪些验证逻辑
+           return true; // 简单示例，总是返回 true
+       }
+   }
+   ```
+
+3. **在使用时指定分组：** 在实际使用时，通过使用 `@Validated` 或 `@Valid` 注解，以及指定验证组来触发相应的验证。
+
+   ```java
+   public class MyClass {
+
+       public void myMethod(@MyCustomConstraint(groups = {Group1.class}) String input) {
+           // 方法体
+       }
+   }
+   ```
+
+   在上述示例中，`@MyCustomConstraint` 注解标注在 `input` 参数上，并指定了分组 `Group1.class`。这意味着在验证 `input` 参数时，将会执行 `Group1.class` 定义的验证规则。
+
+### 总结：
+
+- **分组验证的显式指定：** 要使用分组验证，确实需要在自定义校验器中显式地处理分组逻辑。这是因为分组验证提供了一种根据不同的验证需求选择性地执行验证规则的机制，这种机制需要在验证器中进行逻辑实现和控制。
+  
+- **使用分组的好处：** 分组验证允许您根据不同的场景选择性地应用验证规则，从而提高了灵活性和可维护性，尤其适用于复杂的业务场景。
+
+通过合理地使用分组验证，可以有效地管理和控制应用中的数据验证流程，确保数据的完整性和一致性，同时提升用户体验和系统的安全性。
+
+# 28. 我自己实现了校验器，代码大概是 
+```java
+context.disableDefaultConstraintViolation();
+context.buildConstraintViolationWithTemplate(message).addConstraintViolation();
+```
+根据您提供的代码片段：
+
+```java
+context.disableDefaultConstraintViolation();
+context.buildConstraintViolationWithTemplate(message).addConstraintViolation();
+```
+
+这段代码通常用于自定义校验器中，用来构建自定义的验证错误消息。
+
+### 解释代码逻辑：
+
+1. **`disableDefaultConstraintViolation()` 方法：**
+   - 这个方法用于禁用默认的约束违规（violation）创建。默认情况下，框架可能会创建一些默认的验证错误消息，但是通过调用 `disableDefaultConstraintViolation()`，您可以完全控制错误消息的生成过程。
+
+2. **`buildConstraintViolationWithTemplate(message)` 方法：**
+   - 这个方法创建一个基于模板的验证错误消息。`message` 参数通常是您在注解中定义的错误消息模板，可以包含占位符或者直接的错误消息文本。
+
+3. **`addConstraintViolation()` 方法：**
+   - 这个方法用于将构建的验证错误消息添加到验证上下文中。通过调用 `buildConstraintViolationWithTemplate()` 构建的验证错误消息会被添加到验证上下文中，并在验证失败时返回给调用方。
+
+### 可能的问题和建议：
+
+- **确保正确传递验证上下文：** 确保在验证器的 `isValid()` 方法中正确处理和传递 `ConstraintValidatorContext` 对象。验证上下文是用来构建和处理验证错误消息的关键对象。
+
+- **验证器逻辑确认：** 确保在 `isValid()` 方法中，根据验证逻辑的结果（是否通过验证）来决定是否创建并添加验证错误消息。验证失败时，应该调用 `buildConstraintViolationWithTemplate()` 和 `addConstraintViolation()` 方法来构建并添加验证错误消息。
+
+- **调试和日志记录：** 如果 `getFieldError()` 返回 `null`，可以通过在验证器中添加调试信息或日志记录来追踪验证流程，确保验证器中的逻辑按预期执行。
+
+通过以上方法，您可以更好地控制和定制验证器的行为，确保验证错误消息能够正确生成和返回。如果您遇到特定的问题或需要进一步帮助，请提供更多上下文或代码细节，我将很乐意继续协助您解决问题。
+
+# 29. 经过调试发现，getAllErrors和getGlobalErrors是有值的，就是getFieldErrors是null
+如果在使用 Spring 的 `BindingResult` 或 `Errors` 对象时，调用 `getFieldErrors()` 方法返回 `null`，而 `getAllErrors()` 和 `getGlobalErrors()` 方法有值，通常情况下可以考虑以下几个方面来解决问题：
+
+1. **验证结果类型不匹配：** 确保在方法参数中使用的是正确的验证结果对象类型。通常情况下，使用 `BindingResult` 或其子类（如 `BeanPropertyBindingResult`）来处理验证结果。
+
+   ```java
+   public String handleFormSubmit(@Valid MyForm form, BindingResult bindingResult) {
+       // 确保 bindingResult 是 BindingResult 类型或其子类
+       if (bindingResult.hasErrors()) {
+           // 处理验证错误
+           List<FieldError> fieldErrors = bindingResult.getFieldErrors();
+           // 其他处理逻辑
+       }
+       // 其他逻辑
+   }
+   ```
+
+2. **验证结果未正确绑定：** 确保在控制器方法中，验证结果对象被正确地绑定和传递。验证结果对象应该与验证表单或实体类的类型相匹配，并且在验证失败时能够正确地收集和返回错误信息。
+
+3. **验证逻辑和校验器实现：** 如果您在校验器中自定义了验证逻辑（如前面提到的自定义校验器），确保在 `isValid()` 方法中正确处理和返回验证错误。您应该在验证失败时调用 `ConstraintValidatorContext` 的方法来构建和添加错误消息。
+
+4. **调试和日志记录：** 如果需要进一步调试，可以添加日志记录来跟踪验证流程，尤其是验证结果对象的状态和内容。这有助于查看在验证过程中发生了什么以及为什么 `getFieldErrors()` 返回 `null`。
+
+### 示例问题解决方法：
+
+假设您有一个控制器方法如下：
+
+```java
+@PostMapping("/submitForm")
+public String submitForm(@Valid MyForm form, BindingResult bindingResult) {
+    if (bindingResult.hasErrors()) {
+        List<FieldError> fieldErrors = bindingResult.getFieldErrors();
+        // 处理字段错误
+        return "errorPage";
+    }
+    // 处理成功提交逻辑
+    return "successPage";
+}
+```
+
+在这个例子中，确保 `bindingResult` 参数是正确的 `BindingResult` 类型，并且在验证失败时能够正确地获取和处理 `getFieldErrors()` 返回的字段错误信息。
+
+如果您继续遇到问题或需要进一步帮助，请提供更多的代码片段或具体情况，我将很乐意继续协助解决。
+
+# 30. getAllErrors和getGlobalErrors、getFieldErrors，这几个方法都有什么区别？
+在 Spring 的数据绑定和验证过程中，`BindingResult` 接口提供了几种方法来获取验证结果的错误信息，包括 `getAllErrors()`、`getGlobalErrors()` 和 `getFieldErrors()`。这些方法的区别如下：
+
+1. **`getAllErrors()` 方法：**
+   - 返回所有验证失败的错误信息，无论是字段错误还是全局错误（即与具体字段无关的验证错误）。
+   - 包括所有类型的错误，不仅限于字段错误，还包括对象级别的验证错误（如对象级别的约束）。
+
+2. **`getGlobalErrors()` 方法：**
+   - 返回所有的全局错误，即与具体字段无关的验证错误。
+   - 这些错误通常是一些与整个对象或表单相关的验证错误，而不是特定字段上的错误。
+   - 例如，如果您在验证时设置了全局的约束或条件，这些错误将会被记录在全局错误中。
+
+3. **`getFieldErrors()` 方法：**
+   - 返回所有的字段错误信息，即特定字段上的验证错误。
+   - 每个 `FieldError` 对象代表一个字段验证失败的情况，包括字段名称、错误消息和拒绝的值。
+
+### 示例使用：
+
+假设有一个表单对象 `MyForm`，包含字段 `name` 和 `age`，进行表单验证时：
+
+```java
+@PostMapping("/submitForm")
+public String submitForm(@Valid MyForm form, BindingResult bindingResult) {
+    if (bindingResult.hasErrors()) {
+        // 获取所有的全局错误
+        List<ObjectError> globalErrors = bindingResult.getGlobalErrors();
+        
+        // 获取所有的字段错误
+        List<FieldError> fieldErrors = bindingResult.getFieldErrors();
+        
+        // 处理错误逻辑
+        return "errorPage";
+    }
+    // 处理成功提交逻辑
+    return "successPage";
+}
+```
+
+- `globalErrors` 列表将包含所有的全局错误，例如未通过对象级别验证的情况。
+- `fieldErrors` 列表将包含所有字段级别的错误，例如字段格式不符合或者字段为空等情况。
+
+### 总结：
+
+- **`getAllErrors()`**：获取所有类型的验证错误，包括字段级别和全局级别的。
+- **`getGlobalErrors()`**：获取与具体字段无关的全局验证错误。
+- **`getFieldErrors()`**：获取所有字段级别的验证错误。
+
+通过这些方法，可以精确地获取并处理在验证过程中发生的不同类型的错误信息，有助于提高应用程序的可靠性和用户体验。
+
+# 31. 自定义校验器时，如何才能保证getFieldErrors？
+确保在自定义校验器中能够正确地收集和返回字段级别的验证错误（即确保 `getFieldErrors()` 方法能够返回预期的结果），需要遵循以下几个步骤和注意事项：
+
+### 步骤和注意事项：
+
+1. **实现 ConstraintValidator 接口：** 首先，确保您的自定义校验器类实现了 `ConstraintValidator` 接口。这是一个泛型接口，您需要指定自定义注解类型和被校验的值的类型。
+
+   ```java
+   public class MyValidator implements ConstraintValidator<MyCustomConstraint, Object> {
+       // 实现验证逻辑
+       @Override
+       public boolean isValid(Object value, ConstraintValidatorContext context) {
+           // 实现验证逻辑
+           return true; // 简单示例，总是返回 true
+       }
+   }
+   ```
+
+2. **验证逻辑中使用 ConstraintValidatorContext：** 在 `isValid()` 方法中，使用 `ConstraintValidatorContext` 对象来构建和添加字段级别的验证错误。
+
+   ```java
+   public class MyValidator implements ConstraintValidator<MyCustomConstraint, Object> {
+       @Override
+       public boolean isValid(Object value, ConstraintValidatorContext context) {
+           if (value == null) {
+               context.disableDefaultConstraintViolation();
+               context.buildConstraintViolationWithTemplate("Value cannot be null")
+                      .addConstraintViolation();
+               return false;
+           }
+           // 更多验证逻辑
+           return true;
+       }
+   }
+   ```
+
+3. **禁用默认约束违规：** 在需要自定义错误消息时，调用 `disableDefaultConstraintViolation()` 方法来禁用默认的约束违规处理。
+
+4. **构建和添加字段错误消息：** 使用 `buildConstraintViolationWithTemplate()` 方法构建错误消息，并通过 `addConstraintViolation()` 方法将错误消息添加到 `ConstraintValidatorContext` 中。
+
+   ```java
+   context.disableDefaultConstraintViolation();
+   context.buildConstraintViolationWithTemplate("Custom error message")
+          .addConstraintViolation();
+   ```
+
+5. **在控制器或服务层中使用 BindingResult：** 在控制器或服务层方法中，确保正确地处理 `BindingResult` 对象，并使用 `getFieldErrors()` 方法来获取字段级别的验证错误。
+
+   ```java
+   @PostMapping("/submitForm")
+   public String submitForm(@Valid MyForm form, BindingResult bindingResult) {
+       if (bindingResult.hasErrors()) {
+           List<FieldError> fieldErrors = bindingResult.getFieldErrors();
+           // 处理字段级别的验证错误
+           return "errorPage";
+       }
+       // 处理成功提交逻辑
+       return "successPage";
+   }
+   ```
+
+### 总结：
+
+通过以上步骤和注意事项，您可以确保在自定义校验器中正确地处理字段级别的验证错误，并使 `getFieldErrors()` 方法能够返回预期的结果。在 `isValid()` 方法中，使用 `ConstraintValidatorContext` 构建和添加验证错误消息是关键，同时确保在控制器或服务层中正确处理 `BindingResult` 对象来获取和处理验证错误。
+
+# 32. MyCustomConstraint注解是不是必须标注在字段上才能够获取到getFieldErrors？
+在 Spring 的验证机制中，通常情况下，如果您希望通过 `getFieldErrors()` 方法获取字段级别的验证错误信息，那么自定义的验证注解（如 `MyCustomConstraint`）确实需要标注在字段上才能生效并被验证框架识别。这是因为验证框架在进行数据绑定和验证时，会根据注解的位置来确定验证的目标。
+
+具体来说：
+
+- **字段级别验证：** 如果您希望在某个字段上应用自定义的验证逻辑，并能够通过 `getFieldErrors()` 获取到这个字段的验证错误信息，那么 `MyCustomConstraint` 注解必须直接标注在目标字段的定义上。
+
+```java
+public class MyForm {
+    @MyCustomConstraint
+    private String fieldName;
+
+    // getter and setter
+}
+```
+
+在这种情况下，当验证失败时，Spring MVC 将能够将字段级别的错误信息添加到 `BindingResult` 对象中，并且您可以通过 `getFieldErrors()` 方法获取这些错误信息。
+
+- **其他级别的验证：** 如果 `MyCustomConstraint` 注解标注在类级别或方法级别，通常情况下它们会被用于对象级别的验证，而不是针对具体的字段。这种情况下，您可能需要通过 `getGlobalErrors()` 方法获取全局级别的验证错误信息，或者在自定义的验证器中处理对象级别的验证逻辑。
+
+总之，确保将自定义的验证注解正确地标注在需要验证的字段上是保证能够通过 `getFieldErrors()` 获取字段级别验证错误的关键。这样能够让 Spring MVC 在数据绑定和验证过程中正确地识别和应用您的自定义验证逻辑。
+
+# 33. 实现自定义校验器时,isValid方法详细解释，包括方法用途和方法参数分别是什么？
