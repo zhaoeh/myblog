@@ -7812,3 +7812,29 @@ public class CustomValidator implements ConstraintValidator<CustomConstraint, St
 
 ### 总结
 `payload` 的调用时机主要是在验证失败后，由你自己或框架在后续处理逻辑中访问和使用。它不会影响验证的执行，但提供了一种灵活的方式，供其他系统或逻辑在验证失败时获取更多的上下文信息。如果你需要基于验证失败做出不同的业务决策或扩展框架，`payload` 就非常有用。
+
+
+# 130. spring validation中的group分组， 必须是interface而不能是一个class吗？
+是的，在Spring Validation中，分组（groups）必须是一个接口（`interface`），而不能是一个类（`class`）。这是因为分组验证依赖于接口来作为标识符，而不是具体的类实现。通过接口可以更灵活地定义和引用多个分组，满足多种验证场景的需求。
+
+### 使用分组的示例
+以下是使用分组的简单示例：
+
+```java
+import javax.validation.constraints.NotNull;
+import javax.validation.groups.Default;
+
+public class User {
+
+    @NotNull(groups = Create.class)
+    private String username;
+
+    @NotNull(groups = {Update.class, Default.class})
+    private String email;
+
+    public interface Create {}
+    public interface Update {}
+}
+```
+
+在上例中，`Create`和`Update`都是接口，用于在不同的场景中应用不同的验证规则。
