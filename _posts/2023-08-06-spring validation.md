@@ -7955,3 +7955,162 @@ public class User {
 - 如果你还使用了 `buildConstraintViolationWithTemplate()` 自定义了消息，那么验证结果会同时显示默认消息和自定义消息。
 
 而如果你希望只显示自定义的错误信息，就需要在自定义验证器中调用 `disableDefaultConstraintViolation()` 来禁用掉注解中的默认消息。
+
+
+# 134. 在spring validation中，@vaild注解和@validated注解的区别是什么？从分组校验、级联校验等角度全面分析
+在 Spring Validation 中，`@Valid` 和 `@Validated` 注解都是用于进行参数校验的注解，但它们之间有一些细微的区别，特别是在分组校验和级联校验的支持上。以下是对二者的全面对比：
+
+### 1. 基本用法
+- **`@Valid`**：来自于 Java Bean Validation（JSR 303）。通常用在方法参数、字段或方法返回值上，用于触发对该对象或字段的默认校验。
+- **`@Validated`**：来自于 Spring 框架的扩展，支持分组校验，通常用在类或方法上。
+
+### 2. 级联校验
+- **`@Valid`**：支持级联校验。当一个对象中包含另一个需要校验的嵌套对象时，可以在嵌套对象的字段上添加 `@Valid` 注解，触发级联校验。例如：
+
+  ```java
+  public class Parent {
+      @Valid  // 触发对 child 对象的校验
+      private Child child;
+  }
+  ```
+
+- **`@Validated`**：不直接支持级联校验。在级联校验场景中，`@Validated` 通常用在类或方法参数上，不会自动触发嵌套对象的级联校验。
+
+### 3. 分组校验
+- **`@Valid`**：不支持分组校验，使用 `@Valid` 只会触发对象的默认校验。
+- **`@Validated`**：支持分组校验。可以在注解中指定校验组，例如 `@Validated(GroupA.class)`，这样就只会触发属于 `GroupA` 的校验规则。这在同一个实体类中定义多个校验组，并根据业务需求只验证其中某一部分规则时非常有用。
+
+  ```java
+  @Validated(GroupA.class)
+  public void someMethod(@Validated(GroupB.class) SomeRequest request) { ... }
+  ```
+
+### 4. 使用场景
+- **`@Valid`**：
+  - 用于一般校验场景，特别是需要级联校验时。
+  - 适合用于简单的 Bean 校验，并自动支持嵌套对象的校验。
+  - 当只需要对参数进行常规校验而不涉及分组时，可以选择 `@Valid`。
+
+- **`@Validated`**：
+  - 用于需要分组校验的场景，可以在同一实体中定义不同分组的校验规则。
+  - 更灵活，适合用于复杂的业务逻辑，例如在不同情况下应用不同的校验规则。
+
+### 5. 实际使用中的选择
+- 当只需要默认校验和级联校验时，`@Valid` 更加简洁。
+- 当需要分组校验时，`@Validated` 是唯一选择。使用分组校验可以让同一个实体类在不同的业务场景下复用，但只触发相应的校验规则。
+
+### 代码示例
+
+假设我们有一个用户注册和更新接口，在注册时我们需要验证所有字段，而在更新时只需验证部分字段：
+
+```java
+public class User {
+    @NotNull(groups = Register.class)
+    private String username;
+
+    @NotNull(groups = Register.class)
+    @Size(min = 6, groups = {Register.class, Update.class})
+    private String password;
+
+    // 其他字段...
+}
+```
+
+在控制器中可以通过 `@Validated` 指定校验组：
+
+```java
+@RestController
+public class UserController {
+    @PostMapping("/register")
+    public void register(@Validated(Register.class) @RequestBody User user) {
+        // 只会验证 Register 分组下的规则
+    }
+
+    @PostMapping("/update")
+    public void update(@Validated(Update.class) @RequestBody User user) {
+        // 只会验证 Update 分组下的规则
+    }
+}
+```
+
+### 总结
+- `@Valid`：适用于简单的校验需求，特别是级联校验。
+- `@Validated`：适用于复杂校验，尤其是分组校验的需求，但不支持级联校验。
+
+# 135. 如果我既需要分组校验、又需要级联校验，请问是否可以结合二者使用？比如在controller方法参数上通过@validated开启分组校验，在实体中通过@valid开启级联校验？
+是的，`@Validated` 和 `@Valid` 可以结合使用，以同时实现分组校验和级联校验的需求。典型用法是在 Controller 方法参数上使用 `@Validated` 以启用分组校验，而在实体类的嵌套字段上使用 `@Valid` 来触发级联校验。具体实现方式如下：
+
+### 使用示例
+
+假设我们有一个用户注册请求，需要进行分组校验，同时还包含一个地址信息的嵌套对象，该地址对象也需要验证字段。
+
+#### 1. 定义分组接口
+
+```java
+public interface RegisterGroup {}
+public interface UpdateGroup {}
+```
+
+#### 2. 定义实体类及嵌套对象
+
+在 `User` 实体类中定义 `Address` 的嵌套对象，并在嵌套字段上使用 `@Valid` 以支持级联校验。
+
+```java
+public class Address {
+    @NotBlank(groups = {RegisterGroup.class, UpdateGroup.class})
+    private String city;
+
+    @NotBlank(groups = {RegisterGroup.class, UpdateGroup.class})
+    private String street;
+
+    // Getters and Setters
+}
+
+public class User {
+    @NotNull(groups = RegisterGroup.class)
+    private String username;
+
+    @Size(min = 6, groups = {RegisterGroup.class, UpdateGroup.class})
+    private String password;
+
+    @Valid  // 启用对 address 对象的级联校验
+    @NotNull(groups = RegisterGroup.class)
+    private Address address;
+
+    // Getters and Setters
+}
+```
+
+#### 3. 在 Controller 中使用 `@Validated` 启用分组校验
+
+在 Controller 方法中，通过 `@Validated` 注解指定使用某一校验组，同时确保嵌套对象中的 `@Valid` 生效：
+
+```java
+@RestController
+public class UserController {
+    @PostMapping("/register")
+    public void register(@Validated(RegisterGroup.class) @RequestBody User user) {
+        // 进行注册操作，校验规则会针对 RegisterGroup 分组
+    }
+
+    @PostMapping("/update")
+    public void update(@Validated(UpdateGroup.class) @RequestBody User user) {
+        // 进行更新操作，校验规则会针对 UpdateGroup 分组
+    }
+}
+```
+
+### 工作原理
+
+- `@Validated(RegisterGroup.class)` 会触发 `User` 类上与 `RegisterGroup` 相关的校验规则。
+- `@Valid` 作用于 `User` 中的 `address` 字段，确保对 `Address` 对象的校验规则进行级联校验。
+- 当 `RegisterGroup` 校验组被触发时，`User` 实体中的 `username`、`password` 以及 `address` 字段都会被校验，同时 `address` 对象中的 `city` 和 `street` 也会因 `@Valid` 而被校验。
+
+### 注意事项
+
+- 使用 `@Valid` 时，确保嵌套对象 `Address` 中的字段也要符合当前分组要求，否则它们不会被校验。
+- 确保在 `@Validated` 的分组参数中包含所有级联对象校验时需要的组。
+
+### 总结
+
+这种组合使用能够实现分组校验和级联校验的功能，同时满足复杂校验需求。
