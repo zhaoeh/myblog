@@ -7838,3 +7838,120 @@ public class User {
 ```
 
 在上例中，`Create`和`Update`都是接口，用于在不同的场景中应用不同的验证规则。
+
+
+# 131. 在spring validation中，disableDefaultConstraintViolation方法的核心目的是什么？到底做了什么逻辑？
+在Spring Validation中，`disableDefaultConstraintViolation()` 方法的核心目的是**禁用默认的验证错误消息**，从而允许开发者自定义特定的错误消息，而不显示默认消息。
+
+### 工作机制
+默认情况下，当一个约束被违反时，Hibernate Validator 会自动添加一个默认的验证错误消息。例如，`@NotNull`注解在验证失败时会触发一条默认的“不能为null”的消息。
+
+调用 `disableDefaultConstraintViolation()` 后，默认的错误消息将不再自动添加。此时，您可以通过 `ConstraintValidatorContext#buildConstraintViolationWithTemplate` 方法，自定义并添加自己的错误消息。
+
+### 具体逻辑流程
+1. **禁用默认错误消息**：调用 `disableDefaultConstraintViolation()` 会阻止 `ConstraintValidatorContext` 自动添加验证失败消息。
+2. **添加自定义消息**：然后可以调用 `buildConstraintViolationWithTemplate(String messageTemplate)` 来添加自定义消息。该消息可以包含占位符，如 `{min}`, `{max}`, 等。
+3. **关联自定义消息到具体字段**（可选）：还可以通过 `addPropertyNode("fieldName")` 来将错误消息关联到指定的字段，而非整个对象。
+
+### 示例
+以下是一个验证器的示例，它使用 `disableDefaultConstraintViolation()` 禁用默认消息并添加自定义消息：
+
+```java
+public class CustomValidator implements ConstraintValidator<CustomConstraint, String> {
+
+    @Override
+    public boolean isValid(String value, ConstraintValidatorContext context) {
+        if (value == null || !value.matches("[a-zA-Z]+")) {
+            context.disableDefaultConstraintViolation();
+            context.buildConstraintViolationWithTemplate("Only alphabetic characters are allowed")
+                   .addConstraintViolation();
+            return false;
+        }
+        return true;
+    }
+}
+```
+
+在这个例子中，`disableDefaultConstraintViolation()` 禁用了默认消息，取而代之的是自定义的“Only alphabetic characters are allowed”错误提示。如果不禁用默认消息，最终的错误信息会同时显示默认消息和自定义消息。
+
+# 132. 是不是只要自定义了校验器，就必须调用disableDefaultConstraintViolation方法？如果不调用，自定义的消息模板添加不进去吗？
+不一定要调用 `disableDefaultConstraintViolation()` 方法才能添加自定义消息模板。如果不调用这个方法，自定义的消息模板依然可以正常添加进去，但是会**同时显示默认的验证错误消息和自定义的错误消息**。  
+
+### 不调用 `disableDefaultConstraintViolation()` 的影响
+如果在自定义验证器中不调用 `disableDefaultConstraintViolation()`，当验证失败时，Spring Validation 会：
+1. 添加默认的验证错误消息（由约束注解自带的 `message` 属性决定）。
+2. 添加你自定义的错误消息（如果你使用了 `buildConstraintViolationWithTemplate()` 方法）。
+
+因此，结果是两个消息都会显示：默认消息和自定义消息。
+
+### 什么时候需要 `disableDefaultConstraintViolation()`
+如果你希望**仅显示自定义的错误消息**，而不想显示默认消息，就需要调用 `disableDefaultConstraintViolation()`。禁用默认消息后，最终的错误消息中将只包含你通过 `buildConstraintViolationWithTemplate()` 方法添加的自定义消息。
+
+### 示例对比
+
+假设我们有一个自定义验证器，但没有禁用默认消息：
+
+```java
+public class CustomValidator implements ConstraintValidator<CustomConstraint, String> {
+
+    @Override
+    public boolean isValid(String value, ConstraintValidatorContext context) {
+        if (value == null || !value.matches("[a-zA-Z]+")) {
+            context.buildConstraintViolationWithTemplate("Only alphabetic characters are allowed")
+                   .addConstraintViolation();
+            return false;
+        }
+        return true;
+    }
+}
+```
+
+在验证失败时，错误消息中可能会包含**默认的错误消息**以及**自定义消息**。
+
+而如果我们使用 `disableDefaultConstraintViolation()`，只会显示自定义消息：
+
+```java
+public class CustomValidator implements ConstraintValidator<CustomConstraint, String> {
+
+    @Override
+    public boolean isValid(String value, ConstraintValidatorContext context) {
+        if (value == null || !value.matches("[a-zA-Z]+")) {
+            context.disableDefaultConstraintViolation(); // 禁用默认消息
+            context.buildConstraintViolationWithTemplate("Only alphabetic characters are allowed")
+                   .addConstraintViolation();
+            return false;
+        }
+        return true;
+    }
+}
+```
+
+### 总结
+- 如果需要**只显示自定义错误消息**，则需要调用 `disableDefaultConstraintViolation()`。
+- 如果不调用 `disableDefaultConstraintViolation()`，会显示默认和自定义的错误消息。
+
+# 133. 什么叫默认的错误消息？是指spring validation框架中，约束注解添加的message吗？比如NotNull中我添加了“name cannot be null”，这个我添加的message就是默认的错误消息吗？
+是的，在 Spring Validation（特别是 Hibernate Validator）中，**默认的错误消息**通常是指在约束注解中通过 `message` 属性指定的错误提示信息。
+
+例如，对于 `@NotNull` 注解，如果你指定了 `message` 属性（如 `"name cannot be null"`），那么这个指定的消息就会被视为**默认的错误消息**。当验证失败时，如果你没有在自定义验证器中禁用默认消息（即不调用 `disableDefaultConstraintViolation()`），Spring Validation 会将这个 `message` 字段中的消息添加到验证错误消息中。
+
+### 示例说明
+假设你的实体类中有一个字段使用了 `@NotNull` 注解：
+
+```java
+public class User {
+    @NotNull(message = "name cannot be null")
+    private String name;
+}
+```
+
+在这个例子中，`"name cannot be null"` 就是这个注解的默认错误消息。**默认消息的来源可以是：**
+1. 直接在注解的 `message` 属性中指定，如上例中的 `"name cannot be null"`。
+2. 如果没有指定 `message`，会使用注解默认的消息模板，例如 `"must not be null"`（`@NotNull` 的内置默认消息）。
+
+### 自定义验证器中的默认消息行为
+如果你在自定义验证器中没有禁用默认消息（即不调用 `disableDefaultConstraintViolation()`），当验证失败时：
+- 默认消息（即注解的 `message` 属性中的内容）会自动添加到验证结果中。
+- 如果你还使用了 `buildConstraintViolationWithTemplate()` 自定义了消息，那么验证结果会同时显示默认消息和自定义消息。
+
+而如果你希望只显示自定义的错误信息，就需要在自定义验证器中调用 `disableDefaultConstraintViolation()` 来禁用掉注解中的默认消息。
