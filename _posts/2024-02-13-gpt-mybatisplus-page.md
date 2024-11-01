@@ -283,3 +283,43 @@ public class UserServiceImpl implements UserService {
 
 ### 结论
 MyBatis-Plus 的分页功能可以完全替代 PageHelper，并且它们都是实现物理分页的工具。根据项目的需求和现有的技术栈选择合适的分页方案即可。
+
+
+# 8. pageHelper分页查询每次执行查询都会先查询一次count吗？
+`PageHelper` 是 MyBatis 的一个分页插件，它提供了方便的分页功能，但默认情况下每次执行查询时确实会先查询一次 count。这是为了获取总记录数以便于计算分页信息。这种方式适用于大多数情况，但在数据量非常大的情况下可能会影响性能，因为会多出一次查询。
+
+如果你对总记录数的精确性要求不高，也可以考虑关闭 `PageHelper` 的 count 查询功能，这样可以减少一次查询，提升性能。你可以通过设置 `PageHelper` 的 `count` 属性来控制是否执行 count 查询。例如：
+
+```java
+PageHelper.startPage(pageNum, pageSize);
+((Page) yourList).setCount(false);
+List<YourEntity> yourList = yourMapper.selectYourData();
+```
+
+这样设置后，在执行分页查询时就不会再额外执行 count 查询了。
+
+# 9. sql在排序的同时要分页怎么处理？
+在 SQL 中进行排序同时分页的处理可以通过 `ORDER BY` 和 `LIMIT`（或类似的分页语法，如 `FETCH FIRST ... ROWS ONLY`）结合来实现。下面是一个简单的例子：
+
+```sql
+SELECT * FROM your_table
+ORDER BY column_name
+LIMIT 10 OFFSET 20;
+```
+
+这个查询将会按照 `column_name` 列进行排序，并且返回从第 21 条记录开始的 10 条记录，实现了同时排序和分页的效果。
+
+- `LIMIT 10` 指定了返回的记录数量为 10 条。
+- `OFFSET 20` 指定了从第 21 条记录开始取，即跳过前面的 20 条记录。
+
+如果你的数据库支持 `FETCH FIRST ... ROWS ONLY` 语法，也可以使用类似的方式：
+
+```sql
+SELECT * FROM your_table
+ORDER BY column_name
+FETCH FIRST 10 ROWS ONLY OFFSET 20;
+```
+
+这个语法与上面的 `LIMIT` 和 `OFFSET` 等效，只是语法上稍有不同。
+
+注意，如果你要在大型数据集上进行排序和分页，要确保数据库中相应的字段上有适当的索引，以提高查询性能。
