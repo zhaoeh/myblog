@@ -239,3 +239,63 @@ public class RedisKeyDeletionExample {
 
 # 17. 一个月最长有几天
 一个月最长的天数是31天。   
+
+# 18. java中有返回值的递归方法怎么实现，感觉好抽象？
+返回值的递归方法在Java中实现起来并不复杂，但可能会涉及到对问题的抽象理解。一般来说，你可以按照以下步骤来实现：
+
+1. **定义递归方法：** 首先，你需要定义一个递归方法，确定方法的输入参数和返回类型。
+
+2. **编写递归终止条件：** 在递归方法内部，编写终止条件，即递归调用停止的条件，否则会陷入无限循环。
+
+3. **编写递归调用：** 在方法体内，编写递归调用，调用自身并传入适当的参数。这个过程可能会涉及到问题的分解或者状态的更新。
+
+4. **处理递归返回值：** 当递归终止时，将最终的结果返回给上层调用。
+
+举个例子，假设我们要实现一个递归方法来计算斐波那契数列的第n项：
+
+```java
+public class Fibonacci {
+    public static int fibonacci(int n) {
+        // 终止条件
+        if (n <= 0) {
+            return 0;
+        } else if (n == 1) {
+            return 1;
+        }
+
+        // 递归调用
+        return fibonacci(n - 1) + fibonacci(n - 2);
+    }
+
+    public static void main(String[] args) {
+        int result = fibonacci(5); // 计算斐波那契数列第5项
+        System.out.println("Fibonacci(5) = " + result);
+    }
+}
+```
+
+在这个例子中，`fibonacci`方法接收一个整数n作为参数，返回斐波那契数列的第n项。递归调用部分通过调用`fibonacci(n - 1)`和`fibonacci(n - 2)`来实现斐波那契数列的递归定义。递归终止条件则是n小于等于1时返回0和1。
+
+# 19. 有更简单的例子吗？
+当然，这里有一个更简单的例子来说明返回值的递归方法：
+
+```java
+public class Factorial {
+    public static int factorial(int n) {
+        // 终止条件
+        if (n <= 0) {
+            return 1;
+        }
+
+        // 递归调用
+        return n * factorial(n - 1);
+    }
+
+    public static void main(String[] args) {
+        int result = factorial(5); // 计算5的阶乘
+        System.out.println("5的阶乘 = " + result);
+    }
+}
+```
+
+这个例子中，`factorial`方法计算一个整数n的阶乘。递归调用部分通过调用`factorial(n - 1)`来实现递归计算阶乘。递归终止条件是当n小于等于0时返回1，因为0的阶乘是1。
