@@ -1932,3 +1932,437 @@ public class User {
 ### 结论
 
 是的，Swagger 会展示通过 Jackson 注解（如 `@JsonIgnore` 和 `@JsonProperty`）解析的模型字段。这使得你的 API 文档更加准确地反映实际的序列化和反序列化行为。如果你有进一步的问题或需要更多的帮助，请随时告诉我。
+
+
+# 25. mybatisplus中，查询的数据库字段为10个，我的实体中定义了11个，如何忽略那个多余的字段，否则报错呢？
+在 MyBatis-Plus 中，如果查询的数据库字段与实体类中定义的字段数量不匹配，你可以通过使用 `@TableField` 注解的 `exist` 属性来告诉 MyBatis-Plus 忽略实体类中多余的字段，避免报错。
+
+假设你的实体类中定义了11个字段，但只有10个字段需要在查询时匹配数据库字段，你可以在第11个字段上添加 `@TableField(exist = false)` 注解，示例代码如下：
+
+```java
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+
+@TableName("your_table_name")
+public class YourEntity {
+
+    private Long id;
+    private String name;
+    private Integer age;
+    // 其他字段...
+
+    @TableField(exist = false) // 忽略数据库中不存在的字段
+    private String extraField;
+
+    // 省略 getter 和 setter 方法
+}
+```
+
+这样配置后，MyBatis-Plus 在查询时就会忽略实体类中 `extraField` 字段，避免报错。
+
+# 26. 还有其他方式吗？
+除了使用 `@TableField(exist = false)` 注解外，你还可以使用 `@JsonIgnore` 注解或者在查询语句中指定需要查询的字段列表来达到忽略多余字段的目的。
+
+1. 使用 `@JsonIgnore` 注解：
+
+```java
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.baomidou.mybatisplus.annotation.TableName;
+
+@TableName("your_table_name")
+public class YourEntity {
+
+    private Long id;
+    private String name;
+    private Integer age;
+    // 其他字段...
+
+    @JsonIgnore // 忽略序列化和反序列化过程中的该字段
+    private String extraField;
+
+    // 省略 getter 和 setter 方法
+}
+```
+
+这样配置后，`extraField` 字段在序列化和反序列化过程中会被忽略，但需要注意的是，如果直接通过 MyBatis-Plus 进行查询，该字段仍会被包含在查询语句中。
+
+2. 在查询语句中指定需要查询的字段列表：
+
+```java
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.service.IService;
+
+import java.util.List;
+
+public class YourService implements IService<YourEntity> {
+
+    private final YourMapper yourMapper;
+
+    public YourService(YourMapper yourMapper) {
+        this.yourMapper = yourMapper;
+    }
+
+    public List<YourEntity> queryEntities() {
+        QueryWrapper<YourEntity> wrapper = Wrappers.query();
+        wrapper.select("id", "name", "age"); // 指定需要查询的字段列表
+        return yourMapper.selectList(wrapper);
+    }
+}
+```
+
+在上面的示例中，通过 `wrapper.select("id", "name", "age")` 指定了需要查询的字段列表，从而避免了多余字段的查询和报错问题。
+
+这些方法都可以帮助你在使用 MyBatis-Plus 进行查询时忽略实体类中多余的字段。
+
+# 27. 我使用@TableField注解没有生效还是报错呢？
+如果 `@TableField(exist = false)` 注解没有生效或者依然报错，可以检查以下几个可能的原因：
+
+1. **确认注解引入：** 确保你的实体类中正确引入了 MyBatis-Plus 的 `@TableField` 注解，而非其他类库的同名注解。
+
+2. **检查表字段和实体字段对应关系：** 确保数据库表中不存在的字段在实体类中添加了 `@TableField(exist = false)` 注解，并且实体类的字段名与数据库字段名对应。
+
+3. **编译问题：** 如果使用了 IDE，尝试重新编译项目或者清理构建缓存，以确保注解生效。
+
+4. **版本兼容性：** 确认 MyBatis-Plus 版本与你的项目所使用的其他依赖库版本兼容，并且没有版本冲突导致注解失效。
+
+5. **日志调试：** 可以在 MyBatis-Plus 的日志中查看是否有相关的错误或警告信息，帮助定位问题所在。
+
+如果以上步骤都确认无误而仍然无法解决问题，可以考虑提供更具体的报错信息或代码片段，以便更准确地定位问题。
+
+# 28. 我记得有一个其他的注解可以做到这种
+你可能在谈论 `@JsonIgnoreProperties` 注解。这个注解通常与 Jackson 库一起使用，用于在序列化和反序列化过程中忽略指定的属性。但需要注意的是，它和 MyBatis-Plus 的 `@TableField(exist = false)` 注解有一些区别。
+
+`@JsonIgnoreProperties` 注解是用来控制 JSON 序列化和反序列化的行为，而 `@TableField(exist = false)` 注解是用来告诉 MyBatis-Plus 在数据库查询中忽略实体类中不存在的字段。
+
+以下是一个示例，演示了如何使用 `@JsonIgnoreProperties` 注解来忽略实体类中多余的字段：
+
+```java
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.baomidou.mybatisplus.annotation.TableName;
+
+@TableName("your_table_name")
+@JsonIgnoreProperties({"extraField"}) // 忽略序列化和反序列化过程中的 extraField 字段
+public class YourEntity {
+
+    private Long id;
+    private String name;
+    private Integer age;
+    // 其他字段...
+
+    private String extraField;
+
+    // 省略 getter 和 setter 方法
+}
+```
+
+在这个示例中，`@JsonIgnoreProperties({"extraField"})` 注解告诉 Jackson 序列化和反序列化过程中忽略 `extraField` 字段。
+
+需要注意的是，虽然 `@JsonIgnoreProperties` 注解可以帮助忽略实体类中的字段，但在数据库查询中仍需要使用 MyBatis-Plus 的 `@TableField(exist = false)` 注解来告诉 MyBatis-Plus 忽略实体类中不存在的字段。
+
+# 29. 我在mapper xml中如何手动处理呢？
+在 MyBatis 的 Mapper XML 文件中手动处理实体类中多余的字段可以通过以下几种方式实现：
+
+1. **使用 SQL 中的字段别名：** 在 SQL 查询语句中使用字段别名来映射实体类中的字段，只查询需要的字段并将其映射到实体类中存在的字段上。这样可以避免多余字段的问题。
+
+```xml
+<select id="selectById" resultType="YourEntity">
+    SELECT id, name, age as realAge FROM your_table WHERE id = #{id}
+</select>
+```
+
+在上面的示例中，查询语句中使用了 `age as realAge` 来将数据库中的 `age` 字段映射到实体类中的 `realAge` 字段上。
+
+2. **手动处理查询结果：** 在 Mapper XML 文件中可以使用 `<resultMap>` 标签手动处理查询结果，只将需要的字段映射到实体类中。
+
+```xml
+<resultMap id="yourResultMap" type="YourEntity">
+    <id column="id" property="id" />
+    <result column="name" property="name" />
+    <result column="age" property="age" />
+</resultMap>
+
+<select id="selectById" resultMap="yourResultMap">
+    SELECT id, name, age FROM your_table WHERE id = #{id}
+</select>
+```
+
+在上面的示例中，通过 `<resultMap>` 标签手动指定了需要映射的字段，可以避免多余字段的问题。
+
+3. **使用 SQL 中的动态查询：** 可以根据需要在 SQL 查询语句中使用动态条件来控制返回的字段，这样可以根据实际情况灵活处理字段。
+
+```xml
+<select id="selectById" resultType="YourEntity">
+    <if test="includeExtraField">
+        SELECT id, name, age, extraField FROM your_table WHERE id = #{id}
+    </if>
+    <if test="!includeExtraField">
+        SELECT id, name, age FROM your_table WHERE id = #{id}
+    </if>
+</select>
+```
+
+在上面的示例中，根据 `includeExtraField` 参数的值来动态决定是否包含 `extraField` 字段。
+
+这些方法可以根据实际情况灵活处理实体类中多余字段的问题，选择适合你项目需求的方式进行处理。
+
+# 30. mybatis如何忽略实体字段的映射？
+在 MyBatis 中，你可以使用 `<resultMap>` 标签的 `<result>` 子标签来手动映射实体类中需要的字段，而忽略实体类中不需要的字段。这样可以实现忽略实体字段的映射。
+
+以下是一个示例，在 Mapper XML 文件中如何忽略实体字段的映射：
+
+```xml
+<resultMap id="yourResultMap" type="YourEntity">
+    <id column="id" property="id" />
+    <result column="name" property="name" />
+    <result column="age" property="age" />
+    <!-- 这里没有映射 extraField 字段 -->
+</resultMap>
+
+<select id="selectById" resultMap="yourResultMap">
+    SELECT id, name, age FROM your_table WHERE id = #{id}
+</select>
+```
+
+在上面的示例中，`<resultMap>` 标签中只定义了需要映射的字段，没有映射 `extraField` 字段，这样在查询结果映射到实体类时就会忽略 `extraField` 字段的映射。
+
+# 31. 还有其他方式吗？
+除了使用 `<resultMap>` 标签手动映射实体类中需要的字段外，还可以通过使用 MyBatis 提供的 `@Result` 注解来实现忽略实体字段的映射。具体步骤如下：
+
+1. 在实体类中使用 `@Result` 注解标记需要映射的字段，并设置 `column` 属性为对应的数据库字段名。
+
+```java
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.Results;
+
+@Results(id = "yourResultMap", value = {
+    @Result(property = "id", column = "id"),
+    @Result(property = "name", column = "name"),
+    @Result(property = "age", column = "age")
+    // 这里没有映射 extraField 字段
+})
+public class YourEntity {
+    // 省略实体类的其他代码
+}
+```
+
+2. 在 Mapper XML 文件中引用定义的 `@Results` 注解，指定需要使用的结果映射。
+
+```xml
+<select id="selectById" resultMap="yourResultMap">
+    SELECT id, name, age FROM your_table WHERE id = #{id}
+</select>
+```
+
+这样配置后，MyBatis 在查询结果映射到实体类时会按照 `@Result` 注解中指定的映射关系进行映射，忽略未定义的字段。
+
+这种方式相对于使用 `<resultMap>` 标签更加简洁，同时也能够有效地忽略实体类中不需要映射的字段。
+
+# 32. mybatis查询报错，index 6 out of bounds for length 6
+这个错误通常意味着你正在访问一个数组、列表或字符串的索引，而这个索引超出了该数组、列表或字符串的范围。在 MyBatis 中，这种错误通常与结果映射有关。
+
+可能的原因和解决方法如下：
+
+1. **结果映射错误：** 确保你的查询结果和结果映射配置正确匹配。比如，如果你的查询结果只有6个字段，但结果映射中配置了第7个字段，就会出现这种索引越界的错误。检查一下你的查询结果和结果映射的对应关系。
+
+2. **实体类属性匹配：** 确保实体类中的属性与结果映射中的字段一一对应，没有多余或缺失的属性，以及属性类型匹配。
+
+3. **查询语句检查：** 检查一下你的查询语句，确认它返回的列数与你期望的结果匹配。可以先在数据库客户端执行相同的查询语句，查看返回的结果列数。
+
+4. **调试日志：** 打开 MyBatis 的调试日志，查看详细的 SQL 执行过程和结果映射情况，可能能够帮助你找到具体出错的地方。
+
+5. **处理结果集：** 如果你的查询结果可能为空，可以在结果映射中使用 `javaType` 属性来指定属性的类型，并在实体类中将属性定义为对应的包装类型，以避免空指针异常或索引越界异常。
+
+如果你能提供更多关于错误出现的代码片段或具体的查询语句和结果映射配置，我可以更详细地帮助你排查问题。
+
+# 33. 我的实体类确实多了一个属性，怎么办呢？
+如果实体类多了一个属性而导致查询报错，你可以通过以下几种方式解决这个问题：
+
+1. **使用 `@TableField(exist = false)` 注解：** 在实体类中，对于多余的属性可以使用 `@TableField(exist = false)` 注解来标记，表示该属性在数据库中不存在，从而避免与查询结果的映射错误。
+
+   ```java
+   import com.baomidou.mybatisplus.annotation.TableField;
+
+   public class YourEntity {
+       private Long id;
+       private String name;
+       private Integer age;
+       @TableField(exist = false)
+       private String extraField; // 多余的属性，标记为不存在于数据库
+       // 省略其他属性和方法
+   }
+   ```
+
+2. **调整查询结果映射：** 在查询结果映射中，只映射实际存在的字段，忽略多余的字段。这样可以避免查询结果和实体类属性不匹配导致的错误。
+
+   ```xml
+   <resultMap id="yourResultMap" type="YourEntity">
+       <id column="id" property="id" />
+       <result column="name" property="name" />
+       <result column="age" property="age" />
+       <!-- 这里不映射 extraField 字段 -->
+   </resultMap>
+   ```
+
+3. **动态查询结果映射：** 如果查询语句中的字段数量不确定，可以使用动态的方式进行结果映射，根据实际情况决定映射哪些字段，避免多余字段的问题。
+
+   ```xml
+   <sql id="baseColumns">
+       id, name, age
+   </sql>
+
+   <select id="selectById" resultMap="yourResultMap">
+       SELECT <include refid="baseColumns" /> FROM your_table WHERE id = #{id}
+   </select>
+   ```
+
+通过以上方式中的任意一种，都可以解决实体类多余属性导致的查询报错问题。选择适合你项目需求和数据结构的方式进行处理即可。
+
+# 34. 使用spring的objectProvider尝试获取一个Map<String，接口>，为什么获取到的objectProvider拿到的map始终是null呢？
+如果你使用 Spring 的 `ObjectProvider` 尝试获取一个 `Map<String, 接口>`，但始终拿到的是 `null`，可能有以下几个原因：
+
+1. **Map 对象未被正确注入：** 确保你的 `Map<String, 接口>` 对象已经在 Spring 容器中正确注入，并且被 `ObjectProvider` 管理。
+
+2. **泛型类型擦除：** 在运行时，Java 的泛型信息会被擦除，导致 Spring 无法准确识别你需要获取的是什么类型的 `Map`。这种情况下，可以尝试使用 `@Qualifier` 注解结合泛型参数来指定具体的 `Map` 实例。
+
+   ```java
+   @Autowired
+   private ObjectProvider<Map<String, Interface>> objectProvider;
+
+   public void someMethod() {
+       Map<String, Interface> map = objectProvider.getIfAvailable();
+       if (map != null) {
+           // 处理 map
+       } else {
+           // 处理未获取到 map 的情况
+       }
+   }
+   ```
+
+3. **Bean 名称与类型匹配：** 确保你获取 `ObjectProvider` 时指定的泛型参数类型与实际被管理的 Bean 类型匹配。如果存在多个符合条件的 Bean，可以使用 `@Qualifier` 注解指定具体的 Bean 名称。
+
+   ```java
+   @Autowired
+   @Qualifier("yourMapBeanName")
+   private ObjectProvider<Map<String, Interface>> objectProvider;
+   ```
+
+4. **Bean 作用域问题：** 如果你的 `Map` Bean 的作用域为原型（prototype），则每次获取都会得到一个新的实例。在某些情况下，这可能导致获取到的对象是 `null`，因为没有符合条件的 Bean 被创建。
+
+5. **容器启动顺序：** 确保你的代码在 Spring 容器完全初始化之后再进行 `ObjectProvider` 的获取操作，以免因为容器尚未完成初始化而导致获取到 `null`。
+
+通过检查以上可能的原因并逐一排查，应该能够解决你使用 `ObjectProvider` 获取 `Map<String, 接口>` 时获取到 `null` 的问题。
+
+# 35. 我的接口的实现类，确实是在objectProvider获取之后才由sprign实例化的
+如果你的接口的实现类是在 `ObjectProvider` 获取之后由 Spring 实例化的，那么可能存在以下几个方面需要注意和检查：
+
+1. **延迟加载问题：** 确保你的接口实现类是延迟加载的，即在需要时才被实例化。这通常通过 Spring 的懒加载特性来实现。你可以在 Bean 的配置中使用 `@Lazy` 注解或者设置 `lazy-init="true"` 来延迟加载实现类。
+
+   ```java
+   @Bean
+   @Lazy
+   public YourInterface yourInterfaceImpl() {
+       return new YourInterfaceImpl();
+   }
+   ```
+
+2. **对象实例化时机：** 确保你在获取 `ObjectProvider` 之前没有提前实例化接口的实现类。如果提前实例化了，`ObjectProvider` 将无法管理该实例，可能导致获取到 `null`。
+
+3. **Bean 注册方式：** 如果你的实现类是通过 `@Component`、`@Service`、`@Repository` 等注解注册到 Spring 容器中的，确保这些注解在获取 `ObjectProvider` 之后才生效。
+
+4. **Bean 作用域和生命周期：** 确保你的实现类的 Bean 作用域和生命周期设置正确。如果是单例（singleton）作用域且在容器启动时就实例化，可能会影响 `ObjectProvider` 的获取结果。
+
+5. **调试日志：** 可以在 Spring 的调试日志中查看 Bean 的初始化和注入过程，以确认实现类的实例化时机和状态。
+
+综上所述，你可以通过调整实现类的延迟加载、对象实例化时机、Bean 注册方式等方面来确保在 `ObjectProvider` 获取之后才由 Spring 实例化，避免获取到 `null` 的问题。
+
+# 36. 如何交给objectProvider去管理呢？
+要让 `ObjectProvider` 管理接口的实现类，你可以通过 Spring 的依赖注入机制来实现。下面是一种常见的方法：
+
+1. 首先，定义接口和其对应的实现类。假设你有一个接口 `YourInterface` 和其实现类 `YourInterfaceImpl`：
+
+```java
+public interface YourInterface {
+    void doSomething();
+}
+
+@Component
+public class YourInterfaceImpl implements YourInterface {
+    @Override
+    public void doSomething() {
+        // 实现接口方法的具体逻辑
+    }
+}
+```
+
+2. 在需要使用接口的地方，通过构造函数或者成员变量注入 `ObjectProvider`，并使用它来获取实现类的实例：
+
+```java
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.stereotype.Component;
+
+@Component
+public class YourComponent {
+    private final ObjectProvider<YourInterface> yourInterfaceProvider;
+
+    public YourComponent(ObjectProvider<YourInterface> yourInterfaceProvider) {
+        this.yourInterfaceProvider = yourInterfaceProvider;
+    }
+
+    public void useYourInterface() {
+        YourInterface yourInterface = yourInterfaceProvider.getIfAvailable();
+        if (yourInterface != null) {
+            yourInterface.doSomething();
+        } else {
+            // 处理未获取到实现类的情况
+        }
+    }
+}
+```
+
+在这个示例中，`YourComponent` 类通过构造函数注入了 `ObjectProvider<YourInterface>`，然后在需要使用接口的方法中通过 `yourInterfaceProvider.getIfAvailable()` 来获取接口实现类的实例。如果实例存在，就可以调用接口方法；如果不存在，可以处理未获取到实例的情况。
+
+这样配置后，Spring 将会在需要时根据需要获取的 Bean 类型来实例化对应的实现类，并由 `ObjectProvider` 进行管理。
+
+# 37. 我就是这样处理的，为什么读取不到呢？
+如果你按照上面的方式处理，并且仍然读取不到实现类实例，可能有以下几个可能的原因需要排查：
+
+1. **实现类未被扫描到：** 确保你的实现类 `YourInterfaceImpl` 被 Spring 扫描到并注册为 Bean。你可以通过在实现类上加上 `@Component`、`@Service`、`@Repository` 等注解，或者在配置类中使用 `@Bean` 注解来注册实现类。
+
+2. **包扫描配置问题：** 检查一下你的 Spring 配置，确保包扫描路径包含了实现类所在的包。
+
+3. **Bean 名称问题：** 如果存在多个符合条件的实现类，可以在注入时使用 `@Qualifier` 注解指定具体的 Bean 名称。
+
+4. **对象实例化时机：** 如果实现类的实例在获取 `ObjectProvider` 之前就被实例化了，`ObjectProvider` 将无法管理该实例。确保实现类是在需要时才被实例化，可以通过 `@Lazy` 注解或者 `lazy-init="true"` 来延迟加载实现类。
+
+5. **调试日志：** 打开 Spring 的调试日志，查看 Bean 的初始化和注入过程，可以帮助你定位问题所在。
+
+下面是一个可能的示例，展示了如何使用 `@Qualifier` 注解来指定 Bean 名称：
+
+```java
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
+
+@Component
+public class YourComponent {
+    private final ObjectProvider<YourInterface> yourInterfaceProvider;
+
+    @Autowired
+    public YourComponent(@Qualifier("yourInterfaceImpl") ObjectProvider<YourInterface> yourInterfaceProvider) {
+        this.yourInterfaceProvider = yourInterfaceProvider;
+    }
+
+    public void useYourInterface() {
+        YourInterface yourInterface = yourInterfaceProvider.getIfAvailable();
+        if (yourInterface != null) {
+            yourInterface.doSomething();
+        } else {
+            // 处理未获取到实现类的情况
+        }
+    }
+}
+```
+
+在上面的示例中，通过 `@Qualifier("yourInterfaceImpl")` 指定了实现类 Bean 的名称为 "yourInterfaceImpl"，确保注入时获取到正确的实现类实例。请根据你的具体情况进行调整和排查。
