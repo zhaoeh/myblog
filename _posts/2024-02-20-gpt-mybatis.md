@@ -2366,3 +2366,36 @@ public class YourComponent {
 ```
 
 在上面的示例中，通过 `@Qualifier("yourInterfaceImpl")` 指定了实现类 Bean 的名称为 "yourInterfaceImpl"，确保注入时获取到正确的实现类实例。请根据你的具体情况进行调整和排查。
+
+# 38. mybatisplus的saveOrUpdate方法怎么使用呢？
+MyBatis-Plus的`saveOrUpdate`方法用于保存或更新实体对象，根据对象的主键或唯一索引判断是执行插入操作还是更新操作。使用方法如下：
+
+```java
+// 导入需要的类
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+
+// 定义Service接口和实现类，例如UserService和UserServiceImpl，继承自IService和ServiceImpl
+public interface UserService extends IService<User> {
+}
+
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+}
+
+// 在业务逻辑中调用saveOrUpdate方法
+@Autowired
+private UserService userService;
+
+// 创建一个实体对象
+User user = new User();
+user.setId(1L); // 设置对象的主键或唯一索引值
+user.setName("Alice");
+user.setAge(30);
+
+// 调用saveOrUpdate方法保存或更新对象
+userService.saveOrUpdate(user);
+```
+
+在这个例子中，假设`User`是你的实体类，包含了id、name、age等字段。`saveOrUpdate`方法会根据`id`字段判断是执行插入操作还是更新操作，如果`id`存在则更新，否则插入新数据。
+
+请确保在使用`saveOrUpdate`方法时，实体对象中的主键或唯一索引字段是正确设置的，以便MyBatis-Plus能够正确判断执行的操作类型。
