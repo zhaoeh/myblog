@@ -432,3 +432,140 @@ public class YourService {
 ```
 
 在这个示例中，通过在`YourService`类的方法上添加`@Transactional`注解，可以确保方法内部的数据库操作在事务管理下进行。如果方法执行过程中发生异常或者事务被标记为回滚，所有对数据库的操作都会被撤销，保证了数据的一致性。
+
+# 21. mysql如何求两个表的差集？
+要求两个MySQL表的差集，你可以使用`NOT IN`或`LEFT JOIN`的方式来实现。以下是两种方法的示例：
+
+1. 使用`NOT IN`：
+
+```sql
+SELECT column_list
+FROM table1
+WHERE column_key NOT IN (SELECT column_key FROM table2);
+```
+
+这里，`column_list`是你想要选择的列，`column_key`是用于比较的关键列，`table1`和`table2`分别是你要比较的两个表。
+
+2. 使用`LEFT JOIN`：
+
+```sql
+SELECT t1.column_list
+FROM table1 t1
+LEFT JOIN table2 t2 ON t1.column_key = t2.column_key
+WHERE t2.column_key IS NULL;
+```
+
+同样，`column_list`是你想要选择的列，`column_key`是用于比较的关键列，`table1`和`table2`分别是你要比较的两个表。
+
+这两种方法都可以用来找出在`table1`中而不在`table2`中的记录。选择哪种方法取决于你的数据和性能需求。
+
+# 22. 我的数据量很大
+如果你的数据量很大，那么在求解两个表的差集时，需要考虑性能和效率。以下是一些针对大数据量的优化建议：
+
+1. **索引优化：** 确保表中用于比较的列都有合适的索引，这样可以加快查询速度。特别是在`JOIN`或`WHERE`子句中使用的列应该被索引。
+
+2. **分批处理：** 如果数据量非常大，可以考虑分批处理数据，例如每次查询部分数据，然后将结果合并。这可以减轻单次查询的压力，同时避免内存或性能问题。
+
+3. **定时任务或增量更新：** 如果数据量经常变化，可以考虑定时任务或增量更新的方式来处理差集，而不是每次都全量比较。
+
+4. **使用临时表：** 可以先将需要比较的数据复制到临时表中，然后使用临时表进行比较操作。这样可以减少对原始表的直接操作，提高查询效率。
+
+5. **优化查询语句：** 确保查询语句简洁明了，避免不必要的子查询或复杂逻辑，这有助于提高查询性能。
+
+综合考虑以上建议，在处理大数据量的表差集时，可以选择适合你情况的方法并进行相应的优化和调整。
+
+# 23. 没有其他更好的方法吗？
+除了前面提到的方法外，如果你的数据量非常大并且需要高效处理两个表的差集，还可以考虑以下几种方法：
+
+1. **使用临时表进行差集计算：** 将两个表中的数据分别导入临时表，然后使用SQL语句进行差集计算。这种方法可以减少对原始表的直接查询，提高查询效率。
+
+```sql
+CREATE TEMPORARY TABLE temp_table1 AS SELECT * FROM table1;
+CREATE TEMPORARY TABLE temp_table2 AS SELECT * FROM table2;
+
+SELECT * FROM temp_table1
+WHERE column_key NOT IN (SELECT column_key FROM temp_table2);
+```
+
+2. **使用存储过程：** 可以编写存储过程来实现差集计算，并且在存储过程中进行优化，例如使用游标处理大量数据，减少内存占用。
+
+3. **分布式计算框架：** 如果数据量非常大且需要高性能处理，可以考虑使用分布式计算框架如Apache Spark或Apache Flink来处理两个表的差集。这些框架可以并行处理大规模数据，提供更高的计算效率。
+
+4. **数据预处理：** 如果两个表中的数据有一定的规律或者可以预先处理，可以通过数据预处理来简化差集计算，例如对数据进行归档或分区，然后只比较特定区域的数据。
+
+以上方法都可以根据具体情况选择合适的方式来处理大数据量的表差集，但需要注意每种方法的适用场景和性能特点。
+
+# 24. mysql已经有一张表里面有很多数据了，我现在要新增一个字段，给默认值为0，原来的那些数据该字段会自动设置为0吗？
+在MySQL中，如果你给已有的表新增一个字段并设置默认值为0，对于已存在的数据，这个新增的字段会自动设置为0。MySQL会在表结构更新后将默认值应用到已存在的数据行中。
+
+例如，假设你有一个表`my_table`，里面已经有很多数据，现在你要新增一个字段`new_column`，并设置默认值为0，可以使用如下的SQL语句：
+
+```sql
+ALTER TABLE my_table ADD COLUMN new_column INT DEFAULT 0;
+```
+
+执行上述语句后，`my_table`表中已存在的数据行会自动将`new_column`字段设置为0。
+
+# 25. mysql有一张几千万数据的表，我在java中一次性读取可能会导致内存溢出，我想一批一批处理，该怎么处理呢？
+处理几千万行数据时，为了避免内存溢出，你可以考虑使用分批处理的方式。这种方法可以将数据分成较小的批次进行处理，从而减少内存消耗。以下是一种在Java中处理大量数据的常见方法：
+
+1. **使用分页查询：** 在SQL语句中使用`LIMIT`和`OFFSET`来实现分页查询，每次查询一定数量的数据，然后在Java中逐批处理这些数据。这种方法适用于数据量大但可以按照某种顺序分页查询的情况。
+
+   ```java
+   int batchSize = 1000; // 每批处理的数据量
+   int offset = 0;
+   boolean hasMoreData = true;
+
+   while (hasMoreData) {
+       List<DataObject> dataBatch = fetchDataBatch(offset, batchSize); // 自定义方法，从数据库中获取数据批次
+       
+       if (dataBatch.isEmpty()) {
+           hasMoreData = false; // 已经处理完所有数据
+       } else {
+           processBatch(dataBatch); // 自定义方法，处理数据批次
+           offset += batchSize;
+       }
+   }
+   ```
+
+2. **使用游标（Cursor）：** 在Java中可以使用JDBC的`ResultSet`和游标来逐行读取数据，然后按照一定规则进行分批处理。这种方法适用于需要按照特定条件或规则处理数据的情况。
+
+   ```java
+   try (Connection connection = DriverManager.getConnection(url, username, password);
+        Statement statement = connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+        ResultSet resultSet = statement.executeQuery("SELECT * FROM my_table")) {
+
+       int batchSize = 1000; // 每批处理的数据量
+       int count = 0;
+       while (resultSet.next()) {
+           // 处理数据逻辑
+           count++;
+           if (count % batchSize == 0) {
+               // 每达到一定数量执行批处理操作
+               processBatch(batchDataList);
+               batchDataList.clear();
+           }
+       }
+       // 处理最后一批数据
+       processBatch(batchDataList);
+   } catch (SQLException e) {
+       e.printStackTrace();
+   }
+   ```
+
+无论采用哪种方法，都需要注意处理数据的效率和内存消耗。合理设置批处理大小、优化查询语句和处理逻辑都可以提高处理大数据量的效率。
+
+# 26. 在分批的时候，如果有新的数据插入了咋么办？
+处理大量数据时，如果在分批处理过程中有新数据插入，可能会导致数据处理不完整或者重复处理部分数据的问题。为了解决这个问题，可以采取以下一些方法：
+
+1. **确定数据范围：** 在每次分批处理时，可以确定一个数据范围，例如通过主键范围或者按照时间范围来确定每批处理的数据。这样可以避免新数据插入影响已经处理的数据范围。
+
+2. **使用版本控制：** 对于需要保证数据处理完整性的场景，可以在数据表中添加一个版本号或者标志字段，在处理数据时检查这个版本号，确保只处理符合条件的数据。
+
+3. **增量处理：** 如果新数据的插入不会影响已经处理的数据范围，可以考虑在分批处理中增加一个增量处理的步骤，只处理新增的数据部分。
+
+4. **定时任务：** 如果数据表中的数据频繁变化，可以考虑使用定时任务或者增量更新的方式来处理数据，而不是一次性读取全部数据进行处理。
+
+5. **事务控制：** 在处理数据时可以使用事务控制，确保数据处理的原子性和完整性，避免因为中断或者异常导致数据处理不完整。
+
+综合考虑以上方法，根据具体场景和需求选择合适的处理方式可以有效解决新数据插入对分批处理的影响问题。
