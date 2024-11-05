@@ -646,3 +646,207 @@ public class TransactionService {
 在你的例子中，主线程确实会等待子线程的事务操作执行完毕，然后才继续主线程的事务操作。这是因为在 Spring 中，`taskExecutor.execute` 方法通常会等待任务执行完成，才会返回。这样可以确保子线程的事务操作在主线程的事务上下文中执行，保证事务的一致性。
 
 所以，如果你在子线程中捕获异常并回滚事务，主线程会等待这个过程完成，然后再继续主线程的事务操作。这种方式确保了主线程和子线程的事务在同一个事务上下文中执行，并保持了事务的一致性。
+
+# 29. 那既然主线程要等待子线程执行完毕，我为啥还要用子线程呢，直接用主线程执行完毕不就行了吗？
+你提出的问题很有意义。实际上，在某些情况下确实可以考虑直接使用主线程执行完毕的方式，而不必启动子线程。使用子线程的主要目的是为了异步执行一些耗时的任务，或者在某些需要并行处理的场景下提高程序的性能和效率。
+
+下面列出了使用子线程和不使用子线程的情况：
+
+使用子线程的情况：
+1. **异步执行：** 当某些任务不需要立即执行，可以放到后台线程中异步执行，以避免阻塞主线程，提高用户体验。
+2. **并行处理：** 在需要并行处理多个任务的情况下，可以使用多个子线程同时执行，提高程序的性能和响应速度。
+3. **任务分离：** 将不同的任务分配给不同的线程处理，可以提高代码的模块化和可维护性。
+
+不使用子线程的情况：
+1. **简单任务：** 如果任务非常简单且执行时间很短，直接在主线程执行可能更加简单和高效。
+2. **同步执行：** 如果任务之间有严格的顺序依赖，需要同步执行的情况下，可以直接在主线程执行完毕。
+3. **资源开销：** 启动子线程会带来一定的资源开销，如果任务不需要异步执行或并行处理，可以考虑直接在主线程执行。
+
+综上所述，使用子线程的场景通常是为了异步执行或并行处理任务，而不使用子线程的情况通常是任务简单、同步执行或资源开销考虑。具体使用哪种方式要根据实际需求和场景来决定。
+
+# 30. 那还是回到简单的问题，我现在主线程执行，有一个事务，启动一个子线程执行一个比较耗时的任务，现在如何保证主线程和子线程的事务一致性？
+要保证主线程和子线程的事务一致性，可以考虑以下几种方法：
+
+1. **手动提交事务：** 在主线程的事务操作完成后，手动提交事务。然后在子线程中执行耗时任务，并在任务执行完成后手动提交或回滚事务。这样可以确保主线程和子线程的事务操作都在同一个事务上下文中，并且根据实际情况选择提交或回滚事务。
+
+```java
+@Autowired
+private TransactionTemplate transactionTemplate;
+
+@Autowired
+private TaskExecutor taskExecutor;
+
+public void executeWithTransaction() {
+    // 主线程执行的事务操作
+    transactionTemplate.execute(status -> {
+        // 这里是主线程的事务操作
+        // 可以调用其他服务类中的方法
+
+        // 启动一个子线程执行事务操作
+        taskExecutor.execute(() -> {
+            // 子线程内部执行耗时任务，确保在同一个事务中
+            try {
+                transactionTemplate.execute(subStatus -> {
+                    // 这里是子线程的事务操作
+                    // 可以调用其他服务类中的方法
+                    return null;
+                });
+            } catch (Exception e) {
+                // 处理异常并回滚子线程的事务
+                subStatus.setRollbackOnly();
+            }
+        });
+
+        // 继续主线程的事务操作
+        return null;
+    });
+}
+```
+
+在这个例子中，主线程的事务操作完成后，启动了一个子线程执行耗时任务，在子线程的事务操作中捕获异常并回滚事务。
+
+2. **使用事务传播机制：** 在主线程的事务操作中，通过事务传播机制调用子线程执行的方法，确保子线程的事务和主线程的事务在同一个事务上下文中。可以使用 `Propagation.REQUIRES_NEW` 或其他合适的传播行为来控制事务的行为。
+
+```java
+@Autowired
+private TransactionTemplate transactionTemplate;
+
+@Autowired
+private TaskExecutor taskExecutor;
+
+public void executeWithTransaction() {
+    // 主线程执行的事务操作
+    transactionTemplate.execute(status -> {
+        // 这里是主线程的事务操作
+        // 可以调用其他服务类中的方法
+
+        // 启动一个子线程执行事务操作
+        taskExecutor.execute(() -> {
+            // 子线程内部执行耗时任务，通过事务传播机制确保在同一个事务中
+            someService.doSomeTaskWithTransaction();
+        });
+
+        // 继续主线程的事务操作
+        return null;
+    });
+}
+```
+
+在这个例子中，通过事务传播机制，在主线程的事务操作中调用子线程执行的方法，确保子线程的事务和主线程的事务在同一个事务上下文中。
+
+这两种方法都可以保证主线程和子线程的事务一致性，具体选择哪种方式可以根据实际需求和场景来决定。
+
+# 31. 这种方案，主线程会等待子线程执行完毕吗？
+在上述的两种方案中，主线程会等待子线程执行完毕，因为 `taskExecutor.execute()` 方法通常会等待任务执行完成后再返回。这样可以保证主线程在子线程执行完毕后再继续执行后续的操作，确保了主线程和子线程的事务在同一个事务上下文中执行，从而保持了事务的一致性。
+
+# 32. 那还是没解决我的问题啊。我的问题是：主线程和子线程并行，主线程要快速响应，子线程执行复杂操作；但是要保证主线程和子线程在同一个事务中。
+对不起，我理解错了。在这种情况下，你可以使用 `TransactionSynchronizationManager` 来实现主线程和子线程在同一个事务中的操作。这个类允许你在不同的线程之间共享事务上下文。
+
+以下是一个示例代码，展示了如何在主线程和子线程中共享同一个事务：
+
+```java
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+public class TransactionService {
+
+    public void executeWithTransaction() {
+        // 开启事务
+        TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+
+        // 主线程执行的事务操作
+        transactionTemplate.execute(status -> {
+            // 这里是主线程的事务操作
+            // 可以调用其他服务类中的方法
+
+            // 启动一个子线程执行事务操作
+            Thread thread = new Thread(() -> {
+                // 子线程内部执行耗时任务
+                try {
+                    TransactionSynchronizationManager.initSynchronization();
+                    TransactionSynchronizationManager.setActualTransactionActive(true);
+
+                    // 这里是子线程的事务操作
+                    // 可以调用其他服务类中的方法
+
+                    TransactionSynchronizationManager.clearSynchronization();
+                } finally {
+                    TransactionSynchronizationManager.clearSynchronization();
+                }
+            });
+            thread.start();
+
+            // 继续主线程的事务操作
+            return null;
+        });
+
+        // 提交事务
+        TransactionSynchronizationManager.clearSynchronization();
+    }
+}
+```
+
+在这个示例中，我们使用 `TransactionSynchronizationManager` 来手动初始化和清理事务上下文，确保主线程和子线程共享同一个事务。在子线程内部也要手动设置事务激活状态和清理事务上下文。这样就可以实现主线程和子线程在同一个事务中执行，同时保证主线程快速响应。
+
+请注意，手动管理事务上下文需要谨慎操作，确保在适当的时候初始化、清理事务上下文，以避免事务状态的混乱或内存泄漏问题。
+
+# 33. 这种方式主线程会等待子线程执行完毕再结束吗？
+在上述的示例中，主线程并不会等待子线程执行完毕再结束。这是因为在启动子线程后，主线程会继续执行后续的操作而不会阻塞等待子线程的完成。
+
+要实现主线程等待子线程执行完毕再结束的行为，可以使用 `Thread.join()` 方法来实现。`join()` 方法会阻塞当前线程（即主线程），直到被调用的线程（即子线程）执行完成。
+
+以下是一个修改过的示例代码，展示了如何使用 `join()` 方法实现主线程等待子线程执行完毕再结束：
+
+```java
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+public class TransactionService {
+
+    public void executeWithTransaction() {
+        // 开启事务
+        TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+
+        // 主线程执行的事务操作
+        transactionTemplate.execute(status -> {
+            // 这里是主线程的事务操作
+            // 可以调用其他服务类中的方法
+
+            // 启动一个子线程执行事务操作
+            Thread thread = new Thread(() -> {
+                // 子线程内部执行耗时任务
+                try {
+                    TransactionSynchronizationManager.initSynchronization();
+                    TransactionSynchronizationManager.setActualTransactionActive(true);
+
+                    // 这里是子线程的事务操作
+                    // 可以调用其他服务类中的方法
+
+                    TransactionSynchronizationManager.clearSynchronization();
+                } finally {
+                    TransactionSynchronizationManager.clearSynchronization();
+                }
+            });
+            thread.start();
+
+            // 等待子线程执行完毕
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+
+            // 继续主线程的事务操作
+            return null;
+        });
+
+        // 提交事务
+        TransactionSynchronizationManager.clearSynchronization();
+    }
+}
+```
+
+在这个示例中，通过调用 `thread.join()` 方法，主线程会等待子线程执行完毕后再继续执行后续的操作。这样可以确保主线程和子线程在同一个事务中，并且主线程会等待子线程的执行结果。
+
+# 34. 也就是说，主线程执行完毕了，都结束了，而子线程执行过程中发现出错了，这时主线程和子线程的事务都会回滚对吗？
+在这种情况下，主线程和子线程的事务都会回滚。主线程在执行完毕后会继续等待子线程的执行，如果子线程执行过程中发生错误并回滚事务，主线程会感知到这个异常并相应地进行事务回滚。这样可以保证主线程和子线程在同一个事务中的一致性，避免了数据不一致或逻辑错误的情况。
