@@ -614,3 +614,209 @@ mvn clean install -X
 ```
 
 通过这些步骤，你应该能够成功地构建和打包一个不需要主类的JAR文件。如果仍有问题，请提供更多详细的错误日志信息，以便进一步诊断。
+
+
+# 6. 自己开发的jar包如何上传到maven仓库呢？如果是公司内部用，该怎么处理呢？
+要将自己开发的Jar包上传到Maven仓库，可以分为两种情况：上传到公共Maven仓库和上传到公司内部的私有Maven仓库。
+
+### 上传到公共Maven仓库
+
+1. **准备你的项目**：确保你的项目使用了Maven构建，并且包含`pom.xml`文件。
+
+2. **创建账户并获得GPG密钥**：
+   - 在[Sonatype](https://issues.sonatype.org/)创建一个账户。
+   - 创建GPG密钥对，用于签名你的发布文件。可以使用以下命令生成：
+     ```sh
+     gpg --gen-key
+     ```
+   - 将公钥上传到公共密钥服务器：
+     ```sh
+     gpg --keyserver hkp://keyserver.ubuntu.com --send-keys YOUR_KEY_ID
+     ```
+
+3. **更新`pom.xml`**：
+   - 添加发布插件和GPG插件：
+     ```xml
+     <project>
+         ...
+         <distributionManagement>
+             <repository>
+                 <id>ossrh</id>
+                 <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+             </repository>
+             <snapshotRepository>
+                 <id>ossrh</id>
+                 <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+             </snapshotRepository>
+         </distributionManagement>
+
+         <build>
+             <plugins>
+                 <plugin>
+                     <groupId>org.apache.maven.plugins</groupId>
+                     <artifactId>maven-gpg-plugin</artifactId>
+                     <version>1.6</version>
+                     <executions>
+                         <execution>
+                             <id>sign-artifacts</id>
+                             <phase>verify</phase>
+                             <goals>
+                                 <goal>sign</goal>
+                             </goals>
+                         </execution>
+                     </executions>
+                 </plugin>
+                 <plugin>
+                     <groupId>org.apache.maven.plugins</groupId>
+                     <artifactId>maven-deploy-plugin</artifactId>
+                     <version>3.0.0-M1</version>
+                     <configuration>
+                         <altDeploymentRepository>ossrh::default::https://oss.sonatype.org/service/local/staging/deploy/maven2/</altDeploymentRepository>
+                     </configuration>
+                 </plugin>
+             </plugins>
+         </build>
+     </project>
+     ```
+
+4. **发布到Sonatype**：
+   - 执行以下命令进行发布：
+     ```sh
+     mvn clean deploy
+     ```
+   - 在Sonatype网站上进行必要的操作以完成发布。
+
+### 上传到公司内部私有Maven仓库
+
+1. **搭建私有Maven仓库**：可以使用Nexus Repository Manager, JFrog Artifactory等工具来搭建私有仓库。
+
+2. **配置私有仓库**：
+   - 在私有仓库的管理界面中创建一个新的仓库（hosted repository），并记录仓库的URL。
+
+3. **更新`pom.xml`**：
+   - 配置你的`pom.xml`，将私有仓库的URL添加到`distributionManagement`中：
+     ```xml
+     <project>
+         ...
+         <distributionManagement>
+             <repository>
+                 <id>internal-repo</id>
+                 <url>http://your-company-repo/repository/internal/</url>
+             </repository>
+         </distributionManagement>
+     </project>
+     ```
+
+4. **配置`settings.xml`**：
+   - 在Maven的`settings.xml`文件中配置私有仓库的认证信息：
+     ```xml
+     <servers>
+         <server>
+             <id>internal-repo</id>
+             <username>your-username</username>
+             <password>your-password</password>
+         </server>
+     </servers>
+     ```
+
+5. **发布到私有仓库**：
+   - 执行以下命令进行发布：
+     ```sh
+     mvn clean deploy
+     ```
+
+通过以上步骤，可以将你开发的Jar包上传到公共或私有Maven仓库，使得它可以被其他项目依赖和使用。
+
+# 7. 我执行命令后报错403
+403 错误通常表示你没有权限访问目标资源。针对你在上传 Jar 包到 Maven 仓库时遇到 403 错误，可以检查以下几项：
+
+### 公共 Maven 仓库（如 Sonatype OSSRH）
+
+1. **账户权限**：
+   - 确保你在 [Sonatype JIRA](https://issues.sonatype.org/) 上已经创建了账户，并且账户已被批准可以上传。
+
+2. **仓库配置**：
+   - 确保你的 `pom.xml` 和 `settings.xml` 文件配置正确，包括仓库 URL 和认证信息。
+   - `distributionManagement` 部分的 URL 应该指向正确的 Sonatype 服务器：
+
+     ```xml
+     <distributionManagement>
+         <repository>
+             <id>ossrh</id>
+             <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+         </repository>
+         <snapshotRepository>
+             <id>ossrh</id>
+             <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+         </snapshotRepository>
+     </distributionManagement>
+     ```
+
+3. **认证信息**：
+   - 在 Maven 的 `settings.xml` 文件中正确配置你的 Sonatype 账户认证信息：
+
+     ```xml
+     <servers>
+         <server>
+             <id>ossrh</id>
+             <username>your-sonatype-username</username>
+             <password>your-sonatype-password</password>
+         </server>
+     </servers>
+     ```
+
+4. **GPG 签名**：
+   - 确保你已经正确配置了 GPG 签名。如果 GPG 签名有问题，也可能导致权限错误。
+
+### 私有 Maven 仓库
+
+1. **仓库权限**：
+   - 确保你在公司内部的私有 Maven 仓库中有足够的权限来上传 artifacts。
+   - 管理员需要确保你有上传权限，并且在仓库中创建了相应的 hosted repository。
+
+2. **仓库配置**：
+   - 检查 `distributionManagement` 部分是否指向正确的私有仓库 URL：
+
+     ```xml
+     <distributionManagement>
+         <repository>
+             <id>internal-repo</id>
+             <url>http://your-company-repo/repository/internal/</url>
+         </repository>
+     </distributionManagement>
+     ```
+
+3. **认证信息**：
+   - 在 Maven 的 `settings.xml` 文件中配置正确的私有仓库认证信息：
+
+     ```xml
+     <servers>
+         <server>
+             <id>internal-repo</id>
+             <username>your-username</username>
+             <password>your-password</password>
+         </server>
+     </servers>
+     ```
+
+### 其他检查项
+
+1. **URL 路径**：
+   - 确保 URL 路径正确，特别是不同的仓库可能有不同的部署路径。比如 snapshots 和 releases 可能有不同的 URL。
+
+2. **防火墙或网络限制**：
+   - 检查是否有防火墙或其他网络限制导致无法访问目标 URL。
+
+3. **Maven 版本**：
+   - 确保你使用的是较新的 Maven 版本，旧版本可能有一些兼容性问题。
+
+4. **详细日志**：
+   - 使用 `-X` 选项运行 Maven 命令以获取详细日志信息：
+
+     ```sh
+     mvn clean deploy -X
+     ```
+
+   这可以帮助你找到更具体的错误原因。
+
+如果你仍然遇到问题，请提供具体的错误日志，这样可以更有针对性地解决问题。
