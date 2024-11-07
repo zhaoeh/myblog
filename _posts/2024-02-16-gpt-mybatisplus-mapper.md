@@ -2811,3 +2811,98 @@ public class MyApplication {
 - **启用 AOP**：确保 Spring Boot 配置了 AOP 支持。
 
 这种方法允许你在 MyBatis-Plus 的 Mapper 接口上使用注解来触发特定的 AOP 逻辑，虽然需要通过间接方式实现，但能够达到在接口层面上进行拦截的目的。
+
+
+# 32. @TableLogic是什么意思？
+`@TableLogic` 是 MyBatis-Plus 提供的一个注解，用于实现逻辑删除。逻辑删除是指在数据库中并不真正删除记录，而是通过设置某个字段的值来表示该记录已被删除。例如，通过将 `deleted` 字段的值从 `0` 改为 `1` 来表示记录已被删除。
+
+使用 `@TableLogic` 注解，可以让 MyBatis-Plus 在执行删除操作时，自动更新该逻辑删除字段，而不是执行真实的删除操作。下面是一个示例：
+
+```java
+import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+@Data
+@TableName("user")
+public class User {
+    private Long id;
+    private String name;
+    private Integer age;
+    
+    @TableLogic
+    private Integer deleted;
+}
+```
+
+在这个示例中，`User` 类有一个 `deleted` 字段，该字段被 `@TableLogic` 注解标记。当你调用 `userMapper.deleteById(id)` 时，MyBatis-Plus 不会真正删除记录，而是将 `deleted` 字段的值设为 `1`。
+
+此外，你还可以通过在配置文件中配置逻辑删除的全局策略，例如：
+
+```yaml
+mybatis-plus:
+  global-config:
+    db-config:
+      logic-delete-value: 1    # 逻辑已删除值（默认为 1）
+      logic-not-delete-value: 0 # 逻辑未删除值（默认为 0）
+```
+
+有了这些配置，MyBatis-Plus 会在查询时自动过滤掉逻辑已删除的记录（即 `deleted = 1` 的记录），在删除时自动更新 `deleted` 字段的值。
+
+通过使用逻辑删除，你可以确保数据库中的数据不被物理删除，从而保留历史记录和数据的可追溯性。
+
+# 33. 那查询时有这个注解呢？
+当在实体类中使用了 `@TableLogic` 注解后，MyBatis-Plus 会自动在查询操作中添加逻辑删除的过滤条件。具体来说，它会在生成的 SQL 语句中自动加入 `deleted` 字段的过滤条件，以确保只查询未被逻辑删除的记录。
+
+例如，假设你有以下 `User` 类：
+
+```java
+import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+@Data
+@TableName("user")
+public class User {
+    private Long id;
+    private String name;
+    private Integer age;
+
+    @TableLogic
+    private Integer deleted;
+}
+```
+
+在执行查询操作时，MyBatis-Plus 会自动在 SQL 语句中加入 `deleted = 0` 的条件。比如，你执行以下查询：
+
+```java
+List<User> users = userMapper.selectList(null);
+```
+
+MyBatis-Plus 会生成类似这样的 SQL 语句：
+
+```sql
+SELECT id, name, age, deleted FROM user WHERE deleted = 0;
+```
+
+这样，你就只会得到那些 `deleted` 字段值为 `0` 的记录（即未被逻辑删除的记录）。
+
+如果你希望查询包括逻辑删除的记录，可以使用 `TableLogic` 提供的相关方法。例如，可以使用 `selectByIdWithDeleted` 方法：
+
+```java
+User user = userMapper.selectByIdWithDeleted(id);
+```
+
+这会生成不带 `deleted` 条件的 SQL 语句，从而查询出包括逻辑删除在内的记录。
+
+同样，你也可以在自定义查询条件中显式包含或排除 `deleted` 字段。例如：
+
+```java
+QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+queryWrapper.eq("deleted", 1); // 查询被逻辑删除的记录
+List<User> deletedUsers = userMapper.selectList(queryWrapper);
+```
+
+这样可以灵活地查询符合特定逻辑删除条件的记录。
+
+总结来说，使用 `@TableLogic` 注解后，MyBatis-Plus 会在查询时自动过滤掉逻辑已删除的记录。你可以通过定制查询条件来查询所有记录或特定逻辑删除状态的记录。
