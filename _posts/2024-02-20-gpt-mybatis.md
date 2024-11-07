@@ -2399,3 +2399,14 @@ userService.saveOrUpdate(user);
 在这个例子中，假设`User`是你的实体类，包含了id、name、age等字段。`saveOrUpdate`方法会根据`id`字段判断是执行插入操作还是更新操作，如果`id`存在则更新，否则插入新数据。
 
 请确保在使用`saveOrUpdate`方法时，实体对象中的主键或唯一索引字段是正确设置的，以便MyBatis-Plus能够正确判断执行的操作类型。
+
+# 39. springboot会自动扫描mapper吗？
+Spring Boot 默认情况下会自动扫描 `@Mapper` 注解标记的接口，并将它们注册为 MyBatis 的 Mapper 接口。这种自动扫描的功能使得在 Spring Boot 项目中使用 MyBatis 变得更加便捷。
+
+# 40. 那还要@mapperScan干啥呢？
+`@MapperScan` 注解的作用是指定要扫描的 Mapper 接口所在的包路径。虽然 Spring Boot 默认会自动扫描 `@Mapper` 注解标记的接口，但有时候需要手动指定扫描的包路径，特别是当 Mapper 接口不在默认扫描路径下时。
+
+举个例子，如果你的 Mapper 接口在特定的包下而不在默认的扫描路径下，就需要使用 `@MapperScan` 注解来告诉 Spring Boot 在哪里扫描这些接口。这样可以灵活地配置扫描路径，使得项目的组织结构更加清晰和灵活。
+
+# 41. 默认扫描路径是啥啊？
+Spring Boot 默认情况下会扫描主应用程序类所在的包以及其子包。也就是说，如果你的主应用程序类（一般是带有 `@SpringBootApplication` 注解的类）位于包 `com.example.application` 下，那么默认情况下 Spring Boot 会扫描 `com.example.application` 包及其子包下的组件，包括 `@Mapper` 注解标记的 Mapper 接口。
