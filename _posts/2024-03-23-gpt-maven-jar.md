@@ -426,3 +426,191 @@ public class MyService {
 3. **依赖注入**：被扫描到的 Bean 可以通过 `@Autowired` 注解自动注入。
 
 通过这种方式，你可以在运行时动态指定要扫描和注册的 Bean，确保在业务代码中通过 `@Bean` 注册的类及其依赖类都能被 Spring 容器管理。
+
+# 4. maven在install时出现Unable to find main class
+Maven在执行`install`时出现“Unable to find main class”错误通常是因为配置或项目结构有问题。以下是一些常见的检查和解决方法：
+
+### 检查主类配置
+1. **确保在`pom.xml`中正确配置了主类**：
+   在Maven项目中，特别是对于打包为可执行JAR文件的项目，需要在`pom.xml`中指定主类。确保你的`pom.xml`包含类似以下的配置：
+   ```xml
+   <build>
+       <plugins>
+           <plugin>
+               <groupId>org.apache.maven.plugins</groupId>
+               <artifactId>maven-jar-plugin</artifactId>
+               <version>3.2.0</version>
+               <configuration>
+                   <archive>
+                       <manifest>
+                           <mainClass>com.example.MainClass</mainClass>
+                       </manifest>
+                   </archive>
+               </configuration>
+           </plugin>
+       </plugins>
+   </build>
+   ```
+
+2. **主类路径正确**：
+   确保`mainClass`的值是你的主类的全限定名（包括包名）。
+
+### 项目结构
+1. **检查源代码目录**：
+   确保你的源代码在标准的Maven目录结构中：
+   ```
+   src
+   └── main
+       └── java
+           └── com
+               └── example
+                   └── MainClass.java
+   ```
+
+2. **确保主类存在并且编译通过**：
+   确保你的主类存在，并且能够通过编译。
+
+### 构建和打包
+1. **清理和重新构建项目**：
+   有时Maven的缓存可能会导致问题。尝试执行以下命令清理并重新构建项目：
+   ```bash
+   mvn clean install
+   ```
+
+2. **检查依赖和插件版本**：
+   确保你使用的Maven插件和依赖版本是兼容的。如果有旧版本的插件或依赖，可能会导致问题。
+
+### 日志和调试
+1. **查看详细的错误日志**：
+   查看Maven的完整错误日志，找出具体的错误信息。可以使用`-X`参数来启用调试输出：
+   ```bash
+   mvn clean install -X
+   ```
+
+2. **检查环境变量**：
+   确保你的Maven和Java环境变量配置正确，特别是`JAVA_HOME`和`MAVEN_HOME`。
+
+### 示例
+假设你的主类是`com.example.MainClass`，以下是一个示例`pom.xml`文件的配置：
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0" 
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>my-app</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>com.example.MainClass</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+通过以上检查和调整，应该能够解决Maven在`install`时出现“Unable to find main class”的问题。如果问题仍然存在，可以提供更多的错误日志信息，以便进一步诊断。
+
+# 5. 我要打包的jar不需要主类啊
+如果你的项目不需要指定主类，通常是因为它不是一个可执行的JAR文件（例如一个库）。在这种情况下，你可以忽略主类配置。下面是一些常见的检查和解决方案，确保你的Maven项目正确地打包成一个库JAR文件：
+
+### 检查和调整pom.xml
+
+1. **移除主类配置**：
+   如果你的`pom.xml`中包含了主类的配置，并且你不需要它，可以移除相关配置。
+
+   ```xml
+   <build>
+       <plugins>
+           <plugin>
+               <groupId>org.apache.maven.plugins</groupId>
+               <artifactId>maven-jar-plugin</artifactId>
+               <version>3.2.0</version>
+               <!-- 不需要 mainClass 配置 -->
+           </plugin>
+       </plugins>
+   </build>
+   ```
+
+2. **确保正确配置项目打包类型**：
+   确保你的项目打包类型是`jar`。在`pom.xml`的根元素中，确保你有以下配置：
+
+   ```xml
+   <packaging>jar</packaging>
+   ```
+
+### 清理和重新构建项目
+
+1. **清理项目**：
+   运行以下命令清理项目：
+   ```bash
+   mvn clean
+   ```
+
+2. **重新安装项目**：
+   运行以下命令重新构建和安装项目：
+   ```bash
+   mvn install
+   ```
+
+### 检查项目结构
+
+确保你的项目结构符合标准的Maven目录结构：
+```
+my-project
+├── pom.xml
+└── src
+    └── main
+        └── java
+            └── com
+                └── example
+                    └── MyClass.java
+```
+
+### 日志和调试
+
+如果问题仍然存在，可以查看详细的Maven日志输出，以找出更多信息。使用`-X`参数来启用调试输出：
+```bash
+mvn clean install -X
+```
+
+### 示例pom.xml
+
+以下是一个不需要主类的Maven项目的`pom.xml`示例：
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0" 
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>my-library</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.2.0</version>
+                <!-- 不需要 mainClass 配置 -->
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+通过这些步骤，你应该能够成功地构建和打包一个不需要主类的JAR文件。如果仍有问题，请提供更多详细的错误日志信息，以便进一步诊断。
