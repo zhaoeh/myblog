@@ -727,3 +727,148 @@ LOGGING_LEVEL = 'DEBUG'
 ```
 
 通过这些步骤，你可以正确配置 Superset，以使用自定义配置文件 `superset_config.py` 来覆盖和扩展默认设置。
+
+# 11. superset如何创建角色，其中有很多自定义的权限都是什么意思？
+Apache Superset 是一个开源的现代数据可视化平台，支持丰富的权限管理功能。创建角色并赋予自定义权限是 Superset 的重要功能之一。以下是如何在 Superset 中创建角色以及一些常见自定义权限的解释。
+
+### 创建角色
+
+1. **登录 Superset**：使用管理员帐户登录 Superset。
+
+2. **导航到“Security”**：
+   - 点击顶部导航栏中的“Security”菜单。
+   - 选择“List Roles”选项。
+
+3. **创建新角色**：
+   - 在“Roles”页面，点击右上角的“+ ROLE”按钮。
+   - 输入新角色的名称。
+
+4. **分配权限**：
+   - 创建角色后，可以为角色分配权限。在“Roles”页面找到新创建的角色，点击角色名称进行编辑。
+   - 在编辑页面中，可以看到一系列可以分配的权限。
+
+### 常见自定义权限解释
+
+在 Superset 中，权限可以细分为很多不同的方面，这里列出一些常见的权限以及它们的作用：
+
+1. **can add on Table**：允许用户在指定的数据库表上添加数据。
+
+2. **can delete on Table**：允许用户删除指定数据库表中的数据。
+
+3. **can edit on Table**：允许用户编辑指定数据库表中的数据。
+
+4. **can read on Table**：允许用户读取指定数据库表中的数据。
+
+5. **menu access on [Menu Item]**：允许用户访问指定的菜单项，例如“menu access on Charts”表示用户可以访问“Charts”菜单。
+
+6. **database access on [Database Name]**：允许用户访问指定的数据库。
+
+7. **schema access on [Schema Name]**：允许用户访问指定的数据库模式。
+
+8. **can explore on [Datasource]**：允许用户在指定的数据源上进行探索和分析。
+
+9. **can access all datasources**：允许用户访问所有数据源。
+
+10. **can approve on [Feature]**：允许用户批准指定的功能，例如“can approve on Dashboards”表示用户可以批准仪表盘相关的操作。
+
+11. **all database access**：允许用户访问所有数据库。
+
+12. **all datasource access**：允许用户访问所有数据源。
+
+13. **can download CSV on [Data Source]**：允许用户从指定的数据源下载 CSV 文件。
+
+14. **can execute sql on [Database]**：允许用户在指定的数据库上执行 SQL 查询。
+
+### 自定义权限的设置
+
+对于具体的权限设置，可以根据业务需求进行调整。例如，你可以创建一个“数据分析师”角色，赋予其读取和分析数据的权限，但不允许其删除或编辑数据。或者，你可以创建一个“管理员”角色，赋予其所有权限。
+
+通过细致的权限管理，可以确保不同用户在使用 Superset 时只能访问和操作他们被授权的部分，提高系统的安全性和数据的完整性。
+
+### 具体操作步骤
+
+1. **添加权限**：
+   - 在角色编辑页面中，找到“Permissions”部分。
+   - 点击“Add a new record”，在弹出的窗口中选择权限类型和具体权限。
+
+2. **保存角色**：
+   - 添加完所需的权限后，点击“Save”按钮保存角色。
+
+### 总结
+
+通过创建角色和分配权限，可以灵活地管理不同用户在 Superset 中的操作权限。这不仅有助于确保数据的安全性，还能提升团队协作的效率。根据业务需求，合理配置权限，让每个用户在合适的权限范围内操作，从而实现数据可视化平台的高效管理和使用。
+
+# 12. can read on savedQuery是什么意思，还有很多类似的，能全部解释一下吗？
+在 Apache Superset 中，权限控制非常细致，用户可以被授予特定对象的特定权限。以下是对 `can read on savedQuery` 以及其他一些常见权限的解释。
+
+### 常见权限解释
+
+1. **can read on savedQuery**：允许用户读取已保存的查询。这意味着用户可以查看其他用户保存的 SQL 查询，但不能编辑或删除它们。
+
+2. **can write on savedQuery**：允许用户创建、编辑或删除已保存的查询。
+
+3. **can read on Dashboard**：允许用户查看仪表盘。
+
+4. **can write on Dashboard**：允许用户创建、编辑或删除仪表盘。
+
+5. **can read on Slice (Chart)**：允许用户查看图表。
+
+6. **can write on Slice (Chart)**：允许用户创建、编辑或删除图表。
+
+7. **can read on Table**：允许用户读取数据库表中的数据。
+
+8. **can write on Table**：允许用户在数据库表中插入、更新或删除数据。
+
+9. **can read on Database**：允许用户访问并读取数据库中的数据。
+
+10. **can write on Database**：允许用户在数据库中执行写操作，如插入、更新或删除数据。
+
+11. **menu access on [Menu Item]**：允许用户访问指定的菜单项。例如，“menu access on SQL Lab”表示用户可以访问 SQL Lab 菜单。
+
+12. **can access all datasources**：允许用户访问所有数据源。
+
+13. **database access on [Database Name]**：允许用户访问特定的数据库。
+
+14. **schema access on [Schema Name]**：允许用户访问特定的数据库模式（Schema）。
+
+15. **can explore on [Datasource]**：允许用户在特定的数据源上进行数据探索和分析。
+
+16. **can download CSV on [Datasource]**：允许用户从特定的数据源下载 CSV 文件。
+
+17. **can execute sql on [Database]**：允许用户在特定的数据库上执行 SQL 查询。
+
+18. **all database access**：允许用户访问所有数据库。
+
+19. **all datasource access**：允许用户访问所有数据源。
+
+20. **can approve on [Feature]**：允许用户批准特定功能的操作。例如，“can approve on Dashboards”表示用户可以批准与仪表盘相关的操作。
+
+### 使用场景示例
+
+- **分析师角色**：
+  - `can read on Table`
+  - `can explore on [Datasource]`
+  - `can read on savedQuery`
+  - `can download CSV on [Datasource]`
+
+  分析师可以访问并读取数据库表中的数据、探索特定的数据源、查看保存的查询以及下载数据。
+
+- **数据管理员角色**：
+  - `can write on Table`
+  - `can write on Database`
+  - `can execute sql on [Database]`
+  - `can access all datasources`
+
+  数据管理员可以对数据库表和数据库进行写操作、执行 SQL 查询以及访问所有数据源。
+
+- **仪表盘设计师角色**：
+  - `can write on Dashboard`
+  - `can write on Slice (Chart)`
+  - `can read on Table`
+  - `can explore on [Datasource]`
+
+  仪表盘设计师可以创建和编辑仪表盘和图表，读取表数据，并进行数据探索。
+
+### 总结
+
+通过对不同权限的详细理解和配置，可以确保每个用户在 Superset 中拥有适当的访问和操作权限。这不仅有助于保护数据安全，还能提高团队协作效率。根据实际业务需求，合理分配和管理这些权限，是确保系统安全和高效运行的关键。
