@@ -357,3 +357,37 @@ public class ByteHouseExample {
 
             while (rs.next()) {
                 System.out.println(rs.getString
+```
+
+# 7. Superset是否支持byteHouse？
+Apache Superset 是一个开源的数据可视化和数据探索平台，支持多种数据库和数据仓库。ByteHouse 是 ByteDance 开发的一种列式数据库，基于 ClickHouse 构建。Superset 支持 ClickHouse 数据库，因此，可以通过适当的配置实现对 ByteHouse 的支持。
+
+要在 Superset 中配置 ByteHouse，可以按照以下步骤进行：
+
+1. **安装 ClickHouse 驱动**：
+   安装 ClickHouse 的 Python 驱动程序 `clickhouse-connect`。你可以通过以下命令安装：
+
+   ```bash
+   pip install clickhouse-connect
+   ```
+
+2. **配置数据库连接**：
+   在 Superset 中添加 ByteHouse 数据库连接。你可以通过 Superset 的用户界面（UI）或直接在配置文件中添加连接字符串。
+
+   连接字符串格式为：
+   ```
+   clickhouse+http://<user>:<password>@<host>:<port>/<database>
+   ```
+
+   例如：
+   ```
+   clickhouse+http://user:password@bytehouse.example.com:8123/default
+   ```
+
+3. **验证连接**：
+   在 Superset 的 UI 中测试连接，确保可以成功连接到 ByteHouse 数据库。
+
+4. **开始使用**：
+   一旦连接配置成功，你就可以使用 Superset 对 ByteHouse 数据库进行数据查询和可视化了。
+
+请注意，尽管 ByteHouse 基于 ClickHouse 构建，但可能存在一些特定的功能差异或优化。因此，在使用过程中，建议参考 ByteHouse 和 ClickHouse 的文档，以确保配置和使用的兼容性。
