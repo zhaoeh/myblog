@@ -421,7 +421,65 @@ init exchange02...
 神奇的发现，它并不像配置Bean的方式，等到使用rabbitTemplate操作的时候再去创建。    
 <font color="#dc143c"><b>通过@RabbitListener去创建Exchange、Queue和Binding，是在容器启动过程中就执行的。容器启动时会扫描该注解，然后使用它的配置去创建交换机、队列，然后创建对应的绑定关系。</b></font>    
 
-    
+# 5. Message.getMessageProperties可能为null吗？
+`Message.getMessageProperties()` 方法在Spring中用于获取消息的属性。它返回的是一个 `MessageProperties` 对象，用于表示消息的属性，例如消息的头部信息、内容类型等。通常情况下，如果消息是通过Spring的消息发送机制发送的，那么 `getMessageProperties()` 不应该为null。但是，在某些情况下，如果消息对象没有设置属性或者消息不是通过Spring的消息发送机制发送的，可能会返回null。
+
+因此，你在使用 `getMessageProperties()` 方法时最好进行空指针检查，确保在可能为null的情况下不会出现空指针异常。例如：
+
+```java
+MessageProperties messageProperties = message.getMessageProperties();
+if (messageProperties != null) {
+    // 处理消息属性
+} else {
+    // 处理无消息属性的情况
+}
+```
+
+# 6. 我看它源码的toString方法就是直接使用的，为啥它的源码不怕空指针呢？
+如果你看到 `Message.getMessageProperties().toString()` 的源码实现是直接使用的，而不会对返回的 `MessageProperties` 对象进行空指针检查，那么这可能是因为在这个具体的实现中，假设了调用 `getMessageProperties()` 方法一定会返回非空对象。
+
+这种假设在某些情况下是合理的，比如在特定的消息发送环境中，确保消息对象始终具有属性信息。但是，在其他情况下，尤其是在处理外部传入的消息或者在不同环境中使用消息时，为空指针检查是很重要的，可以避免潜在的空指针异常。
+
+如果你在自己的代码中使用 `Message.getMessageProperties().toString()`，建议添加空指针检查，以确保代码的健壮性和稳定性。
+
+# 7. 不是，是Message对象的toString方法
+哦，明白了！你是指 `Message` 对象的 `toString()` 方法。通常情况下，Spring 中的 `Message` 对象在调用 `toString()` 方法时不会出现空指针异常的情况，因为 `toString()` 方法的实现通常是比较简单的，不会涉及访问可能为null的属性或方法。
+
+Spring 的 `Message` 对象一般用于消息传递，例如在消息队列、消息通道等场景中使用。`Message` 对象的 `toString()` 方法一般会简单地将消息内容转换为字符串输出，而不会涉及到属性对象的调用。
+
+所以，当你调用 `Message.toString()` 时，通常不需要担心空指针异常问题，除非在你的特定实现中对 `Message` 类进行了特殊的定制或重写 `toString()` 方法的逻辑，才有可能导致空指针异常。
+
+# 8. 我是说，Message对象中的toString方法里面，对messageProperties属性直接使用，为啥不怕空指针呢
+在理解这个问题之前，需要考虑几个方面：
+
+1. **默认实现不会返回null**：Spring 消息对象 `Message` 在 `toString()` 方法的默认实现中，会先检查 `messageProperties` 是否为null，如果不为null，则调用其 `toString()` 方法输出；如果为null，则直接返回一个空字符串或其他默认值。
+
+2. **稳定的消息对象**：在正常使用的情况下，Spring 的消息传递机制会确保创建的 `Message` 对象是完整的，即使没有显式设置 `messageProperties`，也会有一个默认的空对象或默认值。
+
+3. **内部实现保证不会出现空指针**：Spring 框架的实现通常会对可能出现空指针的情况进行检查和处理，特别是对于内部类和方法之间的调用关系，一般会确保不会因为空指针而导致异常。
+
+因此，在大多数情况下，Spring 框架内部对于 `Message` 对象的 `toString()` 方法会进行适当的空指针检查和处理，以确保在使用过程中不会因为空指针而出现异常。
+
+# 9. spring中的Message对象是amqp中的吗？专门用来封装rabbitmq的消息吗？
+是的，Spring 中的 `Message` 对象是来自 `spring-amqp` 包的，它是专门用于封装 RabbitMQ 消息的类。在 Spring AMQP 框架中，`Message` 类用于表示 AMQP 消息（如 RabbitMQ 消息），包含消息的主体和消息属性。
+
+`Message` 类的结构主要包括两个部分：
+
+1. **消息主体（body）**：消息的实际内容，以字节数组的形式存储。
+2. **消息属性（MessageProperties）**：包含消息的各种属性信息，例如消息的 `contentType`、`deliveryMode`、`headers` 等，这些属性对应于 RabbitMQ 的消息元数据。
+
+Spring 使用 `Message` 类来标准化 AMQP 消息的处理，方便开发者在 Spring 应用中更好地发送和接收 RabbitMQ 消息。在构造消息时，`MessageProperties` 通常会被自动填充，因此在大部分场景中，`MessageProperties` 是非空的。
+
+**示例：**
+
+```java
+byte[] messageBody = "Hello, RabbitMQ!".getBytes();
+MessageProperties properties = new MessageProperties();
+properties.setContentType(MessageProperties.CONTENT_TYPE_TEXT_PLAIN);
+Message message = new Message(messageBody, properties);
+```
+
+在这个例子中，`Message` 对象被初始化时，`messageProperties` 属性也被赋予了值，因此 `toString()` 方法可以直接调用 `messageProperties.toString()`，而不需要担心空指针的问题。
 
 
 
