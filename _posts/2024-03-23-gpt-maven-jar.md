@@ -2301,3 +2301,783 @@ public class MyService {
 ```
 
 通过以上方式，你可以创建一个通用的 JAR 包，并且让使用该 JAR 包的项目自行管理和决定其 Spring Boot 版本。
+
+# 22. nacos如果不显式指定dataId，默认按照什么规则进行匹配？
+在Nacos中，如果不显式指定 `dataId`，它默认按照以下规则进行匹配：
+
+1. **默认 `dataId` 规则**：
+    - 当应用名称为 `application` 时，默认的 `dataId` 为 `application.properties` 或 `application.yml`。
+    - 如果没有配置应用名称，则默认为 `application`，即 `dataId` 为 `application.properties` 或 `application.yml`。
+
+2. **默认 `group`**：
+    - 默认的 `group` 为 `DEFAULT_GROUP`。
+
+3. **默认的 `namespace`**：
+    - 如果未配置 `namespace`，则使用默认的 `namespace`（一般是空字符串）。
+
+在 Nacos 配置的完整路径中，`dataId`、`group` 和 `namespace` 共同组成了配置的唯一标识。例如，如果应用名称是 `myapp`，且使用默认的 `group` 和 `namespace`，则默认 `dataId` 可能是 `myapp.properties` 或 `myapp.yml`。
+
+### 具体配置示例
+
+假设应用名称为 `myapp`，在没有显式指定 `dataId` 的情况下，Nacos 将会查找以下配置：
+- `dataId`: `myapp.properties` 或 `myapp.yml`
+- `group`: `DEFAULT_GROUP`
+- `namespace`: （默认）
+
+### Spring Cloud Alibaba Nacos 示例
+
+在使用 Spring Cloud Alibaba 集成 Nacos 时，可以在 `application.properties` 或 `application.yml` 中配置 Nacos 的相关信息：
+
+```properties
+spring.application.name=myapp
+spring.cloud.nacos.config.server-addr=127.0.0.1:8848
+```
+
+或者在 `application.yml` 中：
+
+```yaml
+spring:
+  application:
+    name: myapp
+  cloud:
+    nacos:
+      config:
+        server-addr: 127.0.0.1:8848
+```
+
+以上配置中，Spring Cloud Alibaba Nacos 将自动使用 `spring.application.name` 作为 `dataId`。
+
+### 总结
+
+默认情况下，Nacos 使用应用名称作为 `dataId`，如果没有显式指定 `dataId`，则会使用 `application.properties` 或 `application.yml` 作为默认的 `dataId`。这使得在大多数情况下无需显式配置 `dataId`，简化了配置管理。
+
+# 23. maven在打jar包时，pom中如何使用provide去表示依赖的jar包由外部提供呢？
+在 Maven 中，如果希望某个依赖项由外部提供而不包含在打包的 JAR 文件中，可以使用 `provided` 作用范围（scope）。这种情况下，Maven 认为这些依赖在编译和测试时是需要的，但在运行时由外部提供，因此不会将其包含在最终生成的 JAR 文件中。
+
+以下是一个示例，展示了如何在 `pom.xml` 中配置 `provided` 作用范围：
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>com.example</groupId>
+        <artifactId>example-dependency</artifactId>
+        <version>1.0.0</version>
+        <scope>provided</scope>
+    </dependency>
+</dependencies>
+```
+
+在上面的配置中，`example-dependency` 依赖项的作用范围设置为 `provided`，表示它由外部提供，在打包时不会包含在生成的 JAR 文件中。
+
+### 完整示例
+
+假设你有一个项目需要依赖于 `javax.servlet-api`，并且该依赖项会在运行时由应用服务器提供，因此你不希望它包含在最终的 JAR 文件中。以下是一个完整的 `pom.xml` 示例：
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>my-app</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>4.0.1</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+在这个示例中，`javax.servlet-api` 的作用范围被设置为 `provided`，因此在运行 `mvn package` 时，生成的 JAR 文件中不会包含这个依赖项。
+
+### 作用范围的意义
+
+- **compile**：默认范围，依赖在编译、测试和运行时都需要。
+- **provided**：依赖在编译和测试时需要，但在运行时由外部提供。
+- **runtime**：依赖在运行和测试时需要，但在编译时不需要。
+- **test**：依赖仅在测试编译和运行时需要。
+- **system**：类似于 `provided`，但依赖路径必须在本地系统中指定。
+- **import**：用于导入依赖管理的 POM。
+
+通过使用 `provided` 作用范围，可以确保你的项目在编译和测试时拥有必要的依赖，同时避免在最终打包的 JAR 文件中包含这些依赖，从而减少冲突和包的体积。
+
+# 24. 那parent节点中可以使用provided吗？
+在 Maven 的 `parent` 节点中，`provided` 作用范围不适用。`provided` 作用范围仅适用于 `dependencies` 元素中的依赖项定义。在 Maven 的 `parent` 节点中，你可以继承和集中管理项目的通用配置、依赖管理、插件配置等，但不能直接在 `parent` 节点中使用 `provided` 作用范围。
+
+但是，你可以在父 POM 中使用 `dependencyManagement` 元素来集中管理依赖项的版本，并在子项目中使用 `provided` 作用范围。下面是一个示例：
+
+### 父 POM（parent POM）
+
+首先，定义一个父 POM，用于管理通用的依赖版本：
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>parent-pom</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>javax.servlet</groupId>
+                <artifactId>javax.servlet-api</artifactId>
+                <version>4.0.1</version>
+                <scope>provided</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.8.1</version>
+                    <configuration>
+                        <source>1.8</source>
+                        <target>1.8</target>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
+```
+
+### 子 POM（子项目 POM）
+
+在子项目的 POM 文件中，可以继承父 POM 并使用 `provided` 作用范围：
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>parent-pom</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>my-app</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+在这个示例中，父 POM 管理了 `javax.servlet-api` 的版本，子项目可以直接使用该依赖并指定 `provided` 作用范围。这种方式有助于确保所有子项目使用一致的依赖版本，同时允许每个子项目根据需要设置依赖的作用范围。
+
+### 总结
+
+- `parent` 节点中不能直接使用 `provided` 作用范围。
+- 可以在父 POM 中使用 `dependencyManagement` 来集中管理依赖版本。
+- 子项目继承父 POM 并在其 `dependencies` 元素中使用 `provided` 作用范围。
+
+# 24. 使用parent节点来配置的目的是什么？
+在 Maven 项目中使用 `parent` 节点的主要目的是通过定义一个父 POM (Project Object Model) 来集中管理和继承项目的配置。这种做法在大型多模块项目和企业项目中尤为常见，因其带来了许多好处，包括配置复用、版本一致性、集中管理和简化项目结构等。
+
+### 使用 `parent` 节点的目的和好处
+
+1. **集中管理依赖版本**：
+   - 在父 POM 中使用 `dependencyManagement` 元素，可以集中管理所有子项目的依赖版本。这样子项目只需要声明依赖，而不需要指定版本，从而确保版本一致性。
+   
+   ```xml
+   <dependencyManagement>
+       <dependencies>
+           <dependency>
+               <groupId>org.springframework.boot</groupId>
+               <artifactId>spring-boot-starter-web</artifactId>
+               <version>2.7.7</version>
+           </dependency>
+       </dependencies>
+   </dependencyManagement>
+   ```
+
+2. **配置复用**：
+   - 通过父 POM，可以在多个子项目之间复用 Maven 插件配置、属性和其他构建设置，减少重复配置，降低维护成本。
+
+   ```xml
+   <build>
+       <pluginManagement>
+           <plugins>
+               <plugin>
+                   <groupId>org.apache.maven.plugins</groupId>
+                   <artifactId>maven-compiler-plugin</artifactId>
+                   <version>3.8.1</version>
+                   <configuration>
+                       <source>1.8</source>
+                       <target>1.8</target>
+                   </configuration>
+               </plugin>
+           </plugins>
+       </pluginManagement>
+   </build>
+   ```
+
+3. **版本一致性**：
+   - 父 POM 可以定义一个统一的 Maven 项目版本号，从而确保所有子项目使用相同的版本进行构建。
+
+   ```xml
+   <version>1.0-SNAPSHOT</version>
+   ```
+
+4. **集中管理插件**：
+   - 在父 POM 中配置插件管理 (`pluginManagement`)，可以统一管理插件的版本和配置，子项目可以直接使用这些插件而无需再次配置。
+
+   ```xml
+   <pluginManagement>
+       <plugins>
+           <plugin>
+               <groupId>org.apache.maven.plugins</groupId>
+               <artifactId>maven-jar-plugin</artifactId>
+               <version>3.2.0</version>
+           </plugin>
+       </plugins>
+   </pluginManagement>
+   ```
+
+5. **简化子项目配置**：
+   - 子项目继承父 POM，可以省略大量配置，子项目只需要关心自身特有的部分，从而使子项目的 POM 文件更简洁。
+
+### 父 POM 示例
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>parent-pom</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-web</artifactId>
+                <version>2.7.7</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.8.1</version>
+                    <configuration>
+                        <source>1.8</source>
+                        <target>1.8</target>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
+```
+
+### 子项目 POM 示例
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>parent-pom</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>my-app</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+    </dependencies>
+</project>
+```
+
+在这个子项目 POM 示例中，通过继承父 POM，子项目无需再次声明 Spring Boot 依赖的版本号，并且可以复用父 POM 中的所有配置。
+
+### 总结
+
+使用 `parent` 节点和父 POM 的主要目的是为了集中管理和继承项目配置，提供配置复用、版本一致性和简化子项目配置。这种方式特别适用于多模块项目和需要统一管理依赖和插件的场景。
+
+# 25. 创建一个springboot工程，为什么都在pom中引入了parent？
+在创建一个 Spring Boot 项目时，通常会在 `pom.xml` 中引入 `parent` 元素，这是因为 Spring Boot 提供了一个父 POM，叫做 `spring-boot-starter-parent`，它帮助简化了项目配置，提供了一致的依赖版本管理和插件配置。引入 Spring Boot 的父 POM 有许多好处：
+
+### 1. **版本管理**
+
+Spring Boot 父 POM 管理了许多常用库的版本，避免了版本冲突。你不需要手动管理这些依赖的版本号，只需要指定你需要的依赖，Spring Boot 父 POM 会提供一个兼容的版本。
+
+```xml
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-dependencies</artifactId>
+            <version>${spring-boot.version}</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+### 2. **默认插件配置**
+
+Spring Boot 父 POM 提供了许多常用插件的默认配置，这些配置使得项目构建过程更加简便。比如，它会自动配置 Maven Compiler Plugin 来编译代码，Maven Surefire Plugin 来运行测试，Maven JAR Plugin 来打包项目等。
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+        </plugin>
+    </plugins>
+</build>
+```
+
+### 3. **简化配置**
+
+使用 Spring Boot 父 POM，可以减少大量重复配置。你不需要在每个项目中重复配置常用插件和依赖的版本号。它提供了许多开箱即用的功能，使得 Spring Boot 项目更容易启动和运行。
+
+### 4. **统一管理**
+
+Spring Boot 父 POM 统一管理了依赖和插件的版本，确保在不同的项目中使用相同的版本，减少了由于版本不一致带来的问题。
+
+### 引入 Spring Boot 父 POM 的示例
+
+以下是一个典型的 Spring Boot 项目 `pom.xml`，其中引入了 `spring-boot-starter-parent` 作为父 POM：
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.7.7</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>my-app</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>my-app</name>
+    <description>Demo project for Spring Boot</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+```
+
+### 具体解释
+
+- **parent** 元素：
+  ```xml
+  <parent>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-parent</artifactId>
+      <version>2.7.7</version>
+      <relativePath/> <!-- lookup parent from repository -->
+  </parent>
+  ```
+  这个元素引入了 Spring Boot 的父 POM。它提供了一些默认配置，包括依赖管理和插件配置。
+
+- **properties** 元素：
+  ```xml
+  <properties>
+      <java.version>1.8</java.version>
+  </properties>
+  ```
+  这个元素定义了一些项目级别的属性，比如 Java 版本。这些属性可以在 POM 文件中其他地方使用。
+
+- **dependencies** 元素：
+  ```xml
+  <dependencies>
+      <dependency>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-starter-web</artifactId>
+      </dependency>
+      <dependency>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-starter-test</artifactId>
+          <scope>test</scope>
+      </dependency>
+  </dependencies>
+  ```
+  这个元素定义了项目的依赖。Spring Boot 的父 POM 管理了这些依赖的版本，所以你不需要在这里指定版本号。
+
+- **build** 元素：
+  ```xml
+  <build>
+      <plugins>
+          <plugin>
+              <groupId>org.springframework.boot</groupId>
+              <artifactId>spring-boot-maven-plugin</artifactId>
+          </plugin>
+      </plugins>
+  </build>
+  ```
+  这个元素定义了构建插件。`spring-boot-maven-plugin` 插件用于打包和运行 Spring Boot 应用。
+
+### 总结
+
+通过在 `pom.xml` 中引入 `parent` 元素并使用 Spring Boot 的父 POM，可以简化项目的配置和管理，确保依赖版本的一致性，并提供大量开箱即用的功能，使得开发和维护 Spring Boot 应用更加方便和高效。
+
+# 26. 我现在的需求是，我有一个springboot编写的工程，需要打成jar包，然后这个工程中使用了parent，但是我打好的jar包实际上需要的springboot版本应该由引用方进行指定
+要实现这一需求，你可以考虑将 Spring Boot 依赖和配置抽离到一个独立的模块中，这个模块可以作为一个 BOM (Bill of Materials) 使用。这样，引用方可以根据需要指定 Spring Boot 的版本，而你的核心工程不会受到影响。
+
+具体步骤如下：
+
+### 1. 创建一个父 POM 项目
+
+首先，创建一个父 POM 项目，用于管理版本和依赖。这个父 POM 可以是一个纯粹的 POM 项目，不包含任何业务逻辑，只是用于依赖管理。
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>parent-pom</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>
+```
+
+### 2. 创建核心业务模块
+
+在你的核心业务模块中，不直接引入 `spring-boot-starter-parent`，而是通过父 POM 管理依赖版本。
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>parent-pom</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>my-core-module</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+    </dependencies>
+</project>
+```
+
+### 3. 在引用方项目中指定 Spring Boot 版本
+
+在引用方项目的 `pom.xml` 中，引入你的核心业务模块，并指定所需的 Spring Boot 版本。
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>my-application</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <spring-boot.version>2.7.7</spring-boot.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>my-core-module</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+### 总结
+
+通过这种方式，你可以在引用方项目中指定 Spring Boot 的版本，而核心业务模块中的依赖版本由父 POM 管理，从而实现灵活的版本管理和依赖控制。这种做法不仅提高了代码的复用性，还确保了各个模块之间的独立性。
+
+# 27. spring-boot-dependencies是什么？
+`spring-boot-dependencies` 是 Spring Boot 提供的一个特殊的 POM (Bill of Materials, BOM)，它包含了 Spring Boot 及其依赖库的版本管理。这意味着，当你引入 `spring-boot-dependencies` 时，你不需要为项目中的每个依赖项显式地指定版本号，Spring Boot 会自动为你管理这些版本。
+
+`spring-boot-dependencies` 的主要作用有以下几点：
+
+### 1. **统一依赖管理**
+
+通过引入 `spring-boot-dependencies`，你的项目可以自动继承 Spring Boot 的依赖版本，这确保了不同库之间的兼容性，减少了版本冲突的可能性。
+
+### 2. **简化配置**
+
+你不需要在每个项目中显式地指定依赖库的版本号，只需引入依赖即可。例如：
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+```
+
+### 3. **易于维护**
+
+集中管理依赖版本可以大大简化项目的维护工作。如果需要升级 Spring Boot 版本，只需在一个地方更新版本号即可，所有依赖库的版本会自动更新。
+
+### 4. **提供默认配置**
+
+`spring-boot-dependencies` 还提供了许多默认的插件配置和属性，使得项目的构建和运行更加方便。例如，编译插件、测试插件等都可以通过这个 BOM 进行统一管理。
+
+### 如何使用 `spring-boot-dependencies`
+
+通常在 Spring Boot 项目中，`spring-boot-starter-parent` 作为父 POM，而 `spring-boot-dependencies` 作为依赖管理的一部分被引入。这是通过 `import` 方式实现的。
+
+### 示例
+
+以下是一个典型的 Spring Boot 项目的 `pom.xml` 文件示例，其中引入了 `spring-boot-starter-parent`，并通过它间接引入了 `spring-boot-dependencies`：
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.7.7</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>my-app</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>my-app</name>
+    <description>Demo project for Spring Boot</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+### 不使用 `spring-boot-starter-parent` 的情况
+
+如果你不想使用 `spring-boot-starter-parent` 作为父 POM，你可以直接在 `dependencyManagement` 部分引入 `spring-boot-dependencies`。
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>my-app</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>my-app</name>
+    <description>Demo project for Spring Boot</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+        <spring-boot.version>2.7.7</spring-boot.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+### 总结
+
+`spring-boot-dependencies` 是一个用于统一管理 Spring Boot 及其相关依赖库版本的 BOM。通过引入 `spring-boot-dependencies`，可以简化依赖管理，确保库之间的兼容性，减少版本冲突，使得项目配置更加简洁和易于维护。
