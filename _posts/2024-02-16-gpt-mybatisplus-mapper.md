@@ -2906,3 +2906,235 @@ List<User> deletedUsers = userMapper.selectList(queryWrapper);
 这样可以灵活地查询符合特定逻辑删除条件的记录。
 
 总结来说，使用 `@TableLogic` 注解后，MyBatis-Plus 会在查询时自动过滤掉逻辑已删除的记录。你可以通过定制查询条件来查询所有记录或特定逻辑删除状态的记录。
+
+# 34. mybatis如何配置，当删除条件为null时不拼接删除语句？
+在 MyBatis 中，你可以通过条件判断来控制 SQL 语句的拼接。例如，当删除条件为 `null` 时，不拼接删除语句。这可以通过动态 SQL 来实现，使用 `<if>` 标签来根据条件动态生成 SQL 语句。
+
+以下是一个示例，演示如何在 MyBatis 中配置删除操作，当删除条件为 `null` 时不拼接删除语句：
+
+### 1. 创建实体类
+假设我们有一个实体类 `User`，其中 `id` 是删除条件：
+
+```java
+public class User {
+    private Integer id;
+    // other fields, getters and setters
+}
+```
+
+### 2. 创建 Mapper 接口
+在 Mapper 接口中定义删除方法：
+
+```java
+public interface UserMapper {
+    int deleteUserById(@Param("id") Integer id);
+}
+```
+
+### 3. 编写 XML 映射文件
+在 XML 映射文件中编写动态 SQL：
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mapper.UserMapper">
+
+    <delete id="deleteUserById" parameterType="java.lang.Integer">
+        DELETE FROM users
+        <where>
+            <if test="id != null">
+                id = #{id}
+            </if>
+        </where>
+    </delete>
+
+</mapper>
+```
+
+在上面的 XML 映射文件中：
+
+- `<delete>` 标签用于定义删除操作。
+- `<where>` 标签用于拼接 `WHERE` 子句。
+- `<if>` 标签用于条件判断，当 `id` 不为 `null` 时拼接 `id = #{id}` 条件。
+
+### 4. 配置 MyBatis
+在 MyBatis 配置文件中注册 Mapper：
+
+```xml
+<configuration>
+    <mappers>
+        <mapper resource="com/example/mapper/UserMapper.xml" />
+    </mappers>
+</configuration>
+```
+
+### 5. 测试删除操作
+编写测试代码来验证删除操作：
+
+```java
+import com.example.mapper.UserMapper;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+
+public class MyBatisTest {
+    public static void main(String[] args) {
+        SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(MyBatisTest.class.getResourceAsStream("/mybatis-config.xml"));
+        try (SqlSession session = sqlSessionFactory.openSession()) {
+            UserMapper userMapper = session.getMapper(UserMapper.class);
+            
+            Integer userId = 1; // Change this value to test with different IDs
+            int rowsAffected = userMapper.deleteUserById(userId);
+            session.commit();
+
+            System.out.println("Rows affected: " + rowsAffected);
+        }
+    }
+}
+```
+
+在这个示例中：
+
+- 如果 `userId` 为 `null`，生成的 SQL 不会包含 `WHERE` 子句，从而不会执行删除操作。
+- 如果 `userId` 不为 `null`，生成的 SQL 将包含 `WHERE id = #{id}`，并执行删除操作。
+
+通过这种方式，你可以在 MyBatis 中灵活地控制 SQL 语句的拼接，确保在删除条件为 `null` 时不执行删除操作。
+
+# 35. 为null不是全删掉了吗？
+如果在 MyBatis 中删除条件为 `null` 时拼接的 SQL 是 `DELETE FROM table`，那么这将导致删除整个表中的所有记录。这显然是非常危险的行为。因此，我们需要确保在删除条件为 `null` 时，删除操作不会执行。
+
+为此，可以通过在 SQL 语句中加入动态条件来防止这种情况发生。具体实现如下：
+
+### 1. 创建实体类
+假设我们有一个实体类 `User`，其中 `id` 是删除条件：
+
+```java
+public class User {
+    private Integer id;
+    // other fields, getters, and setters
+}
+```
+
+# 36. mybatisplus如何避免这一点？
+在 MyBatis-Plus 中，避免删除操作中条件为 `null` 时误删除所有记录，可以通过使用逻辑删除、条件判断以及自定义 SQL 语句等方式实现。下面是如何使用这些方法来确保安全性：
+
+### 方法一：使用逻辑删除
+
+逻辑删除是指通过更新标记字段来表示记录已删除，而不是实际删除记录。在 MyBatis-Plus 中，可以通过配置逻辑删除字段来实现。
+
+#### 配置逻辑删除字段
+
+1. **在实体类中添加逻辑删除字段**
+
+```java
+import com.baomidou.mybatisplus.annotation.TableLogic;
+
+public class User {
+    private Integer id;
+    private String name;
+
+    @TableLogic
+    private Integer deleted;
+    
+    // other fields, getters, and setters
+}
+```
+
+2. **在 `application.yml` 配置文件中配置逻辑删除**
+
+```yaml
+mybatis-plus:
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+```
+
+这样，当执行删除操作时，MyBatis-Plus 会将 `deleted` 字段的值更新为 `1`，而不是实际删除记录。
+
+### 方法二：条件判断
+
+通过条件判断来防止删除操作中条件为 `null` 时误删除所有记录，可以在自定义的 SQL 语句中使用动态 SQL 标签 `<if>` 来实现。
+
+#### 自定义 SQL 语句
+
+1. **Mapper 接口**
+
+```java
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Param;
+
+public interface UserMapper extends BaseMapper<User> {
+
+    @Delete("<script>"
+            + "DELETE FROM users WHERE id = #{id}"
+            + "<if test='id == null'> AND 1=2</if>"
+            + "</script>")
+    int deleteUserById(@Param("id") Integer id);
+}
+```
+
+在这个例子中，当 `id` 为 `null` 时，`AND 1=2` 确保了没有记录会被删除。
+
+### 方法三：使用 Wrapper 条件构造器
+
+MyBatis-Plus 提供了丰富的条件构造器，可以在执行删除操作前进行条件校验。
+
+```java
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.service.IService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class UserService {
+
+    @Autowired
+    private UserMapper userMapper;
+
+    public boolean deleteUserById(Integer id) {
+        if (id == null) {
+            return false;
+        }
+
+        QueryWrapper<User> queryWrapper = Wrappers.query();
+        queryWrapper.eq("id", id);
+
+        return userMapper.delete(queryWrapper) > 0;
+    }
+}
+```
+
+在这个例子中，当 `id` 为 `null` 时，删除操作不会执行。
+
+### 测试代码
+
+编写测试代码来验证删除操作：
+
+```java
+import com.example.mapper.UserMapper;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+import org.springframework.beans.factory.annotation.Autowired;
+
+public class MyBatisPlusTest {
+
+    @Autowired
+    private UserService userService;
+
+    public static void main(String[] args) {
+        MyBatisPlusTest test = new MyBatisPlusTest();
+        Integer userId = null; // Change this value to test with different IDs
+        boolean result = test.userService.deleteUserById(userId);
+        System.out.println("Delete operation successful: " + result);
+    }
+}
+```
+
+通过以上方法，你可以在 MyBatis-Plus 中有效地防止条件为 `null` 时误删除所有记录，确保数据操作的安全性。
+
