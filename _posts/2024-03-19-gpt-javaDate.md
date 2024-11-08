@@ -481,3 +481,56 @@ public class SecureRandomExample {
 - **加密初始化向量**：生成用于加密算法的初始化向量。
 
 `SecureRandom` 是一个强大的工具，确保了生成的随机数在高安全性场景中的可靠性和不可预测性。
+
+# 9. java中BigInteger如何实例化？列举所有实例化它的方式？
+在 Java 中，`BigInteger` 类提供了多种方式来实例化大整数。以下是所有主要的实例化方式：
+
+### 1. 使用字符串构造器
+使用字符串表示的数字来创建 `BigInteger` 对象，通常使用十进制。
+```java
+BigInteger bigInt1 = new BigInteger("12345678901234567890");
+```
+
+### 2. 使用指定基数的字符串构造器
+可以指定基数（如二进制、八进制、十六进制等）来解析字符串并创建 `BigInteger`。
+```java
+BigInteger bigInt2 = new BigInteger("101010", 2); // 二进制
+BigInteger bigInt3 = new BigInteger("A5", 16); // 十六进制
+```
+
+### 3. 使用字节数组构造器
+通过字节数组来创建 `BigInteger`。这个构造器特别适合处理二进制数据。
+```java
+byte[] byteArray = {1, 2, 3, 4};
+BigInteger bigInt4 = new BigInteger(byteArray);
+```
+
+### 4. 使用 `BigInteger.valueOf(long val)`
+该方法可以用 `long` 值创建 `BigInteger`，适合于不超过 `long` 范围的整数。
+```java
+BigInteger bigInt5 = BigInteger.valueOf(123456789L);
+```
+
+### 5. 使用常量（`BigInteger.ZERO`, `BigInteger.ONE`, `BigInteger.TWO`, `BigInteger.TEN`）
+`BigInteger` 提供了一些常用的常量。
+```java
+BigInteger zero = BigInteger.ZERO;
+BigInteger one = BigInteger.ONE;
+BigInteger two = BigInteger.TWO;
+BigInteger ten = BigInteger.TEN;
+```
+
+### 6. 使用随机数生成器 (`BigInteger(int numBits, Random rnd)`)
+可以指定位数生成一个随机的 `BigInteger`，通常用于加密算法中。
+```java
+Random random = new Random();
+BigInteger bigInt6 = new BigInteger(64, random); // 生成一个64位的随机数
+```
+
+### 7. 使用 `BigInteger.probablePrime(int bitLength, Random rnd)`
+生成指定位长度的可能是质数的 `BigInteger`，在加密领域常用。
+```java
+BigInteger probablePrime = BigInteger.probablePrime(64, new Random());
+```
+
+这些方法基本涵盖了 `BigInteger` 的所有实例化方式。根据需要选择合适的方式来创建 `BigInteger` 实例。
