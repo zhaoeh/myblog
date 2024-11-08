@@ -872,3 +872,31 @@ Apache Superset 是一个开源的现代数据可视化平台，支持丰富的�
 ### 总结
 
 通过对不同权限的详细理解和配置，可以确保每个用户在 Superset 中拥有适当的访问和操作权限。这不仅有助于保护数据安全，还能提高团队协作效率。根据实际业务需求，合理分配和管理这些权限，是确保系统安全和高效运行的关键。
+
+
+# 13. superset的dashboard是否支持通过api访问呢？比如我有一个网站，我想引用superset中已经生成的dashboard？
+是的，Apache Superset 允许通过 API 访问 dashboard 并将其嵌入到其他网站中。以下是一些常见的方法：
+
+1. **使用 iframe 嵌入**：这是最简单的方法，可以直接在你的网页中嵌入 Superset 的 dashboard。具体操作如下：
+   - 打开 Superset 的 dashboard 页面。
+   - 复制该页面的 URL。
+   - 在你的网页中使用 `<iframe>` 标签将该 URL 嵌入，例如：
+     ```html
+     <iframe src="https://your-superset-instance.com/superset/dashboard/1/" width="100%" height="600px"></iframe>
+     ```
+
+2. **使用 Superset 的 Embed API**：Superset 提供了更高级的嵌入功能，允许你控制嵌入的内容和行为。可以参考 Superset 的文档了解如何使用 Embed API。
+
+3. **使用 Superset 的 REST API 获取数据并自行渲染**：如果你需要更灵活的控制，可以使用 Superset 提供的 REST API 获取 dashboard 的数据，并在你的网站上自行渲染。你可以参考 Superset 的 API 文档获取详细信息。
+
+具体步骤如下：
+   - **获取 API Token**：首先，你需要获取一个 API token，用于身份验证。
+   - **调用 API 获取数据**：使用该 token 调用 Superset 的 API 获取 dashboard 数据。例如，你可以使用 `curl` 命令：
+     ```sh
+     curl -X GET "https://your-superset-instance.com/api/v1/dashboard/1" -H "Authorization: Bearer YOUR_API_TOKEN"
+     ```
+   - **在你的网站上渲染数据**：使用前端框架（如 React、Vue.js 等）在你的网站上渲染获取的数据。
+
+4. **SSO (Single Sign-On) 认证**：如果你需要保护嵌入的内容，可以使用 SSO 认证，确保用户在访问你的网页时已经经过身份验证。这通常涉及到更多的配置和集成工作。
+
+你可以根据你的具体需求和技术栈选择合适的方法来实现 Superset dashboard 的嵌入和访问。
