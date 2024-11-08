@@ -1,7 +1,7 @@
 ---
 layout:     post
-title:      mybatisPlus别名
-subtitle:   mybatisPlus别名
+title:      mybatisPlus mapper
+subtitle:   mybatisPlus mapper入门
 categories: [gpt]
 mermaid: false
 sequence: false
@@ -3138,3 +3138,625 @@ public class MyBatisPlusTest {
 
 通过以上方法，你可以在 MyBatis-Plus 中有效地防止条件为 `null` 时误删除所有记录，确保数据操作的安全性。
 
+
+# 36. mybatisplus配置动态数据源时如何指定各个数据源的sqlsessionFactory呢？
+在 MyBatis-Plus 中配置动态数据源并指定各个数据源的 `SqlSessionFactory`，你需要按照以下步骤进行配置：
+
+1. **引入必要的依赖**：
+
+   确保你在 `pom.xml` 中引入了 MyBatis-Plus、Spring Boot、Dynamic Data Source 等相关的依赖：
+
+   ```xml
+   <dependency>
+       <groupId>com.baomidou</groupId>
+       <artifactId>mybatis-plus-boot-starter</artifactId>
+       <version>3.5.0</version>
+   </dependency>
+   <dependency>
+       <groupId>com.baomidou</groupId>
+       <artifactId>dynamic-datasource-spring-boot-starter</artifactId>
+       <version>3.5.0</version>
+   </dependency>
+   ```
+
+2. **配置数据源**：
+
+   在 `application.yml` 或 `application.properties` 中配置多个数据源。例如：
+
+   ```yaml
+   spring:
+     datasource:
+       dynamic:
+         primary: master
+         datasource:
+           master:
+             url: jdbc:mysql://localhost:3306/master
+             username: root
+             password: root
+             driver-class-name: com.mysql.cj.jdbc.Driver
+           slave:
+             url: jdbc:mysql://localhost:3306/slave
+             username: root
+             password: root
+             driver-class-name: com.mysql.cj.jdbc.Driver
+   ```
+
+3. **配置数据源切换**：
+
+   创建一个配置类来配置动态数据源和 `SqlSessionFactory`：
+
+   ```java
+   import com.baomidou.dynamic.datasource.DynamicRoutingDataSource;
+   import com.baomidou.dynamic.datasource.provider.YmlDynamicDataSourceProvider;
+   import com.baomidou.mybatisplus.core.MybatisConfiguration;
+   import com.baomidou.mybatisplus.core.MybatisXMLLanguageDriver;
+   import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
+   import org.apache.ibatis.session.SqlSessionFactory;
+   import org.mybatis.spring.SqlSessionTemplate;
+   import org.springframework.beans.factory.annotation.Autowired;
+   import org.springframework.beans.factory.annotation.Qualifier;
+   import org.springframework.context.annotation.Bean;
+   import org.springframework.context.annotation.Configuration;
+   import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+
+   import javax.sql.DataSource;
+
+   @Configuration
+   public class MyBatisPlusConfig {
+
+       @Autowired
+       private DataSource dataSource;
+
+       @Bean
+       public SqlSessionFactory sqlSessionFactory() throws Exception {
+           MybatisSqlSessionFactoryBean sessionFactoryBean = new MybatisSqlSessionFactoryBean();
+           sessionFactoryBean.setDataSource(dataSource);
+           sessionFactoryBean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath:/mapper/*.xml"));
+           MybatisConfiguration configuration = new MybatisConfiguration();
+           configuration.setDefaultScriptingLanguage(MybatisXMLLanguageDriver.class);
+           sessionFactoryBean.setConfiguration(configuration);
+           return sessionFactoryBean.getObject();
+       }
+
+       @Bean
+       public SqlSessionTemplate sqlSessionTemplate(@Qualifier("sqlSessionFactory") SqlSessionFactory sqlSessionFactory) {
+           return new SqlSessionTemplate(sqlSessionFactory);
+       }
+   }
+   ```
+
+4. **配置数据源提供者**：
+
+   使用 `YmlDynamicDataSourceProvider` 或自定义 `DynamicDataSourceProvider` 来加载数据源配置：
+
+   ```java
+   import com.baomidou.dynamic.datasource.provider.DynamicDataSourceProvider;
+   import com.baomidou.dynamic.datasource.provider.YmlDynamicDataSourceProvider;
+   import org.springframework.context.annotation.Bean;
+   import org.springframework.context.annotation.Configuration;
+
+   @Configuration
+   public class DynamicDataSourceConfig {
+
+       @Bean
+       public DynamicDataSourceProvider dynamicDataSourceProvider() {
+           return new YmlDynamicDataSourceProvider();
+       }
+   }
+   ```
+
+5. **使用数据源**：
+
+   使用注解或程序逻辑来切换数据源。例如，使用 `@DS` 注解来指定某个方法使用特定的数据源：
+
+   ```java
+   import com.baomidou.dynamic.datasource.annotation.DS;
+   import org.springframework.stereotype.Service;
+
+   @Service
+   public class UserService {
+
+       @DS("slave")
+       public void getDataFromSlave() {
+           // 从 slave 数据源获取数据的逻辑
+       }
+
+       @DS("master")
+       public void getDataFromMaster() {
+           // 从 master 数据源获取数据的逻辑
+       }
+   }
+   ```
+
+这样，你就可以在 MyBatis-Plus 中配置和使用动态数据源，并指定每个数据源的 `SqlSessionFactory`。通过这种方式，可以根据需要动态切换数据源，满足不同的业务需求。
+
+# 37. mybatisplus动态数据源内部是如何处理各个数据源的SqlSessionFactory 的呢？因为实际上每个数据源都需要定制一套属于自己独有的SqlSessionFactory ，比如不同数据源注册进去的拦截器就不一样，使用mybatisplus动态数据源后，该如何定制每个数据源的SqlSessionFactory呢？
+在 MyBatis-Plus 的动态数据源实现中，每个数据源可以配置属于自己独有的 `SqlSessionFactory`。要实现这一点，可以使用 `AbstractRoutingDataSource` 以及自定义的 `DynamicDataSourceProvider` 来配置和管理每个数据源的 `SqlSessionFactory`。以下是具体的实现步骤：
+
+1. **引入必要的依赖**：
+
+   确保你在 `pom.xml` 中引入了 MyBatis-Plus、Spring Boot、Dynamic Data Source 等相关的依赖：
+
+   ```xml
+   <dependency>
+       <groupId>com.baomidou</groupId>
+       <artifactId>mybatis-plus-boot-starter</artifactId>
+       <version>3.5.0</version>
+   </dependency>
+   <dependency>
+       <groupId>com.baomidou</groupId>
+       <artifactId>dynamic-datasource-spring-boot-starter</artifactId>
+       <version>3.5.0</version>
+   </dependency>
+   ```
+
+2. **配置数据源**：
+
+   在 `application.yml` 或 `application.properties` 中配置多个数据源。例如：
+
+   ```yaml
+   spring:
+     datasource:
+       dynamic:
+         primary: master
+         datasource:
+           master:
+             url: jdbc:mysql://localhost:3306/master
+             username: root
+             password: root
+             driver-class-name: com.mysql.cj.jdbc.Driver
+           slave:
+             url: jdbc:mysql://localhost:3306/slave
+             username: root
+             password: root
+             driver-class-name: com.mysql.cj.jdbc.Driver
+   ```
+
+3. **配置数据源切换**：
+
+   创建一个配置类来配置动态数据源和 `SqlSessionFactory`：
+
+   ```java
+   import com.baomidou.dynamic.datasource.DynamicRoutingDataSource;
+   import com.baomidou.dynamic.datasource.provider.DynamicDataSourceProvider;
+   import com.baomidou.dynamic.datasource.provider.YmlDynamicDataSourceProvider;
+   import com.baomidou.mybatisplus.core.MybatisConfiguration;
+   import com.baomidou.mybatisplus.core.MybatisXMLLanguageDriver;
+   import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
+   import org.apache.ibatis.session.SqlSessionFactory;
+   import org.mybatis.spring.SqlSessionTemplate;
+   import org.springframework.beans.factory.annotation.Autowired;
+   import org.springframework.beans.factory.annotation.Qualifier;
+   import org.springframework.context.annotation.Bean;
+   import org.springframework.context.annotation.Configuration;
+   import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+
+   import javax.sql.DataSource;
+   import java.util.HashMap;
+   import java.util.Map;
+
+   @Configuration
+   public class MyBatisPlusConfig {
+
+       @Autowired
+       private DataSource dataSource;
+
+       @Bean
+       public DynamicRoutingDataSource dynamicDataSource(DynamicDataSourceProvider provider) {
+           return provider.loadDataSources();
+       }
+
+       @Bean
+       public DynamicDataSourceProvider dynamicDataSourceProvider() {
+           return new YmlDynamicDataSourceProvider();
+       }
+
+       @Bean
+       public SqlSessionFactory sqlSessionFactory(DynamicRoutingDataSource dynamicDataSource) throws Exception {
+           MybatisSqlSessionFactoryBean sessionFactoryBean = new MybatisSqlSessionFactoryBean();
+           sessionFactoryBean.setDataSource(dynamicDataSource);
+           sessionFactoryBean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath:/mapper/*.xml"));
+           MybatisConfiguration configuration = new MybatisConfiguration();
+           configuration.setDefaultScriptingLanguage(MybatisXMLLanguageDriver.class);
+           sessionFactoryBean.setConfiguration(configuration);
+           return sessionFactoryBean.getObject();
+       }
+
+       @Bean
+       public SqlSessionTemplate sqlSessionTemplate(@Qualifier("sqlSessionFactory") SqlSessionFactory sqlSessionFactory) {
+           return new SqlSessionTemplate(sqlSessionFactory);
+       }
+   }
+   ```
+
+4. **自定义数据源提供者**：
+
+   自定义 `DynamicDataSourceProvider`，为每个数据源配置独有的 `SqlSessionFactory`，包括特定的拦截器：
+
+   ```java
+   import com.baomidou.dynamic.datasource.provider.DynamicDataSourceProvider;
+   import com.baomidou.dynamic.datasource.provider.YmlDynamicDataSourceProvider;
+   import org.apache.ibatis.plugin.Interceptor;
+   import org.apache.ibatis.session.SqlSessionFactory;
+   import org.mybatis.spring.SqlSessionFactoryBean;
+   import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+
+   import javax.sql.DataSource;
+   import java.util.HashMap;
+   import java.util.Map;
+
+   public class CustomDynamicDataSourceProvider implements DynamicDataSourceProvider {
+
+       private final DataSourceProperties properties;
+
+       public CustomDynamicDataSourceProvider(DataSourceProperties properties) {
+           this.properties = properties;
+       }
+
+       @Override
+       public DynamicRoutingDataSource loadDataSources() {
+           Map<String, DataSource> dataSourceMap = new HashMap<>();
+           // 这里加载多个数据源
+           DataSource master = createDataSource(properties.getMaster());
+           DataSource slave = createDataSource(properties.getSlave());
+           dataSourceMap.put("master", master);
+           dataSourceMap.put("slave", slave);
+
+           DynamicRoutingDataSource dynamicRoutingDataSource = new DynamicRoutingDataSource();
+           dynamicRoutingDataSource.setDefaultTargetDataSource(master);
+           dynamicRoutingDataSource.setTargetDataSources(new HashMap<>(dataSourceMap));
+           return dynamicRoutingDataSource;
+       }
+
+       private DataSource createDataSource(DataSourceProperties.DataSourceConfig config) {
+           HikariConfig hikariConfig = new HikariConfig();
+           hikariConfig.setJdbcUrl(config.getUrl());
+           hikariConfig.setUsername(config.getUsername());
+           hikariConfig.setPassword(config.getPassword());
+           hikariConfig.setDriverClassName(config.getDriverClassName());
+           return new HikariDataSource(hikariConfig);
+       }
+
+       public SqlSessionFactory createSqlSessionFactory(DataSource dataSource, Interceptor[] interceptors) throws Exception {
+           SqlSessionFactoryBean sessionFactoryBean = new SqlSessionFactoryBean();
+           sessionFactoryBean.setDataSource(dataSource);
+           sessionFactoryBean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath:/mapper/*.xml"));
+           sessionFactoryBean.setPlugins(interceptors);  // 设置特定的拦截器
+           return sessionFactoryBean.getObject();
+       }
+   }
+   ```
+
+5. **在配置类中使用自定义的数据源提供者**：
+
+   使用自定义的 `DynamicDataSourceProvider` 来配置不同的 `SqlSessionFactory`：
+
+   ```java
+   @Configuration
+   public class MyBatisPlusConfig {
+
+       @Autowired
+       private DataSourceProperties properties;
+
+       @Bean
+       public DynamicRoutingDataSource dynamicDataSource() {
+           CustomDynamicDataSourceProvider provider = new CustomDynamicDataSourceProvider(properties);
+           return provider.loadDataSources();
+       }
+
+       @Bean
+       public SqlSessionFactory sqlSessionFactory(DynamicRoutingDataSource dynamicDataSource) throws Exception {
+           CustomDynamicDataSourceProvider provider = new CustomDynamicDataSourceProvider(properties);
+           // 为每个数据源创建独有的 SqlSessionFactory
+           SqlSessionFactory masterSqlSessionFactory = provider.createSqlSessionFactory(dynamicDataSource.getDataSource("master"), new Interceptor[]{new MasterInterceptor()});
+           SqlSessionFactory slaveSqlSessionFactory = provider.createSqlSessionFactory(dynamicDataSource.getDataSource("slave"), new Interceptor[]{new SlaveInterceptor()});
+           // 根据需要配置更多的 SqlSessionFactory
+
+           // 返回默认的 SqlSessionFactory（可以根据具体需求选择）
+           return masterSqlSessionFactory;
+       }
+
+       @Bean
+       public SqlSessionTemplate sqlSessionTemplate(@Qualifier("sqlSessionFactory") SqlSessionFactory sqlSessionFactory) {
+           return new SqlSessionTemplate(sqlSessionFactory);
+       }
+   }
+   ```
+
+通过这种方式，你可以为每个数据源配置独特的 `SqlSessionFactory`，并根据需要设置不同的拦截器。这种灵活性使得你可以更好地管理和优化不同数据源的行为和配置。
+
+# 38. mybatisplus中setTypeAliasesPackage是什么意思？
+在 MyBatis-Plus 中，`setTypeAliasesPackage` 是一个用于配置 MyBatis 别名扫描包路径的方法。通过设置这个路径，MyBatis 可以自动为指定包路径下的类创建别名，以简化 XML 映射文件中的类引用。
+
+别名是 MyBatis 提供的一种方便功能，它允许你使用短名称引用类，而不是使用全限定名。这在编写 XML 映射文件时可以使代码更加简洁和易读。
+
+### 使用 `setTypeAliasesPackage`
+
+假设你有一个实体类 `User` 位于包 `com.example.project.entity` 中，你可以通过 `setTypeAliasesPackage` 将该包路径下的所有类设置别名。别名通常是类名的小写形式，比如 `User` 类的别名会是 `user`。
+
+### 配置方式
+
+你可以在 MyBatis 的 `SqlSessionFactoryBean` 配置中设置 `typeAliasesPackage` 属性。以下是一个示例配置：
+
+```java
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionFactoryBean;
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+
+import javax.sql.DataSource;
+
+@Configuration
+@MapperScan("com.example.project.mapper")
+public class MyBatisConfig {
+
+    @Bean
+    public SqlSessionFactory sqlSessionFactory(DataSource dataSource) throws Exception {
+        SqlSessionFactoryBean sessionFactoryBean = new SqlSessionFactoryBean();
+        sessionFactoryBean.setDataSource(dataSource);
+        sessionFactoryBean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath:/mapper/*.xml"));
+        
+        // 设置类型别名扫描包路径
+        sessionFactoryBean.setTypeAliasesPackage("com.example.project.entity");
+
+        return sessionFactoryBean.getObject();
+    }
+}
+```
+
+在上面的配置中，`setTypeAliasesPackage("com.example.project.entity")` 指定了 MyBatis 应该扫描 `com.example.project.entity` 包路径下的所有类，并为这些类创建别名。
+
+### XML 文件中的使用
+
+假设有一个实体类 `User`，其全限定名为 `com.example.project.entity.User`。通过设置别名，你可以在 MyBatis 的 XML 文件中直接使用别名：
+
+```xml
+<resultMap id="userResultMap" type="user">
+    <id column="id" property="id" />
+    <result column="name" property="name" />
+    <result column="age" property="age" />
+</resultMap>
+
+<select id="selectUser" resultMap="userResultMap">
+    SELECT id, name, age FROM user WHERE id = #{id}
+</select>
+```
+
+在这个例子中，`type="user"` 就是别名，而不是使用全限定名 `type="com.example.project.entity.User"`。
+
+### 总结
+
+- **作用**：`setTypeAliasesPackage` 用于指定 MyBatis 别名扫描的包路径。
+- **好处**：通过设置别名，可以简化 XML 映射文件中的类引用，使代码更简洁、易读。
+- **使用**：在 `SqlSessionFactoryBean` 中配置 `typeAliasesPackage` 属性，并指定需要扫描的包路径。
+
+通过合理配置和使用别名，你可以大大简化 MyBatis 的 XML 映射配置，提高开发效率。
+
+# 39. mapperScan注解必须指定sqlsessionRef吗？
+在使用 MyBatis 和 Spring 集成时，`@MapperScan` 注解用于指定需要扫描的 Mapper 接口包路径。`sqlSessionTemplateRef` 属性是可选的，仅在有多个 `SqlSessionFactory` 或 `SqlSessionTemplate` 实例时才需要指定。通常情况下，如果你只有一个 `SqlSessionFactory` 或 `SqlSessionTemplate` 实例，那么你不需要指定 `sqlSessionTemplateRef`。
+
+### 使用 `@MapperScan` 的基本示例
+
+在只有一个 `SqlSessionFactory` 或 `SqlSessionTemplate` 实例的情况下，通常不需要指定 `sqlSessionTemplateRef`：
+
+```java
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+@MapperScan("com.example.project.mapper")
+public class MyBatisConfig {
+    // 其他配置
+}
+```
+
+### 有多个 `SqlSessionFactory` 或 `SqlSessionTemplate` 的情况
+
+当你的应用程序中有多个数据源，每个数据源都有自己的 `SqlSessionFactory` 或 `SqlSessionTemplate`，这时候就需要使用 `sqlSessionTemplateRef` 来指定 `Mapper` 所使用的 `SqlSessionTemplate`。
+
+### 示例：多个 `SqlSessionFactory` 或 `SqlSessionTemplate`
+
+假设你有两个数据源 `master` 和 `slave`，并且为每个数据源配置了不同的 `SqlSessionFactory` 和 `SqlSessionTemplate`。
+
+#### 配置主数据源和 `SqlSessionFactory`
+
+```java
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionFactoryBean;
+import org.mybatis.spring.SqlSessionTemplate;
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+
+import javax.sql.DataSource;
+
+@Configuration
+@MapperScan(basePackages = "com.example.project.master.mapper", sqlSessionTemplateRef = "masterSqlSessionTemplate")
+public class MasterDataSourceConfig {
+
+    @Bean(name = "masterDataSource")
+    public DataSource masterDataSource() {
+        // 配置并返回主数据源
+    }
+
+    @Bean(name = "masterSqlSessionFactory")
+    public SqlSessionFactory masterSqlSessionFactory(@Qualifier("masterDataSource") DataSource dataSource) throws Exception {
+        SqlSessionFactoryBean sqlSessionFactoryBean = new SqlSessionFactoryBean();
+        sqlSessionFactoryBean.setDataSource(dataSource);
+        sqlSessionFactoryBean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath:/mapper/master/*.xml"));
+        return sqlSessionFactoryBean.getObject();
+    }
+
+    @Bean(name = "masterSqlSessionTemplate")
+    public SqlSessionTemplate masterSqlSessionTemplate(@Qualifier("masterSqlSessionFactory") SqlSessionFactory sqlSessionFactory) {
+        return new SqlSessionTemplate(sqlSessionFactory);
+    }
+
+    @Bean(name = "masterTransactionManager")
+    public DataSourceTransactionManager masterTransactionManager(@Qualifier("masterDataSource") DataSource dataSource) {
+        return new DataSourceTransactionManager(dataSource);
+    }
+}
+```
+
+#### 配置从数据源和 `SqlSessionFactory`
+
+```java
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionFactoryBean;
+import org.mybatis.spring.SqlSessionTemplate;
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+
+import javax.sql.DataSource;
+
+@Configuration
+@MapperScan(basePackages = "com.example.project.slave.mapper", sqlSessionTemplateRef = "slaveSqlSessionTemplate")
+public class SlaveDataSourceConfig {
+
+    @Bean(name = "slaveDataSource")
+    public DataSource slaveDataSource() {
+        // 配置并返回从数据源
+    }
+
+    @Bean(name = "slaveSqlSessionFactory")
+    public SqlSessionFactory slaveSqlSessionFactory(@Qualifier("slaveDataSource") DataSource dataSource) throws Exception {
+        SqlSessionFactoryBean sqlSessionFactoryBean = new SqlSessionFactoryBean();
+        sqlSessionFactoryBean.setDataSource(dataSource);
+        sqlSessionFactoryBean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath:/mapper/slave/*.xml"));
+        return sqlSessionFactoryBean.getObject();
+    }
+
+    @Bean(name = "slaveSqlSessionTemplate")
+    public SqlSessionTemplate slaveSqlSessionTemplate(@Qualifier("slaveSqlSessionFactory") SqlSessionFactory sqlSessionFactory) {
+        return new SqlSessionTemplate(sqlSessionFactory);
+    }
+
+    @Bean(name = "slaveTransactionManager")
+    public DataSourceTransactionManager slaveTransactionManager(@Qualifier("slaveDataSource") DataSource dataSource) {
+        return new DataSourceTransactionManager(dataSource);
+    }
+}
+```
+
+### 关键点总结
+
+1. **单个 `SqlSessionFactory` 或 `SqlSessionTemplate` 的情况**：直接使用 `@MapperScan`，不需要指定 `sqlSessionTemplateRef`。
+2. **多个 `SqlSessionFactory` 或 `SqlSessionTemplate` 的情况**：在 `@MapperScan` 中使用 `sqlSessionTemplateRef` 指定对应的 `SqlSessionTemplate`，以确保每个 `Mapper` 使用正确的数据源。
+
+通过这种配置方式，可以在一个项目中灵活管理多个数据源，并确保每个数据源的 `Mapper` 使用正确的 `SqlSessionFactory` 或 `SqlSessionTemplate`。
+
+# 40. mybatisplus的ampperlocations配置，会被代码中的编码配置覆盖掉吗？
+在 MyBatis-Plus 的配置中，如果你在代码中和配置文件中都设置了 `mapperLocations`，代码中的配置通常会覆盖配置文件中的配置。这是因为代码中的配置是在 Spring 容器初始化过程中明确设置的，而配置文件中的配置是在解析配置文件时加载的。
+
+### 详细说明
+
+1. **配置文件中的配置**
+
+   如果你在 `application.yml` 或 `application.properties` 中设置了 `mapperLocations`，它会被 MyBatis 自动读取并使用。例如：
+
+   ```yaml
+   mybatis-plus:
+     mapper-locations: classpath:/mapper/*.xml
+   ```
+
+2. **代码中的配置**
+
+   在代码中，你可以使用 `SqlSessionFactoryBean` 或 `MybatisSqlSessionFactoryBean` 来设置 `mapperLocations`。例如：
+
+   ```java
+   import org.apache.ibatis.session.SqlSessionFactory;
+   import org.mybatis.spring.SqlSessionFactoryBean;
+   import org.springframework.context.annotation.Bean;
+   import org.springframework.context.annotation.Configuration;
+   import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+
+   import javax.sql.DataSource;
+
+   @Configuration
+   public class MyBatisConfig {
+
+       @Bean
+       public SqlSessionFactory sqlSessionFactory(DataSource dataSource) throws Exception {
+           SqlSessionFactoryBean sessionFactoryBean = new SqlSessionFactoryBean();
+           sessionFactoryBean.setDataSource(dataSource);
+           
+           // 通过代码设置 mapperLocations
+           sessionFactoryBean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath:/mybatis/mappers/*.xml"));
+           
+           return sessionFactoryBean.getObject();
+       }
+   }
+   ```
+
+### 示例：结合配置文件和代码配置
+
+如果你同时在配置文件和代码中设置了 `mapperLocations`，代码中的配置会覆盖配置文件中的配置。以下是一个示例：
+
+#### 配置文件（application.yml）
+
+```yaml
+mybatis-plus:
+  mapper-locations: classpath:/mapper/*.xml
+```
+
+#### Java 配置类
+
+```java
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionFactoryBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+
+import javax.sql.DataSource;
+
+@Configuration
+public class MyBatisConfig {
+
+    @Bean
+    public SqlSessionFactory sqlSessionFactory(DataSource dataSource) throws Exception {
+        SqlSessionFactoryBean sessionFactoryBean = new SqlSessionFactoryBean();
+        sessionFactoryBean.setDataSource(dataSource);
+        
+        // 通过代码设置 mapperLocations，会覆盖配置文件中的配置
+        sessionFactoryBean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath:/mybatis/mappers/*.xml"));
+        
+        return sessionFactoryBean.getObject();
+    }
+}
+```
+
+在这个示例中，尽管配置文件中指定了 `mapper-locations: classpath:/mapper/*.xml`，但是由于在 `MyBatisConfig` 类中明确设置了 `mapperLocations` 为 `classpath:/mybatis/mappers/*.xml`，最终生效的配置将是代码中指定的路径。
+
+### 总结
+
+- **配置文件中的 `mapperLocations`**：可以通过配置文件（如 `application.yml`）指定 XML 映射文件的位置。
+- **代码中的 `mapperLocations`**：可以在 `SqlSessionFactoryBean` 或 `MybatisSqlSessionFactoryBean` 中通过代码设置 XML 映射文件的位置。
+- **优先级**：代码中的配置通常会覆盖配置文件中的配置。这意味着如果你在代码中设置了 `mapperLocations`，它会覆盖配置文件中的同名配置。
+
+通过这种方式，可以灵活地管理和控制 MyBatis 映射文件的位置配置，以满足不同的应用场景需求。
+
+# 41. 代码中是多个数据源的mapperlocations，但是nacos配置中就指定了一个固定的mapper locations，现在怎么处理？
+如果你的代码中配置了多个数据源的 `mapperLocations`，而在 Nacos 配置中只指定了一个固定的 `mapperLocations`，可以考虑以下几种处理方式：
+
+1. **使用动态数据源配置**：如果你使用了动态数据源（比如 Spring Boot 中的 `DynamicRoutingDataSource`），可以在运行时根据 Nacos 配置动态修改数据源的配置，包括 `mapperLocations`。这样可以实现动态切换数据源对应的 XML 映射文件位置。
+
+2. **在代码中动态加载配置**：在代码中动态加载 Nacos 配置，并根据配置设置对应的 `mapperLocations`。这样可以根据 Nacos 配置来动态调整 XML 映射文件的位置。
+
+3. **配置文件和代码结合使用**：可以让 Nacos 配置中的 `mapperLocations` 作为默认值，而在代码中设置的 `mapperLocations` 作为优先级更高的配置。这样可以保留 Nacos 配置的灵活性，同时可以在代码中进行额外的定制。
+
+4. **手动管理映射文件位置**：如果映射文件位置相对固定且不经常变动，可以不使用 Nacos 配置，而直接在代码中硬编码配置 `mapperLocations`。这样可以简化配置管理，但灵活性较低。
+
+具体选择哪种方式取决于你的项目需求和实际情况。如果能提供更多关于项目架构和要求的信息，可以给出更具体的建议。
+
+# 42. 
