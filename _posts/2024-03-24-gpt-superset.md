@@ -1712,4 +1712,404 @@ if __name__ == '__main__':
 
 是的，通过 Superset 的 "Share" 按钮获取的永久链接可以用作嵌入式 Dashboard 的可访问 URL。你可以将其嵌入到你的网页中的 iframe 标签内，但需要确保访问该链接的用户有足够的权限，并且根据需要配置安全访问机制。
 
-# 23. 
+# 23. 我的需要认证，我就是想问这个链接和你之前说的嵌入式链接是同一个链接吗？之前你说的链接后面可以拼接token字段啊？
+理解了你的问题。如果你的 Superset 实例需要认证，那么你需要生成一个带有 token 的嵌入链接，以便在 iframe 中访问 Dashboard 时进行认证。确实，这与直接获取的永久链接略有不同，因为需要添加 token 来进行认证。
+
+### 区别：
+
+- **Permalink**: 从 Superset 的 "Share" 按钮获取的永久链接是一个简单的 URL，可以直接访问 Dashboard，但通常需要用户登录才能查看。
+- **带有 token 的嵌入链接**: 这种链接包括一个认证 token，允许在 iframe 中访问时进行认证，适用于需要认证的情况。
+
+### 如何生成带有 token 的嵌入链接：
+
+1. **获取 Dashboard 的永久链接**：
+   - 在 Superset 中找到 Dashboard，使用 "Share" 按钮获取永久链接。
+   - 假设你获取的链接是 `http://your-superset-url/superset/dashboard/1/`
+
+2. **获取 JWT Token**：
+   - 通过调用 Superset 的登录 API 来获取 token。下面是一个示例代码：
+
+```python
+import requests
+
+def get_superset_token(username, password):
+    url = 'http://your-superset-url/api/v1/security/login'
+    payload = {
+        'username': username,
+        'password': password,
+        'provider': 'db'  # 根据实际情况选择认证提供者，例如 'db' 或 'ldap'
+    }
+    headers = {'Content-Type': 'application/json'}
+    response = requests.post(url, json=payload, headers=headers)
+    data = response.json()
+    return data['access_token']
+
+# 替换为你的 Superset 用户名和密码
+username = 'your_username'
+password = 'your_password'
+token = get_superset_token(username, password)
+print(f"Token: {token}")
+```
+
+3. **生成带有 token 的嵌入 URL**：
+   - 使用获取的 token，生成完整的嵌入 URL。
+
+```python
+def generate_embed_url(dashboard_url, token):
+    embed_url = f"{dashboard_url}?token={token}"
+    return embed_url
+
+dashboard_url = 'http://your-superset-url/superset/dashboard/1/'
+token = get_superset_token('your_username', 'your_password')
+embed_url = generate_embed_url(dashboard_url, token)
+print(f"Embed URL: {embed_url}")
+```
+
+4. **嵌入 iframe**：
+   - 使用生成的带有 token 的嵌入 URL，将其嵌入到你的网页中的 iframe 标签内。
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Embedded Superset Dashboard</title>
+</head>
+<body>
+    <h1>My Embedded Superset Dashboard</h1>
+    <iframe
+        id="superset-dashboard"
+        width="100%"
+        height="800px"
+        frameborder="0"
+        allowfullscreen>
+    </iframe>
+
+    <script>
+        async function getSupersetToken() {
+            const response = await fetch('http://your-backend-url/get_superset_token');
+            const data = await response.json();
+            return data.token;
+        }
+
+        async function embedSupersetDashboard() {
+            const token = await getSupersetToken();
+            const dashboardUrl = 'http://your-superset-url/superset/dashboard/1/'; // 替换为你的 Dashboard URL
+            const iframe = document.getElementById('superset-dashboard');
+            iframe.src = `${dashboardUrl}?token=${token}`;
+        }
+
+        embedSupersetDashboard();
+    </script>
+</body>
+</html>
+```
+
+### 后端代理（推荐）：
+
+为了避免在前端暴露 token，可以在后端设置代理来处理所有与 Superset 的交互。这可以增加安全性。
+
+### 总结：
+
+1. **Permalink** 是直接从 Superset 界面获取的 URL，用于访问 Dashboard。
+2. **带有 token 的嵌入链接** 需要通过调用 Superset 的登录 API 获取 token，并在嵌入链接中附加 token 参数，以便在 iframe 中进行认证访问。
+
+通过这种方式，你可以确保在嵌入的 Dashboard 中进行认证访问。
+
+# 24. 听你这么说，也就是从superset页面上获取到Permalink ，然后后面拼接一个token字段就成了嵌入式链接了吗？
+是的，你理解的没错。基本步骤就是从 Superset 页面上获取 Permalink，然后在 URL 后面拼接一个 token 字段，这样就可以实现嵌入式链接，适用于需要认证的情况。下面是一个完整的步骤和示例代码：
+
+### 具体步骤：
+
+1. **获取 Dashboard 的 Permalink**：
+   - 在 Superset 页面上，找到你需要嵌入的 Dashboard。
+   - 点击 "Share" 按钮，然后选择 "Copy permalink to clipboard"。
+   - 假设你获取的 Permalink 是 `http://your-superset-url/superset/dashboard/1/`
+
+2. **获取 JWT Token**：
+   - 调用 Superset 的登录 API 获取 token。可以使用如下的 Python 代码获取 token：
+
+```python
+import requests
+
+def get_superset_token(username, password):
+    url = 'http://your-superset-url/api/v1/security/login'
+    payload = {
+        'username': username,
+        'password': password,
+        'provider': 'db'  # 根据实际情况选择认证提供者，例如 'db' 或 'ldap'
+    }
+    headers = {'Content-Type': 'application/json'}
+    response = requests.post(url, json=payload, headers=headers)
+    data = response.json()
+    return data['access_token']
+
+# 替换为你的 Superset 用户名和密码
+username = 'your_username'
+password = 'your_password'
+token = get_superset_token(username, password)
+print(f"Token: {token}")
+```
+
+3. **生成带有 token 的嵌入 URL**：
+   - 将获取的 Permalink 和 token 结合生成嵌入 URL。
+
+```python
+def generate_embed_url(dashboard_url, token):
+    embed_url = f"{dashboard_url}?token={token}"
+    return embed_url
+
+dashboard_url = 'http://your-superset-url/superset/dashboard/1/'
+token = get_superset_token('your_username', 'your_password')
+embed_url = generate_embed_url(dashboard_url, token)
+print(f"Embed URL: {embed_url}")
+```
+
+4. **嵌入 iframe**：
+   - 使用生成的带有 token 的嵌入 URL，将其嵌入到你的网页中的 iframe 标签内。
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Embedded Superset Dashboard</title>
+</head>
+<body>
+    <h1>My Embedded Superset Dashboard</h1>
+    <iframe
+        id="superset-dashboard"
+        width="100%"
+        height="800px"
+        frameborder="0"
+        allowfullscreen>
+    </iframe>
+
+    <script>
+        async function getSupersetToken() {
+            const response = await fetch('http://your-backend-url/get_superset_token');
+            const data = await response.json();
+            return data.token;
+        }
+
+        async function embedSupersetDashboard() {
+            const token = await getSupersetToken();
+            const dashboardUrl = 'http://your-superset-url/superset/dashboard/1/'; // 替换为你的 Dashboard URL
+            const iframe = document.getElementById('superset-dashboard');
+            iframe.src = `${dashboardUrl}?token=${token}`;
+        }
+
+        embedSupersetDashboard();
+    </script>
+</body>
+</html>
+```
+
+### 说明：
+
+- **获取 Token**：通过调用 Superset 的登录 API 获取认证 Token。
+- **生成嵌入 URL**：将 Permalink 和 Token 结合生成完整的嵌入 URL。
+- **嵌入 iframe**：将生成的 URL 嵌入到网页的 iframe 中，这样访问时就会自动带上认证 Token。
+
+### 后端代理（可选）：
+
+为了提高安全性，你可以设置后端代理处理与 Superset 的交互，避免在前端暴露 Token。
+
+#### Flask 后端示例：
+
+```python
+from flask import Flask, request, jsonify
+import requests
+
+app = Flask(__name__)
+
+SUPSERSET_URL = 'http://your-superset-url'
+SUPSERSET_USERNAME = 'your_username'
+SUPSERSET_PASSWORD = 'your_password'
+
+def get_superset_token():
+    url = f'{SUPSERSET_URL}/api/v1/security/login'
+    payload = {
+        'username': SUPSERSET_USERNAME,
+        'password': SUPSERSET_PASSWORD,
+        'provider': 'db'
+    }
+    response = requests.post(url, json=payload)
+    return response.json()['access_token']
+
+@app.route('/get_superset_token', methods=['GET'])
+def get_token():
+    token = get_superset_token()
+    return jsonify({'token': token})
+
+@app.route('/superset/dashboard/<int:dashboard_id>', methods=['GET'])
+def proxy_dashboard(dashboard_id):
+    token = get_superset_token()
+    url = f'{SUPSERSET_URL}/superset/dashboard/{dashboard_id}/'
+    headers = {'Authorization': f'Bearer {token}'}
+    response = requests.get(url, headers=headers)
+    return response.content
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+在这种方式下，前端请求你的后端代理服务器获取 Token 或 Dashboard 内容，而无需直接与 Superset 服务器交互。这样可以避免在前端暴露 Token，提高安全性。
+
+# 25. 为什么在你后续的交流中，不再让我修改super_config文件了？之前不是说要开启嵌入吗？
+你提到需要认证，并希望生成带有 token 的嵌入链接，这些都可以通过配置 Superset 并获取认证 token 来实现。然而，嵌入 Dashboard 确实需要在 Superset 的配置文件中进行一些配置来启用嵌入功能。
+
+### 重新配置 Superset 以启用嵌入：
+
+要启用 Superset 的嵌入功能，你需要修改 Superset 的配置文件 `superset_config.py`。这里是一些关键配置：
+
+1. **启用 PUBLIC API 和 JWT 认证**：
+   - 确保 Superset 启用了 Public API 和 JWT 认证。
+
+2. **允许嵌入**：
+   - 设置允许嵌入的域名。
+
+3. **配置 JWT**：
+   - 配置 JWT Secret，用于生成和验证 JWT。
+
+### 示例配置：
+
+在 `superset_config.py` 文件中添加或修改以下内容：
+
+```python
+# Enable Public API
+ENABLE_PUBLIC_VIEWS = True
+
+# Allow embedding dashboards
+ENABLE_JWT_TOKEN = True
+
+# JWT configuration
+JWT_SECRET = 'your_jwt_secret_key'
+JWT_ALGORITHM = 'HS256'
+JWT_EXPIRATION = 86400  # Token expiration time in seconds
+
+# Allow embedding from specific domains
+SUPERSET_WEBSERVER_DOMAINS = ['your-domain.com']
+
+# Configure allowed origins for embedding
+TALISMAN_CONFIG = {
+    'content_security_policy': {
+        'default-src': ["'self'"],
+        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        'style-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        'img-src': ["'self'", "data:"],
+        'frame-src': ["your-domain.com"]
+    }
+}
+```
+
+### 获取和生成带有 token 的嵌入 URL：
+
+1. **获取 JWT Token**：
+   - 确保使用你的认证机制获取 JWT Token。
+
+2. **生成带有 token 的嵌入 URL**：
+   - 使用 Superset 的 URL 和获取的 JWT Token，生成带有 token 的嵌入 URL。
+
+### 示例代码：
+
+获取 JWT Token 和生成嵌入 URL：
+
+```python
+import jwt
+import datetime
+
+def generate_jwt_token(secret_key, username, expiration):
+    payload = {
+        'username': username,
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=expiration)
+    }
+    token = jwt.encode(payload, secret_key, algorithm='HS256')
+    return token
+
+# 配置
+secret_key = 'your_jwt_secret_key'
+username = 'your_username'
+expiration = 86400  # Token 有效期（秒）
+
+# 生成 Token
+token = generate_jwt_token(secret_key, username, expiration)
+print(f"Generated JWT Token: {token}")
+
+# 生成嵌入 URL
+dashboard_url = 'http://your-superset-url/superset/dashboard/1/'
+embed_url = f"{dashboard_url}?token={token}"
+print(f"Embed URL: {embed_url}")
+```
+
+### 嵌入 iframe：
+
+使用生成的嵌入 URL，将其嵌入到你的网页中的 iframe 标签内：
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Embedded Superset Dashboard</title>
+</head>
+<body>
+    <h1>My Embedded Superset Dashboard</h1>
+    <iframe
+        id="superset-dashboard"
+        src="http://your-superset-url/superset/dashboard/1/?token=your_generated_token"
+        width="100%"
+        height="800px"
+        frameborder="0"
+        allowfullscreen>
+    </iframe>
+</body>
+</html>
+```
+
+### 总结：
+
+1. **配置 Superset**：确保在 `superset_config.py` 中配置允许嵌入和启用 JWT。
+2. **生成 JWT Token**：根据你的配置生成 JWT Token。
+3. **生成带有 token 的嵌入 URL**：将 Permalink 和生成的 JWT Token 结合生成嵌入 URL。
+4. **嵌入 iframe**：将生成的嵌入 URL 嵌入到你的网页的 iframe 中。
+
+这样，你就可以安全地嵌入需要认证的 Superset Dashboard。
+
+# 26. 如果不开启嵌入式呢？
+如果不开启 Superset 的嵌入式功能，那么你将无法直接在外部系统中嵌入 Superset 的 Dashboard。没有开启嵌入式功能时，Superset 的 Dashboard 只能在 Superset 的界面中进行访问，无法在其他网站或应用中通过嵌入方式展示。
+
+开启嵌入式功能后，你可以生成带有 token 的嵌入链接，并将其嵌入到你的网页中的 iframe 标签内，以实现在外部系统中展示 Superset 的 Dashboard，并且可以在需要认证的情况下进行安全访问。
+
+# 27. 如果我直接在浏览器访问嵌入式url，携带了正确的token，会正常访问吗？
+如果你直接在浏览器中访问嵌入式 URL，并且该 URL 携带了正确的 token，通常情况下是可以正常访问的。
+
+在 Superset 中，开启了嵌入式功能并配置了正确的 JWT Token，当你使用正确的 token 访问嵌入式 URL 时，Superset 将会验证这个 token，并允许你访问嵌入的 Dashboard。
+
+确保以下几点：
+
+1. **嵌入式功能已启用**：在 Superset 的配置中开启了嵌入式功能。
+2. **JWT Token 正确配置**：生成的 token 必须符合 Superset 的 JWT 配置，包括密钥、过期时间等。
+3. **访问 URL**：在浏览器中输入完整的嵌入式 URL，包括 token，例如 `http://your-superset-url/superset/dashboard/1/?token=your_generated_token`。
+
+如果以上条件都符合，你应该可以在浏览器中正常访问嵌入式 Dashboard。
+
+# 28. 如果没有开启嵌入式访问呢？
+如果没有开启嵌入式访问，直接访问嵌入式 URL 是不会成功的。在没有开启嵌入式功能的情况下，Superset 不会验证或接受带有 token 的嵌入式 URL。
+
+通常情况下，当嵌入式功能未开启时，Superset 的 Dashboard 只能在 Superset 的界面中进行访问，而不能通过嵌入式 URL 在其他网站或应用中展示。
+
+# 29. embedded-sdk是什么东西，是superset的嵌入式sdk吗？
+Superset 的嵌入式 SDK 是指供开发者使用的一组工具和接口，用于在外部应用或网站中嵌入 Superset 的 Dashboard 和视图。这些 SDK 和工具使得在外部环境中展示 Superset 的内容变得更加容易和灵活。
+
+Superset 的嵌入式 SDK 主要包括以下几个方面的功能：
+
+1. **嵌入式 URL 生成器**：能够生成带有 token 的嵌入式 URL，以便在 iframe 中嵌入 Superset 的 Dashboard。
+2. **认证和权限管理**：提供认证和权限管理的接口，确保嵌入式 Dashboard 在外部系统中安全展示。
+3. **JavaScript API**：提供 JavaScript API，用于与嵌入式 Dashboard 进行交互，例如获取数据、过滤器控制等。
+4. **样式定制**：允许开发者定制嵌入式 Dashboard 的样式和外观，使其与外部系统保持一致性。
+
+通过使用 Superset 的嵌入式 SDK，开发者可以更加灵活地将 Superset 的强大功能集成到自己的应用或网站中，为用户提供更加丰富和定制化的数据分析和可视化体验。
