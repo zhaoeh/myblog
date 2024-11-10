@@ -353,14 +353,17 @@ registerPostProcessor方法：
 再看另外一个核心的对象 ClassPathBeanDefinitionScanner：
 ```java
     public ClassPathBeanDefinitionScanner(BeanDefinitionRegistry registry) {
+        // 注意第二个参数，为true，表示是否使用默认的类型过滤器
         this(registry, true);
     }
 
     public ClassPathBeanDefinitionScanner(BeanDefinitionRegistry registry, boolean useDefaultFilters) {
+        // useDefaultFilters 为true
         this(registry, useDefaultFilters, getOrCreateEnvironment(registry));
     }
 
     public ClassPathBeanDefinitionScanner(BeanDefinitionRegistry registry, boolean useDefaultFilters, Environment environment) {
+        // useDefaultFilters 为true
         this(registry, useDefaultFilters, environment, registry instanceof ResourceLoader ? (ResourceLoader)registry : null);
     }
 
@@ -374,6 +377,7 @@ registerPostProcessor方法：
         Assert.notNull(registry, "BeanDefinitionRegistry must not be null");
         this.registry = registry;
         if (useDefaultFilters) {
+            // 此时useDefaultFilters为true，因此执行registerDefaultFilters
             this.registerDefaultFilters();
         }
 
@@ -381,6 +385,42 @@ registerPostProcessor方法：
         this.setResourceLoader(resourceLoader);
     }
 ```
+
+该类继承 ClassPathScanningCandidateComponentProvider 类：
+```java
+public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateComponentProvider
+```
+ClassPathScanningCandidateComponentProvider，负责从classpath下真正提供扫描候选者组件的供应器。
+这个父类中有一个方法 registerDefaultFilters：
+```java
+    protected void registerDefaultFilters() {
+        // includeFilters属性是一个导入过滤器集合，它默认条件是一个基于注解的类型过滤器对象，基于 @Component 注解
+        // 啥意思呢，后面会看到，在通过该扫描器扫描classpath下所有候选者时，判断一个候选者是不是期望的组件，就是通过此处的类型过滤器进行判断的
+        // 其目的就是将classpath下，所有直接或者间接标注了 @Component 注解的候选者转换为BeanDefinition注册到spring容器中
+        // 这意味着，当从@ComponentScan的包路径下遍历扫描组件时，只有直接或者间接标注了@Component注解的类才有资格被转换为BeanDefinition
+        this.includeFilters.add(new AnnotationTypeFilter(Component.class));
+        ClassLoader cl = ClassPathScanningCandidateComponentProvider.class.getClassLoader();
+
+
+        // 默认还通过反射，尝试添加另外两个类型导入器，即如果classpath下存在 javax.annotation.ManagedBean，或者 javax.inject.Named 注解
+        // 则认为直接或者间接标注这两个注解的候选者也是期望的组件
+        try {
+            this.includeFilters.add(new AnnotationTypeFilter(ClassUtils.forName("javax.annotation.ManagedBean", cl), false));
+            this.logger.trace("JSR-250 'javax.annotation.ManagedBean' found and supported for component scanning");
+        } catch (ClassNotFoundException var4) {
+            ;
+        }
+
+        try {
+            this.includeFilters.add(new AnnotationTypeFilter(ClassUtils.forName("javax.inject.Named", cl), false));
+            this.logger.trace("JSR-330 'javax.inject.Named' annotation found and supported for component scanning");
+        } catch (ClassNotFoundException var3) {
+            ;
+        }
+
+    }
+```
+****includeFilters属性在后续扫描候选者的时候，会用到，用来判断一个候选者是不是spring期望的一个组件，即有没有直接或者间接的标注@Component注解****
 
 ClassPathBeanDefinitionScanner ，主要负责扫描classpath下的所有BeanDefinition，它有一个特别重要的方法：
 ```java
@@ -500,6 +540,7 @@ loader.load();
             ((GroovyBeanDefinitionReader)this.groovyReader).beans(loader.getBeans());
         }
 
+        // 在对source进行注册之前，存在一个条件 isEligible,用于判断一个class是否满足某些条件
         if (this.isEligible(source)) {
             
             // 构造器阶段初始化的 AnnotatedBeanDefinitionReader 对象，在这个用到了
@@ -508,6 +549,29 @@ loader.load();
 
     }
 ```
+
+源码如下：
+```java
+    private boolean isEligible(Class<?> type) {
+        return !type.isAnonymousClass() && !this.isGroovyClosure(type) && !this.hasNoConstructors(type);
+    }
+```
+***关于上述isEligible的详细分析***
+
+这个 `isEligible` 方法用于检查一个类是否符合特定的条件。通过以下三个条件来判断 `type` 是否适合某种处理或操作：
+
+1. **`!type.isAnonymousClass()`**:
+   - 这个条件检查 `type` 是否是一个匿名内部类。匿名内部类在 Java 中通常是没有名称的类。通过这个检查，`isEligible` 方法排除了所有匿名内部类。
+
+2. **`!this.isGroovyClosure(type)`**:
+   - 这个条件检查 `type` 是否是 Groovy 的闭包类。Groovy 闭包类是特定于 Groovy 的概念，Spring 在处理 Groovy 闭包时可能需要特别的处理或忽略它们。这段代码通过这个检查排除了 Groovy 闭包。
+
+3. **`!this.hasNoConstructors(type)`**:
+   - 这个条件检查 `type` 是否没有构造函数。如果一个类没有任何构造函数，它可能无法被正确实例化或使用。通过这个检查，`isEligible` 方法排除了那些没有构造函数的类。
+
+总结来说，这个 `isEligible` 方法的目的是确保某个类 `type` 符合特定的条件，从而决定是否可以进行某种操作或处理。具体来说，它排除了匿名内部类、Groovy 闭包类和没有构造函数的类。这个方法可能用于 Spring 框架中某些需要对类进行特定处理的场景。
+
+一般我们的类，都是满足的。   
 
 让我们再次深入spring的AnnotatedBeanDefinitionReader对象的register方法：
 ```java
@@ -595,6 +659,8 @@ loader.load();
    -  流程截止目前，只是启动类被注册到容器中了，它之所以被注册，肯定是要在后续流程中被使用，因此才会被优先注册。
    -  到这个阶段，spring容器中优先注册了一堆Processor，和当前启动类的BeanDefinition对象，都是为了在后续流程中使用。   
    
+***启动类被转换为BeanDefinition并注册到spring容器中，和启动类上有没有标注注解没有任何关系，只要run方法中传入了启动类的Class对象，它就会被注册（尽管源码中注册前在isEligible方法中有一些条件，但java中的类基本上都符合）***   
+   
 # 3. 启动类转为BeanDefinition被注册后，做了什么事？
 开始进入 this.refreshContext(context); 环节。   
 
@@ -640,13 +706,184 @@ org.springframework.context.annotation.internalConfigurationAnnotationProcessor
 this.refreshContext(context);
 ```
 ## 4.1 回顾下refresh()方法的整体流程
+refresh()方法的核心流程请参考上一篇文章。    
+
+## 4.2 关于beanDefinition的注册
+核心方法在下面：
+```java
+this.invokeBeanFactoryPostProcessors(beanFactory);
+```
+这个方法是在获取了容器中的所有beanFactory类型的bean实例后，然后遍历执行其中的钩子方法。      
+我们知道，通过springboot启动阶段，spring容器中已经注册了一个 ConfigurationClassPostProcessor 的beanDefinition。     
+而这个钩子，是 BeanDefinitionRegistryPostProcessor 类型，因此，它会在invokeBeanFactoryPostProcessors方法中被回调触发执行。   
 
 
 # 5. 在容器启动阶段回调执行处理器-ConfigurationClassPostProcessor
 请注意，这个处理器至关重要，负责容器中几乎所有BeanDefinition的注册。   
 尽管它的名称叫做“ConfigurationClassPostProcessor”，表示它用于处理“配置类”，但是并不意味着它只处理“@Configuration”标注的类。     
 言外之意，在spring中，哪些类才称得上是配置类？这只有通过源码才能窥探出来。   
+总之，ConfigurationClassPostProcessor 这个处理器就是用来解析并处理所有的配置类的。     
+要理解该章节的核心逻辑：首先要理解“什么才是spring认为的配置类？”，请直接参考第6小节。     
 
+## 5.1 入口方法
+```java
+    public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) {
+        int registryId = System.identityHashCode(registry);
+        if (this.registriesPostProcessed.contains(registryId)) {
+            throw new IllegalStateException("postProcessBeanDefinitionRegistry already called on this post-processor against " + registry);
+        } else if (this.factoriesPostProcessed.contains(registryId)) {
+            throw new IllegalStateException("postProcessBeanFactory already called on this post-processor against " + registry);
+        } else {
+            this.registriesPostProcessed.add(registryId);
+            this.processConfigBeanDefinitions(registry);
+        }
+    }
+```
+
+processConfigBeanDefinitions()方法如下：
+```java
+    public void processConfigBeanDefinitions(BeanDefinitionRegistry registry) {
+    
+        // 初始化一个“配置候选者”集合
+        List<BeanDefinitionHolder> configCandidates = new ArrayList();
+        
+        // 获取当前容器中的所有 beanDefinition name
+        // 此时容器中的beanDefinition，除了启动类的beanDefinition，剩下的都是一些内置的组件定义
+        String[] candidateNames = registry.getBeanDefinitionNames();
+        String[] var4 = candidateNames;
+        int var5 = candidateNames.length;
+
+        
+        // 注意这个for循环，遍历处理所有的beanDefinition
+        for(int var6 = 0; var6 < var5; ++var6) {
+            String beanName = var4[var6];
+            
+            // 获取容器中的目标beanDefinition对象
+            BeanDefinition beanDef = registry.getBeanDefinition(beanName);
+            
+            // 这里beanDefinition对象中有个标识属性，如果不为null，说明该配置类已经被处理过了
+            // 说白了，只有当某个配置类被处理过了之后，就会给这个属性设置一个值，取值为full或者lite，即是“完整配置类”，还是“部分配置类”
+            if (beanDef.getAttribute(ConfigurationClassUtils.CONFIGURATION_CLASS_ATTRIBUTE) != null) {
+                if (this.logger.isDebugEnabled()) {
+                    this.logger.debug("Bean definition has already been processed as a configuration class: " + beanDef);
+                }
+            } else if (ConfigurationClassUtils.checkConfigurationClassCandidate(beanDef, this.metadataReaderFactory)) {
+                // 否则，进行校验，判断目标beanDefinition是不是配置类候选者
+                // 如果是，则将其转换为一个BeanDefinitionHolder对象并添加到候选者名单
+                configCandidates.add(new BeanDefinitionHolder(beanDef, beanName));
+            }
+        }
+        // 总结上面那个for循环，就是将容器当中属于配置类的BeanDefinition作为了下面解析的候选者集合
+        // 如何判断是不是配置类候选者呢？ ConfigurationClassUtils.checkConfigurationClassCandidate(beanDef, this.metadataReaderFactory) 这个方法
+        // 参考第6小节，如果一个类直接或间接标注了 @Configuration、@Component、@Import、@ComponentScan、@ImportResource、或者定义了@Bean标注的方法，这些了都是“配置类”
+        // 正常启动容器的话，容器中的@Configuration配置类，就只有启动类一个
+        
+        
+        // beanDefinition候选者容器不为空，则进行整个流程
+        // 正常情况下，启动类就是候选者
+        // 这也是为什么springboot启动类上必须标注 @SpringBootApplication 注解的原因，因为这个注解集成了 @Configuration 注解，@ComponentScan 注解等
+        // 如果不标注，则容器中的bean就不会被注册
+        if (!configCandidates.isEmpty()) {
+            
+            // 如果有多个候选者，则根据order排序，这意味着，多个配置配候选者可以通过Order接口或者@Order注解进行顺序指定
+            configCandidates.sort((bd1, bd2) -> {
+                int i1 = ConfigurationClassUtils.getOrder(bd1.getBeanDefinition());
+                int i2 = ConfigurationClassUtils.getOrder(bd2.getBeanDefinition());
+                return Integer.compare(i1, i2);
+            });
+            
+            
+            SingletonBeanRegistry sbr = null;
+            // 这个if语句，核心就是获取容器中已经注册的BeanName生成器对象，然后设置给当前类
+            if (registry instanceof SingletonBeanRegistry) {
+                sbr = (SingletonBeanRegistry)registry;
+                if (!this.localBeanNameGeneratorSet) {
+                    BeanNameGenerator generator = (BeanNameGenerator)sbr.getSingleton("org.springframework.context.annotation.internalConfigurationBeanNameGenerator");
+                    if (generator != null) {
+                        this.componentScanBeanNameGenerator = generator;
+                        this.importBeanNameGenerator = generator;
+                    }
+                }
+            }
+
+            // 初始化 environment
+            if (this.environment == null) {
+                this.environment = new StandardEnvironment();
+            }
+
+
+            // 解析启动类的核心逻辑在这里
+            // 实例化一个 ConfigurationClassParser 对象，从命名可以看出，这个对象专门负责解析配置类
+            ConfigurationClassParser parser = new ConfigurationClassParser(this.metadataReaderFactory, this.problemReporter, this.environment, this.resourceLoader, this.componentScanBeanNameGenerator, registry);
+            
+            // 转存一道，将配置类候选者转存到一个新的容器中，这个新容器 candidates 变量将在下面的循环中动态变化
+            Set<BeanDefinitionHolder> candidates = new LinkedHashSet(configCandidates);
+            // 实例化一个已经被解析处理过的配置类集合
+            HashSet alreadyParsed = new HashSet(configCandidates.size());
+
+            do {
+                StartupStep processConfig = this.applicationStartup.start("spring.context.config-classes.parse");
+                
+                // 通过解析器解析配置类，这个方法一句话，很简单，底层做的事情很复杂
+                // 遍历当前所有配置类候选者
+                // 先判断当前配置类候选者是否应该被解析，即通过条件评估器 @Conditional ，判断在 PARSE_CONFIGURATION 阶段，是否应该解析当前配置类候选者
+                // 如果不符合条件，则直接跳过当前配置类的解析
+                // 
+                parser.parse(candidates);
+                parser.validate();
+                Set<ConfigurationClass> configClasses = new LinkedHashSet(parser.getConfigurationClasses());
+                configClasses.removeAll(alreadyParsed);
+                if (this.reader == null) {
+                    // 这个 ConfigurationClassBeanDefinitionReader 对象，负责将`@Bean`方法注册为BeanDefinition
+                    this.reader = new ConfigurationClassBeanDefinitionReader(registry, this.sourceExtractor, this.resourceLoader, this.environment, this.importBeanNameGenerator, parser.getImportRegistry());
+                }
+
+                // 在这里将
+                this.reader.loadBeanDefinitions(configClasses);
+                alreadyParsed.addAll(configClasses);
+                processConfig.tag("classCount", () -> {
+                    return String.valueOf(configClasses.size());
+                }).end();
+                candidates.clear();
+                if (registry.getBeanDefinitionCount() > candidateNames.length) {
+                    String[] newCandidateNames = registry.getBeanDefinitionNames();
+                    Set<String> oldCandidateNames = new HashSet(Arrays.asList(candidateNames));
+                    Set<String> alreadyParsedClasses = new HashSet();
+                    Iterator var13 = alreadyParsed.iterator();
+
+                    while(var13.hasNext()) {
+                        ConfigurationClass configurationClass = (ConfigurationClass)var13.next();
+                        alreadyParsedClasses.add(configurationClass.getMetadata().getClassName());
+                    }
+
+                    String[] var24 = newCandidateNames;
+                    int var25 = newCandidateNames.length;
+
+                    for(int var15 = 0; var15 < var25; ++var15) {
+                        String candidateName = var24[var15];
+                        if (!oldCandidateNames.contains(candidateName)) {
+                            BeanDefinition bd = registry.getBeanDefinition(candidateName);
+                            if (ConfigurationClassUtils.checkConfigurationClassCandidate(bd, this.metadataReaderFactory) && !alreadyParsedClasses.contains(bd.getBeanClassName())) {
+                                candidates.add(new BeanDefinitionHolder(bd, candidateName));
+                            }
+                        }
+                    }
+
+                    candidateNames = newCandidateNames;
+                }
+            } while(!candidates.isEmpty());
+
+            if (sbr != null && !sbr.containsSingleton(IMPORT_REGISTRY_BEAN_NAME)) {
+                sbr.registerSingleton(IMPORT_REGISTRY_BEAN_NAME, parser.getImportRegistry());
+            }
+
+            if (this.metadataReaderFactory instanceof CachingMetadataReaderFactory) {
+                ((CachingMetadataReaderFactory)this.metadataReaderFactory).clearCache();
+            }
+
+        }
+    }
+```
 
 # 6. ConfigurationClassUtils-处理配置类的工具
 
@@ -902,8 +1139,8 @@ public abstract class ConfigurationClassUtils {
 上述工具类主要逻辑如下：   
 -  判断一个类是否是配置类。
 -  配置类的标准是：
-  -  存在@Configuration注解的类，是“完整配置类”，直接返回true
-  -  不存在 @Configuration注解 ，但存在 @Component注解、@ComponentScan注解、@Import注解、@ImportResource注解 之一的，认为是“部分配置类”，直接返回true
+  -  直接或者间接存在@Configuration注解的类，是“完整配置类”，直接返回true
+  -  不存在 @Configuration注解 ，但直接或间接存在 @Component注解、@ComponentScan注解、@Import注解、@ImportResource注解 之一的，认为是“部分配置类”，直接返回true
   -  不存在上述注解的，但是有@Bean标注的工厂方法的，也认为是“部分配置类”，直接返回true
 - 其他场景统一返回false。
 

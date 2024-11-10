@@ -170,7 +170,7 @@ getOrder 方法的返回值越小的 BeanPostProcessor 对象，它所实现的�
     @Autowired
     private AmqpAdmin amqpAdmin;
 ```
-因为@Bean定义的 BeanDefinition 的类型实际山是 AmqpAdmin 类型，而不是 RabbitAdmin 类型。   
+因为@Bean定义的 BeanDefinition 的类型实际上是 AmqpAdmin 类型，而不是 RabbitAdmin 类型。   
 其他同理的操作，一定要注意。   
 
 # 5. BeanPostProcessor 源码
