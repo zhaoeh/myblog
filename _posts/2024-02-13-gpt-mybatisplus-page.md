@@ -1447,3 +1447,1106 @@ Bob    | supervisor | 2024-10-14 13:30:00
 - **灵活**：只需一次 `GROUP BY` 操作，确保 `updateBy` 为空时可返回默认值。
 
 这种方式适用于需要按分组筛选并保留非空最新值的场景。
+
+# 24. mybatisplus进行分页查询时，为什么sql最后我通过传递参数的方式进行order by操作，结果分页查询count()操作竟然把order by语句放在了最后，导致没法获取到参数
+在 MyBatis-Plus 进行分页查询时，如果在传递参数的过程中包含了 `ORDER BY` 子句，这可能会影响到分页查询中 `COUNT()` 操作的正确性。具体原因是 MyBatis-Plus 的分页插件在生成分页 SQL 和计数 SQL 时，处理方式有所不同。
+
+在分页查询时，MyBatis-Plus 会将查询 SQL 分为两部分：
+
+1. 获取记录列表的 SQL（包含分页、排序等）
+2. 获取总记录数的 SQL（只进行 `COUNT()` 操作）
+
+在处理分页查询时，MyBatis-Plus 会将 `ORDER BY` 子句保留在获取记录列表的 SQL 中，以确保分页结果的顺序正确。而在获取总记录数的 SQL 中，`ORDER BY` 子句通常是无关紧要的，因为 `COUNT()` 操作只需要计算总记录数，不涉及记录的排序。
+
+但是，如果 `ORDER BY` 子句中包含了传递的参数，MyBatis-Plus 可能会将其直接放置在 `COUNT()` SQL 中，这样会导致 SQL 解析错误，因为 `COUNT()` 操作并不需要 `ORDER BY` 子句。
+
+### 解决方法
+
+可以通过以下几种方法来解决这个问题：
+
+#### 1. 使用 MyBatis-Plus 自定义分页插件
+
+自定义分页插件可以更灵活地处理分页和排序逻辑，确保在生成 `COUNT()` SQL 时，排除不必要的 `ORDER BY` 子句。
+
+#### 2. 使用 `PageHelper` 插件
+
+`PageHelper` 是一个常用的分页插件，它在处理 `COUNT()` SQL 时会自动去掉 `ORDER BY` 子句。
+
+#### 3. 在业务代码中单独处理排序逻辑
+
+将排序逻辑从传递参数中移除，在获取分页结果后，在业务代码中手动进行排序。
+
+#### 4. 检查传递的参数，确保 `ORDER BY` 子句在 `COUNT()` SQL 中不会导致错误
+
+确保传递的 `ORDER BY` 参数在 `COUNT()` SQL 中不会引发解析错误。例如，确保 `ORDER BY` 参数不会依赖于某些特定的列或表达式。
+
+### 示例代码
+
+以下是一个使用 `PageHelper` 进行分页查询的示例：
+
+```java
+// 引入 PageHelper 插件
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
+import java.util.List;
+
+public PageInfo<MyEntity> getMyEntities(int pageNum, int pageSize, String orderBy) {
+    // 设置分页参数
+    PageHelper.startPage(pageNum, pageSize);
+
+    // 设置排序参数
+    PageHelper.orderBy(orderBy);
+
+    // 执行查询
+    List<MyEntity> list = myEntityMapper.selectMyEntities();
+
+    // 封装分页结果
+    return new PageInfo<>(list);
+}
+```
+
+### 总结
+
+MyBatis-Plus 在分页查询时会生成两种 SQL，`ORDER BY` 子句在 `COUNT()` SQL 中通常是无用的。为了避免 `ORDER BY` 子句导致的 SQL 解析错误，可以使用 `PageHelper` 插件，或者在业务代码中单独处理排序逻辑。这样可以确保分页查询和计数操作的正确性。
+
+# 25. 请详细解释自定义分页插件来处理这种情况
+自定义分页插件是一种在 MyBatis 中通过拦截器机制实现的功能，它可以拦截和修改 MyBatis 执行的 SQL 语句，从而实现自定义的分页逻辑。在 MyBatis-Plus 中，自定义分页插件的实现方式也是类似的。我们可以创建一个自定义的拦截器，专门处理分页查询时的 SQL 生成逻辑，确保 `COUNT()` 查询不会包含不必要的 `ORDER BY` 子句。
+
+### 步骤一：创建自定义分页拦截器
+
+首先，我们需要创建一个自定义的 MyBatis 拦截器，用于处理分页查询。
+
+```java
+import org.apache.ibatis.executor.Executor;
+import org.apache.ibatis.mapping.BoundSql;
+import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.mapping.SqlSource;
+import org.apache.ibatis.plugin.*;
+import org.apache.ibatis.session.ResultHandler;
+import org.apache.ibatis.session.RowBounds;
+import java.util.Properties;
+
+@Intercepts({
+    @Signature(type = Executor.class, method = "query", args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class})
+})
+public class CustomPaginationInterceptor implements Interceptor {
+
+    @Override
+    public Object intercept(Invocation invocation) throws Throwable {
+        // 获取当前执行的 MappedStatement
+        MappedStatement mappedStatement = (MappedStatement) invocation.getArgs()[0];
+        Object parameter = invocation.getArgs()[1];
+        RowBounds rowBounds = (RowBounds) invocation.getArgs()[2];
+
+        // 判断是否为分页查询
+        if (rowBounds != RowBounds.DEFAULT) {
+            // 获取原始 SQL
+            BoundSql boundSql = mappedStatement.getBoundSql(parameter);
+            String originalSql = boundSql.getSql();
+
+            // 去掉 ORDER BY 子句的正则表达式
+            String countSql = originalSql.replaceAll("(?i)ORDER\\s+BY[\\w\\W]+$", "");
+
+            // 创建新的 BoundSql
+            BoundSql newBoundSql = new BoundSql(mappedStatement.getConfiguration(), countSql, boundSql.getParameterMappings(), boundSql.getParameterObject());
+
+            // 创建新的 MappedStatement
+            MappedStatement newMappedStatement = newMappedStatement(mappedStatement, new BoundSqlSqlSource(newBoundSql));
+
+            // 设置新的 MappedStatement
+            invocation.getArgs()[0] = newMappedStatement;
+        }
+
+        // 执行查询
+        return invocation.proceed();
+    }
+
+    private MappedStatement newMappedStatement(MappedStatement ms, SqlSource newSqlSource) {
+        MappedStatement.Builder builder = new MappedStatement.Builder(ms.getConfiguration(), ms.getId(), newSqlSource, ms.getSqlCommandType());
+        builder.resource(ms.getResource());
+        builder.fetchSize(ms.getFetchSize());
+        builder.statementType(ms.getStatementType());
+        builder.keyGenerator(ms.getKeyGenerator());
+        builder.keyProperty(String.join(",", ms.getKeyProperties() == null ? new String[0] : ms.getKeyProperties()));
+        builder.timeout(ms.getTimeout());
+        builder.parameterMap(ms.getParameterMap());
+        builder.resultMaps(ms.getResultMaps());
+        builder.resultSetType(ms.getResultSetType());
+        builder.cache(ms.getCache());
+        builder.flushCacheRequired(ms.isFlushCacheRequired());
+        builder.useCache(ms.isUseCache());
+        builder.resultOrdered(ms.isResultOrdered());
+        return builder.build();
+    }
+
+    @Override
+    public Object plugin(Object target) {
+        return Plugin.wrap(target, this);
+    }
+
+    @Override
+    public void setProperties(Properties properties) {
+    }
+
+    private static class BoundSqlSqlSource implements SqlSource {
+        private final BoundSql boundSql;
+
+        BoundSqlSqlSource(BoundSql boundSql) {
+            this.boundSql = boundSql;
+        }
+
+        @Override
+        public BoundSql getBoundSql(Object parameterObject) {
+            return boundSql;
+        }
+    }
+}
+```
+
+### 步骤二：注册自定义分页拦截器
+
+接下来，我们需要在 MyBatis 配置中注册自定义分页拦截器。在 Spring Boot 项目中，可以通过配置类来实现。
+
+```java
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionFactoryBean;
+import org.mybatis.spring.boot.autoconfigure.MybatisAutoConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import javax.sql.DataSource;
+
+@Configuration
+public class MyBatisConfig extends MybatisAutoConfiguration {
+
+    @Bean
+    @Override
+    public SqlSessionFactory sqlSessionFactory(DataSource dataSource) throws Exception {
+        SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
+        factoryBean.setDataSource(dataSource);
+
+        // 注册自定义分页拦截器
+        factoryBean.setPlugins(new Interceptor[]{new CustomPaginationInterceptor()});
+
+        return factoryBean.getObject();
+    }
+}
+```
+
+### 步骤三：使用分页查询
+
+在使用分页查询时，就可以正常传递 `ORDER BY` 参数，而不会影响 `COUNT()` 查询。
+
+```java
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.example.mapper.MyEntityMapper;
+import com.example.entity.MyEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MyEntityService {
+
+    @Autowired
+    private MyEntityMapper myEntityMapper;
+
+    public IPage<MyEntity> getMyEntities(int pageNum, int pageSize, String orderBy) {
+        Page<MyEntity> page = new Page<>(pageNum, pageSize);
+        return myEntityMapper.selectPage(page, orderBy);
+    }
+}
+```
+
+### 总结
+
+通过自定义分页拦截器，可以灵活地控制分页查询时的 SQL 生成逻辑，确保 `COUNT()` 查询不会包含不必要的 `ORDER BY` 子句。这种方式不仅解决了分页查询中的问题，还可以根据需要进行更细致的 SQL 优化和处理。
+
+# 26. 还有没有其他方式处理呢？我觉得上述几种方式侵入性比较大，而且比较麻烦
+确实，自定义分页插件或者使用第三方分页插件（如 PageHelper）会引入额外的复杂性。如果你希望采用更简单且侵入性更小的方式，可以考虑以下两种方法：
+
+1. **通过 SQL 拼接去除 `COUNT` 查询中的 `ORDER BY` 子句**
+2. **利用 MyBatis-Plus 内置的分页插件并进行适当的配置**
+
+### 方法一：通过 SQL 拼接去除 `COUNT` 查询中的 `ORDER BY` 子句
+
+这种方式需要手动去除 `COUNT` 查询中的 `ORDER BY` 子句，但对现有代码的侵入性较小。你可以在构建分页查询的 `Wrapper` 对象时进行处理。
+
+以下是一个示例：
+
+```java
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MyEntityService {
+
+    @Autowired
+    private MyEntityMapper myEntityMapper;
+
+    public IPage<MyEntity> getMyEntities(int pageNum, int pageSize, String orderBy) {
+        Page<MyEntity> page = new Page<>(pageNum, pageSize);
+        QueryWrapper<MyEntity> queryWrapper = new QueryWrapper<>();
+
+        // 设置排序
+        if (orderBy != null && !orderBy.isEmpty()) {
+            queryWrapper.orderBy(true, true, orderBy);
+        }
+
+        return myEntityMapper.selectPage(page, queryWrapper);
+    }
+}
+```
+
+### 方法二：利用 MyBatis-Plus 内置的分页插件并进行适当的配置
+
+MyBatis-Plus 内置了分页插件，可以通过简单配置来优化 `COUNT` 查询。可以通过配置分页插件的优化选项来去除 `COUNT` 查询中的 `ORDER BY` 子句。
+
+在 `application.yml` 或 `application.properties` 文件中进行配置：
+
+```yaml
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      optimize-count-sql: true
+      # 是否删除无效的ORDER BY语句
+      remove-order-by-in-count: true
+```
+
+或者在代码中通过配置类进行配置：
+
+```java
+import com.baomidou.mybatisplus.extension.plugins.PaginationInterceptor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class MyBatisPlusConfig {
+
+    @Bean
+    public PaginationInterceptor paginationInterceptor() {
+        PaginationInterceptor paginationInterceptor = new PaginationInterceptor();
+        // 设置最大单页限制数量，默认 500 条，-1 不受限制
+        paginationInterceptor.setLimit(500);
+        // 设置优化 COUNT SQL
+        paginationInterceptor.setOptimizeJoin(true);
+        // 设置优化 COUNT SQL，去掉不必要的 ORDER BY
+        paginationInterceptor.setCountSqlParser(new JsqlParserCountOptimize(true));
+        return paginationInterceptor;
+    }
+}
+```
+
+通过这些配置，MyBatis-Plus 将自动优化 `COUNT` 查询，去除不必要的 `ORDER BY` 子句，减少对现有代码的侵入。
+
+### 总结
+
+相比自定义分页插件和第三方分页插件，通过 SQL 拼接手动去除 `ORDER BY` 子句以及配置 MyBatis-Plus 内置分页插件的优化选项，更加简单和直接。这些方法在不改变现有代码结构的情况下，能够解决 `COUNT` 查询中的 `ORDER BY` 子句问题，具有较低的侵入性和实现成本。
+
+# 27. 我通过将原本的sql，在外边又包裹了一层select * from （原来的sql），最后竟然不报错了
+将原来的 SQL 包裹在一个子查询中，然后再在外层进行分页和排序，这种方法也可以有效解决 `COUNT` 查询中的 `ORDER BY` 子句问题。具体来说，MyBatis-Plus 在处理分页和 `COUNT` 查询时，会生成不同的 SQL，通过这种包裹方式，可以避免直接在 `COUNT` 查询中包含 `ORDER BY` 子句。
+
+### 实现步骤
+
+1. **将原始 SQL 包裹在一个子查询中**
+2. **在外层查询中进行分页和排序**
+
+### 示例代码
+
+以下是一个具体的实现示例：
+
+#### 原始 SQL
+
+假设你的原始 SQL 是：
+
+```sql
+SELECT * FROM my_table WHERE some_column = #{someValue}
+```
+
+#### 包裹后的 SQL
+
+通过将其包裹在一个子查询中，并在外层进行分页和排序：
+
+```sql
+SELECT * FROM (
+    SELECT * FROM my_table WHERE some_column = #{someValue}
+) temp_table
+ORDER BY ${orderBy}
+```
+
+### 在 MyBatis-Plus 中实现
+
+假设我们使用 MyBatis-Plus 的 `QueryWrapper` 和 `Page` 进行分页查询，可以在 Mapper 接口中使用自定义 SQL 来实现这一点。
+
+#### Mapper 接口
+
+```java
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+public interface MyEntityMapper extends BaseMapper<MyEntity> {
+
+    @Select("SELECT * FROM (SELECT * FROM my_table WHERE some_column = #{someValue}) temp_table ORDER BY ${orderBy}")
+    IPage<MyEntity> selectPageCustom(Page<?> page, @Param("someValue") String someValue, @Param("orderBy") String orderBy);
+}
+```
+
+#### Service 实现
+
+```java
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MyEntityService {
+
+    @Autowired
+    private MyEntityMapper myEntityMapper;
+
+    public IPage<MyEntity> getMyEntities(int pageNum, int pageSize, String someValue, String orderBy) {
+        Page<MyEntity> page = new Page<>(pageNum, pageSize);
+        return myEntityMapper.selectPageCustom(page, someValue, orderBy);
+    }
+}
+```
+
+### 说明
+
+1. **Mapper 接口中的自定义 SQL**：使用 `@Select` 注解定义自定义 SQL，将原始查询包裹在子查询中，并在外层进行排序。
+2. **分页和排序参数**：将分页参数 `Page<?> page` 和查询参数 `someValue` 以及排序参数 `orderBy` 传递给自定义查询方法。
+
+### 总结
+
+通过将原始 SQL 包裹在一个子查询中，并在外层进行分页和排序，可以有效避免 `COUNT` 查询中的 `ORDER BY` 子句问题。这个方法简单且对现有代码的侵入性较小，是一种有效的解决方案。
+
+# 28. 我没找到setCountSqlParser这个方法
+你是对的，`setCountSqlParser` 方法在某些版本的 MyBatis-Plus 中可能不可用。我们可以通过其他方式优化 `COUNT` 查询。
+
+### 使用 MyBatis-Plus 内置的 PaginationInterceptor
+
+MyBatis-Plus 内置的 `PaginationInterceptor` 已经能够处理大部分分页和排序的问题。如果需要优化 `COUNT` 查询，可以在配置文件中设置相关参数。
+
+### 示例配置
+
+在 Spring Boot 项目中，可以在 `application.yml` 文件中配置分页插件。
+
+#### application.yml
+
+```yaml
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      optimize-count-sql: true
+      remove-order-by-in-count: true
+```
+
+或者在 `application.properties` 中配置：
+
+#### application.properties
+
+```properties
+mybatis-plus.configuration.log-impl=org.apache.ibatis.logging.stdout.StdOutImpl
+mybatis-plus.global-config.db-config.optimize-count-sql=true
+mybatis-plus.global-config.db-config.remove-order-by-in-count=true
+```
+
+### 使用 PaginationInterceptor
+
+如果这些配置项不符合需求，或者在某些版本中不生效，我们可以继续使用 `PaginationInterceptor`，并且手动进行一些处理。
+
+#### 创建配置类
+
+```java
+import com.baomidou.mybatisplus.extension.plugins.PaginationInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.pagination.optimize.JsqlParserCountOptimize;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class MyBatisPlusConfig {
+
+    @Bean
+    public PaginationInterceptor paginationInterceptor() {
+        PaginationInterceptor paginationInterceptor = new PaginationInterceptor();
+        // 设置最大单页限制数量，默认 500 条，-1 不受限制
+        paginationInterceptor.setLimit(500);
+        // 设置优化 COUNT SQL
+        paginationInterceptor.setCountSqlParser(new JsqlParserCountOptimize(true));
+        return paginationInterceptor;
+    }
+}
+```
+
+### 使用 SQL 包裹方式优化分页查询
+
+如果仍然遇到问题，可以通过 SQL 包裹的方式进行优化。
+
+#### Mapper 接口
+
+假设我们使用 MyBatis-Plus 的 `QueryWrapper` 和 `Page` 进行分页查询，可以在 Mapper 接口中使用自定义 SQL 来实现这一点。
+
+```java
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+public interface MyEntityMapper extends BaseMapper<MyEntity> {
+
+    @Select("SELECT * FROM (SELECT * FROM my_table WHERE some_column = #{someValue}) temp_table ORDER BY ${orderBy}")
+    IPage<MyEntity> selectPageCustom(Page<?> page, @Param("someValue") String someValue, @Param("orderBy") String orderBy);
+}
+```
+
+#### Service 实现
+
+```java
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MyEntityService {
+
+    @Autowired
+    private MyEntityMapper myEntityMapper;
+
+    public IPage<MyEntity> getMyEntities(int pageNum, int pageSize, String someValue, String orderBy) {
+        Page<MyEntity> page = new Page<>(pageNum, pageSize);
+        return myEntityMapper.selectPageCustom(page, someValue, orderBy);
+    }
+}
+```
+
+### 总结
+
+通过正确配置 MyBatis-Plus 的 `PaginationInterceptor` 或者使用 SQL 包裹的方式，可以有效优化分页查询中的 `COUNT` 查询，避免不必要的 `ORDER BY` 子句影响性能。这些方法能够在不对现有代码进行大幅修改的情况下，解决分页查询中的问题。
+
+# 29. 我的代码中使用的是PaginationInnerInterceptor ，根本就没有setCountSqlParser方法
+如果你使用的是 `PaginationInnerInterceptor`，确实没有 `setCountSqlParser` 方法。我们可以通过设置其相关配置来优化分页和 `COUNT` 查询。以下是如何配置 `PaginationInnerInterceptor` 来优化 `COUNT` 查询：
+
+### 配置 `PaginationInnerInterceptor`
+
+在 Spring Boot 项目中，你可以通过配置类来设置 `PaginationInnerInterceptor` 的属性。以下是一个示例配置：
+
+#### 创建配置类
+
+```java
+import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class MyBatisPlusConfig {
+
+    @Bean
+    public MybatisPlusInterceptor mybatisPlusInterceptor() {
+        MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+        PaginationInnerInterceptor paginationInterceptor = new PaginationInnerInterceptor();
+        // 设置单页最大条数限制
+        paginationInterceptor.setMaxLimit(500L);
+        // 启用 count 的 join 优化, 只针对部分 left join
+        paginationInterceptor.setOptimizeJoin(true);
+        interceptor.addInnerInterceptor(paginationInterceptor);
+        return interceptor;
+    }
+}
+```
+
+### 在配置文件中进行优化设置
+
+如果需要进一步优化 `COUNT` 查询，你可以在配置文件中设置 `optimize-count-sql` 和 `remove-order-by-in-count` 参数。
+
+#### application.yml
+
+```yaml
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      optimize-count-sql: true
+      remove-order-by-in-count: true
+```
+
+或者在 `application.properties` 中配置：
+
+```properties
+mybatis-plus.configuration.log-impl=org.apache.ibatis.logging.stdout.StdOutImpl
+mybatis-plus.global-config.db-config.optimize-count-sql=true
+mybatis-plus.global-config.db-config.remove-order-by-in-count=true
+```
+
+### 通过自定义 SQL 优化分页查询
+
+你还可以通过自定义 SQL 来包裹原始查询，从而优化分页和 `COUNT` 查询。
+
+#### Mapper 接口
+
+```java
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+public interface MyEntityMapper extends BaseMapper<MyEntity> {
+
+    @Select("SELECT * FROM (SELECT * FROM my_table WHERE some_column = #{someValue}) temp_table ORDER BY ${orderBy}")
+    IPage<MyEntity> selectPageCustom(Page<?> page, @Param("someValue") String someValue, @Param("orderBy") String orderBy);
+}
+```
+
+#### Service 实现
+
+```java
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MyEntityService {
+
+    @Autowired
+    private MyEntityMapper myEntityMapper;
+
+    public IPage<MyEntity> getMyEntities(int pageNum, int pageSize, String someValue, String orderBy) {
+        Page<MyEntity> page = new Page<>(pageNum, pageSize);
+        return myEntityMapper.selectPageCustom(page, someValue, orderBy);
+    }
+}
+```
+
+### 总结
+
+通过配置 `PaginationInnerInterceptor` 和在配置文件中设置 `optimize-count-sql` 和 `remove-order-by-in-count` 参数，可以有效优化分页和 `COUNT` 查询。如果仍然遇到问题，可以通过自定义 SQL 包裹查询，从而避免不必要的 `ORDER BY` 子句影响性能。这样可以在不对现有代码进行大幅修改的情况下，解决分页查询中的问题。
+
+# 30. 我的是双数据源，没法直接在配置文件中指定，只能通过配置类单独进行配置
+对于双数据源的场景，你可以在配置类中为每个数据源单独配置分页插件。下面是一个示例，演示了如何为两个数据源分别配置 `PaginationInnerInterceptor`。
+
+### 配置类
+
+首先，假设你已经配置好了两个数据源，比如 `dataSource1` 和 `dataSource2`。你需要为每个数据源分别配置 `MybatisPlusInterceptor`，并添加 `PaginationInnerInterceptor`。
+
+#### 示例配置类
+
+```java
+import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionFactoryBean;
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+
+import javax.sql.DataSource;
+
+@Configuration
+public class MyBatisPlusConfig {
+
+    @Primary
+    @Bean("sqlSessionFactory1")
+    public SqlSessionFactory sqlSessionFactory1(@Qualifier("dataSource1") DataSource dataSource) throws Exception {
+        SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
+        factoryBean.setDataSource(dataSource);
+        factoryBean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath*:mapper/db1/*.xml"));
+        factoryBean.setPlugins(mybatisPlusInterceptor());
+        return factoryBean.getObject();
+    }
+
+    @Bean("sqlSessionFactory2")
+    public SqlSessionFactory sqlSessionFactory2(@Qualifier("dataSource2") DataSource dataSource) throws Exception {
+        SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
+        factoryBean.setDataSource(dataSource);
+        factoryBean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath*:mapper/db2/*.xml"));
+        factoryBean.setPlugins(mybatisPlusInterceptor());
+        return factoryBean.getObject();
+    }
+
+    @Bean
+    public MybatisPlusInterceptor mybatisPlusInterceptor() {
+        MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+        PaginationInnerInterceptor paginationInterceptor = new PaginationInnerInterceptor();
+        paginationInterceptor.setMaxLimit(500L);
+        paginationInterceptor.setOptimizeJoin(true);
+        interceptor.addInnerInterceptor(paginationInterceptor);
+        return interceptor;
+    }
+
+    @Primary
+    @Bean(name = "transactionManager1")
+    public DataSourceTransactionManager transactionManager1(@Qualifier("dataSource1") DataSource dataSource) {
+        return new DataSourceTransactionManager(dataSource);
+    }
+
+    @Bean(name = "transactionManager2")
+    public DataSourceTransactionManager transactionManager2(@Qualifier("dataSource2") DataSource dataSource) {
+        return new DataSourceTransactionManager(dataSource);
+    }
+}
+```
+
+### 解释
+
+1. **双数据源配置**：假设你已经在其他配置文件中定义了两个数据源 `dataSource1` 和 `dataSource2`。
+2. **SqlSessionFactory 配置**：为每个数据源分别配置 `SqlSessionFactory`，并在其中添加 `MybatisPlusInterceptor`。
+3. **分页插件配置**：通过 `mybatisPlusInterceptor()` 方法创建一个 `MybatisPlusInterceptor` 实例，并添加 `PaginationInnerInterceptor`。
+4. **事务管理器**：为每个数据源分别配置事务管理器。
+
+### Mapper 配置
+
+在你的 Spring Boot 应用中，你还需要为每个数据源指定不同的 `Mapper` 包扫描路径：
+
+```java
+@Configuration
+@MapperScan(basePackages = "com.example.mapper.db1", sqlSessionFactoryRef = "sqlSessionFactory1")
+public class MyBatisConfig1 {
+}
+
+@Configuration
+@MapperScan
+```
+
+# 31. 我是说，我是双数据源，需要在配置中指定当分页时去除order by语句
+明白了，如果你有双数据源，并且需要在分页时去除 `ORDER BY` 语句，那么可以通过配置 `PaginationInnerInterceptor` 来分别为每个数据源进行配置。虽然 `PaginationInnerInterceptor` 本身没有直接的方法去除 `ORDER BY` 语句，但你可以通过实现自定义插件或修改拦截器来实现这个需求。
+
+### 自定义分页拦截器
+
+可以创建一个自定义的 `PaginationInnerInterceptor` 来移除 `COUNT` 查询中的 `ORDER BY` 语句。
+
+#### 自定义拦截器
+
+首先，创建一个自定义的拦截器来去除 `ORDER BY`：
+
+```java
+import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import net.sf.jsqlparser.statement.Statement;
+import net.sf.jsqlparser.statement.select.Select;
+import net.sf.jsqlparser.util.TablesNamesFinder;
+import net.sf.jsqlparser.util.cnfexpression.MultiAndExpression;
+import org.apache.ibatis.executor.Executor;
+import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.mapping.SqlSource;
+import org.apache.ibatis.plugin.*;
+
+import java.util.List;
+import java.util.Properties;
+
+@Intercepts({@Signature(type = Executor.class, method = "query", args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class})})
+public class CustomPaginationInterceptor extends PaginationInnerInterceptor {
+
+    @Override
+    public Object intercept(Invocation invocation) throws Throwable {
+        MappedStatement mappedStatement = (MappedStatement) invocation.getArgs()[0];
+        if (mappedStatement.getId().contains("Count")) {
+            String originalSql = mappedStatement.getBoundSql(invocation.getArgs()[1]).getSql();
+            String modifiedSql = removeOrderByClause(originalSql);
+            SqlSource sqlSource = new BoundSqlSqlSource(mappedStatement.getBoundSql(invocation.getArgs()[1]));
+            MappedStatement newMappedStatement = copyFromMappedStatement(mappedStatement, sqlSource);
+            invocation.getArgs()[0] = newMappedStatement;
+        }
+        return super.intercept(invocation);
+    }
+
+    private String removeOrderByClause(String sql) throws Exception {
+        Statement statement = CCJSqlParserUtil.parse(sql);
+        if (statement instanceof Select) {
+            Select select = (Select) statement;
+            select.getOrderByElements().clear();
+        }
+        return statement.toString();
+    }
+
+    private MappedStatement copyFromMappedStatement(MappedStatement ms, SqlSource newSqlSource) {
+        MappedStatement.Builder builder = new MappedStatement.Builder(ms.getConfiguration(), ms.getId(), newSqlSource, ms.getSqlCommandType());
+        builder.resource(ms.getResource());
+        builder.fetchSize(ms.getFetchSize());
+        builder.statementType(ms.getStatementType());
+        builder.keyGenerator(ms.getKeyGenerator());
+        if (ms.getKeyProperties() != null && ms.getKeyProperties().length > 0) {
+            StringBuilder keyProperties = new StringBuilder();
+            for (String keyProperty : ms.getKeyProperties()) {
+                keyProperties.append(keyProperty).append(",");
+            }
+            keyProperties.delete(keyProperties.length() - 1, keyProperties.length());
+            builder.keyProperty(keyProperties.toString());
+        }
+        builder.timeout(ms.getTimeout());
+        builder.parameterMap(ms.getParameterMap());
+        builder.resultMaps(ms.getResultMaps());
+        builder.resultSetType(ms.getResultSetType());
+        builder.cache(ms.getCache());
+        builder.flushCacheRequired(ms.isFlushCacheRequired());
+        builder.useCache(ms.isUseCache());
+        return builder.build();
+    }
+
+    private static class BoundSqlSqlSource implements SqlSource {
+        private final BoundSql boundSql;
+
+        public BoundSqlSqlSource(BoundSql boundSql) {
+            this.boundSql = boundSql;
+        }
+
+        @Override
+        public BoundSql getBoundSql(Object parameterObject) {
+            return boundSql;
+        }
+    }
+}
+```
+
+#### 配置类
+
+然后，在配置类中为每个数据源分别配置 `CustomPaginationInterceptor`：
+
+```java
+import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionFactoryBean;
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+
+import javax.sql.DataSource;
+
+@Configuration
+public class MyBatisPlusConfig {
+
+    @Primary
+    @Bean("sqlSessionFactory1")
+    public SqlSessionFactory sqlSessionFactory1(@Qualifier("dataSource1") DataSource dataSource) throws Exception {
+        SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
+        factoryBean.setDataSource(dataSource);
+        factoryBean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath*:mapper/db1/*.xml"));
+        factoryBean.setPlugins(mybatisPlusInterceptor());
+        return factoryBean.getObject();
+    }
+
+    @Bean("sqlSessionFactory2")
+    public SqlSessionFactory sqlSessionFactory2(@Qualifier("dataSource2") DataSource dataSource) throws Exception {
+        SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
+        factoryBean.setDataSource(dataSource);
+        factoryBean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath*:mapper/db2/*.xml"));
+        factoryBean.setPlugins(mybatisPlusInterceptor());
+        return factoryBean.getObject();
+    }
+
+    @Bean
+    public MybatisPlusInterceptor mybatisPlusInterceptor() {
+        MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+        interceptor.addInnerInterceptor(new CustomPaginationInterceptor());
+        return interceptor;
+    }
+
+    @Primary
+    @Bean(name = "transactionManager1")
+    public DataSourceTransactionManager transactionManager1(@Qualifier("dataSource1") DataSource dataSource) {
+        return new DataSourceTransactionManager(dataSource);
+    }
+
+    @Bean(name = "transactionManager2")
+    public DataSourceTransactionManager transactionManager2(@Qualifier("dataSource2") DataSource dataSource) {
+        return new DataSourceTransactionManager(dataSource);
+    }
+}
+```
+
+### 解释
+
+1. **自定义拦截器 `CustomPaginationInterceptor`**：继承 `PaginationInnerInterceptor` 并重写 `intercept` 方法，在 `COUNT` 查询中移除 `ORDER BY` 子句。
+2. **配置类**：为每个数据源配置 `SqlSessionFactory`，并添加自定义的分页拦截器。
+
+通过这种方式，你可以为双数据源分别配置分页拦截器，并在 `COUNT` 查询中去除 `ORDER BY` 子句，从而优化分页查询。
+
+# 32. mybatis通过$获取参数，如何和其他字符串进行拼接呢？
+在 MyBatis 中，使用 `#{}` 和 `${}` 来传递参数和进行字符串拼接是有区别的：
+
+- `#{}` 用于参数化查询，MyBatis 会自动处理 SQL 注入和其他问题。
+- `${}` 用于直接替换 SQL 字符串中的参数，它不会进行参数化，所以在拼接 SQL 时要小心 SQL 注入风险。
+
+如果你需要在 MyBatis 中将动态参数与其他字符串进行拼接，可以使用 `${}` 来拼接 SQL 语句，但要确保输入参数是安全的。
+
+### 示例
+
+假设你有一个查询需要动态拼接 SQL 语句，并且包含参数：
+
+#### 1. 直接拼接 SQL 语句
+
+```xml
+<select id="findByDynamicSql" parameterType="map" resultType="YourEntity">
+    SELECT *
+    FROM your_table
+    WHERE column_name = #{param1}
+      AND ${dynamicColumn} = #{param2}
+</select>
+```
+
+在这个例子中，`${dynamicColumn}` 会直接替换为传入的 `dynamicColumn` 参数的值，`#{param1}` 和 `#{param2}` 依然会进行参数化。
+
+#### 2. 使用 `<choose>` 标签动态拼接
+
+有时，你可能需要更复杂的 SQL 拼接逻辑，比如在 `WHERE` 子句中动态添加条件。可以使用 `<choose>`, `<when>`, 和 `<otherwise>` 标签来实现：
+
+```xml
+<select id="findByDynamicSql" parameterType="map" resultType="YourEntity">
+    SELECT *
+    FROM your_table
+    WHERE 1=1
+      <if test="param1 != null">
+        AND column1 = #{param1}
+      </if>
+      <choose>
+        <when test="dynamicColumn == 'column2'">
+          AND column2 = #{param2}
+        </when>
+        <otherwise>
+          AND column3 = #{param3}
+        </otherwise>
+      </choose>
+</select>
+```
+
+### 拼接字符串和动态 SQL 的示例
+
+如果你想在 SQL 中使用 `#{}` 和 `${}` 结合的情况，确保用 `${}` 拼接的部分是安全的，避免 SQL 注入风险。
+
+```xml
+<select id="findByDynamicSql" parameterType="map" resultType="YourEntity">
+    SELECT *
+    FROM your_table
+    WHERE 1=1
+      <if test="param1 != null">
+        AND column1 = #{param1}
+      </if>
+      <if test="dynamicColumn != null">
+        AND ${dynamicColumn} = #{param2}
+      </if>
+</select>
+```
+
+在这个例子中，`${dynamicColumn}` 是动态列名或字段名，而 `#{param2}` 是动态值。
+
+### 注意事项
+
+1. **SQL 注入风险**：`$` 符号替换会直接插入 SQL 字符串中，不会进行参数化，所以避免直接拼接用户输入的数据，尤其是在 `$` 前缀的地方，最好使用白名单或其他验证措施来确保安全。
+2. **避免拼接 SQL**：尽量使用 `#{}` 和 MyBatis 提供的 XML 标签来构建动态 SQL，而不是直接拼接 SQL 字符串。
+
+通过这些方法，你可以在 MyBatis 中实现安全且灵活的 SQL 拼接。
+
+# 33. 我是说，${}获取出来的值，如何和其他字符串在mapper xml中进行拼接？比如想给${}传入的列名加上表别名前缀 t.
+了解了，你希望在 MyBatis 的 Mapper XML 中使用 `${}` 拼接动态 SQL 片段，并且在拼接时将动态的列名加上表别名前缀。为了实现这个需求，你可以使用 `${}` 来进行动态拼接，但需要注意安全性。
+
+### 示例
+
+假设你有一个表 `your_table`，你想动态地将列名 `dynamicColumn` 加上表别名前缀 `t.`，并且将这个拼接后的列名用于查询条件中。你可以这样实现：
+
+```xml
+<select id="findByDynamicColumn" parameterType="map" resultType="YourEntity">
+    SELECT *
+    FROM your_table t
+    WHERE t.${dynamicColumn} = #{paramValue}
+</select>
+```
+
+### 解释
+
+- `${dynamicColumn}`：动态替换的列名。MyBatis 会将 `dynamicColumn` 的值直接插入到 SQL 字符串中。在这个例子中，假设 `dynamicColumn` 的值是 `column_name`，则 SQL 会变成 `t.column_name`。
+- `#{paramValue}`：安全的参数化查询，用于防止 SQL 注入。这个参数会被 MyBatis 自动处理。
+
+### 使用示例
+
+假设你在调用这个查询时传递的参数如下：
+
+```java
+Map<String, Object> params = new HashMap<>();
+params.put("dynamicColumn", "column_name");
+params.put("paramValue", "someValue");
+
+List<YourEntity> results = yourMapper.findByDynamicColumn(params);
+```
+
+### 注意事项
+
+1. **SQL 注入风险**：
+   - 使用 `${}` 拼接动态 SQL 时，特别是动态列名或表名，必须确保这些动态部分是安全的。可以通过校验和白名单机制来避免 SQL 注入风险。
+   - 对于值（`#{paramValue}`）的使用，依然可以通过 `#{}` 进行参数化，避免 SQL 注入。
+
+2. **验证动态列名**：
+   - 在实际应用中，动态列名应该来源于受信任的源，并且避免直接拼接用户输入的内容。可以考虑对动态列名进行白名单检查，以确保只有合法的列名能够被使用。
+
+通过这种方式，你可以在 MyBatis 的 XML 映射文件中动态拼接 SQL 语句，同时为动态列名添加表别名前缀。
+
+# 34. 对于动态列名，使用#{}如何实现呢？
+在 MyBatis 中，`#{}` 主要用于参数化查询的值，它不会直接处理 SQL 语句中的列名或表名。因此，对于动态列名或表名的处理，通常使用 `${}` 来实现，但这也带来了 SQL 注入的风险。`#{}` 的功能限于防止 SQL 注入的参数化值，不能直接用于动态列名。
+
+如果你确实需要动态列名并希望使用更安全的方式，你可以采取以下策略：
+
+### 1. 使用 `SQL` 拼接的安全实践
+
+即使 `#{}` 不能用于列名，你仍然可以将列名动态处理得更安全。以下是如何将动态列名与 `${}` 安全地结合使用：
+
+#### 示例
+
+```xml
+<select id="findByDynamicColumn" parameterType="map" resultType="YourEntity">
+    SELECT *
+    FROM your_table t
+    WHERE t.${dynamicColumn} = #{paramValue}
+</select>
+```
+
+在这个示例中：
+
+- `${dynamicColumn}` 会直接插入到 SQL 字符串中，因此你必须确保它的来源是受信任的。你可以通过在 Java 代码中进行列名的验证来避免 SQL 注入。
+- `#{paramValue}` 进行参数化处理，安全地处理动态值。
+
+### 2. 使用 Java 代码中进行验证和映射
+
+为了确保 SQL 注入风险最小化，建议在 Java 代码中进行动态列名的验证：
+
+#### 示例
+
+```java
+public class YourService {
+    
+    private static final Set<String> VALID_COLUMNS = Set.of("column1", "column2", "column3");
+
+    @Autowired
+    private YourMapper yourMapper;
+
+    public List<YourEntity> findByDynamicColumn(String dynamicColumn, Object paramValue) {
+        if (!VALID_COLUMNS.contains(dynamicColumn)) {
+            throw new IllegalArgumentException("Invalid column name");
+        }
+        Map<String, Object> params = new HashMap<>();
+        params.put("dynamicColumn", dynamicColumn);
+        params.put("paramValue", paramValue);
+        return yourMapper.findByDynamicColumn(params);
+    }
+}
+```
+
+### 3. 使用 MyBatis `@SelectProvider` 注解
+
+另一种方法是使用 `@SelectProvider` 注解动态生成 SQL，允许在 Java 代码中创建 SQL 字符串。这样，你可以在 Java 代码中直接控制 SQL 的拼接过程，确保安全性。
+
+#### 示例
+
+```java
+import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.jdbc.SQL;
+
+public interface YourMapper {
+    
+    @SelectProvider(type = SqlProvider.class, method = "findByDynamicColumn")
+    List<YourEntity> findByDynamicColumn(@Param("dynamicColumn") String dynamicColumn, @Param("paramValue") Object paramValue);
+
+    class SqlProvider {
+        public String findByDynamicColumn(final String dynamicColumn, final Object paramValue) {
+            if (!VALID_COLUMNS.contains(dynamicColumn)) {
+                throw new IllegalArgumentException("Invalid column name");
+            }
+            return new SQL() {{
+                SELECT("*");
+                FROM("your_table t");
+                WHERE("t." + dynamicColumn + " = #{paramValue}");
+            }}.toString();
+        }
+    }
+}
+```
+
+### 总结
+
+- `#{}` 不能直接用于动态列名，只能用于安全地插入查询值。
+- 使用 `${}` 处理动态列名时要确保安全，避免 SQL 注入。
+- 在 Java 代码中对动态列名进行验证，并使用 `@SelectProvider` 动态生成 SQL 是一种安全的实践。
+
+通过这些方法，你可以在 MyBatis 中安全地处理动态列名和表名，同时防止 SQL 注入。
+
+# 35. sql中的order by是跟表中字段？还是select子句后的字段别名？
+在 SQL 中，`ORDER BY` 子句可以跟表中的字段名，也可以跟 `SELECT` 子句中的字段别名。具体如何处理取决于 SQL 的解析和数据库的实现，但一般情况下，有以下几种处理方式：
+
+### 1. 使用表中的字段名
+
+通常，`ORDER BY` 可以直接使用表中的字段名。这是最常见的用法：
+
+```sql
+SELECT column1, column2
+FROM your_table
+ORDER BY column1;
+```
+
+在这个例子中，`ORDER BY column1` 是基于表中的实际字段 `column1` 进行排序的。
+
+### 2. 使用 `SELECT` 子句中的字段别名
+
+在大多数数据库系统中，你也可以在 `ORDER BY` 子句中使用 `SELECT` 子句中的字段别名：
+
+```sql
+SELECT column1 AS col1, column2 AS col2
+FROM your_table
+ORDER BY col1;
+```
+
+在这个例子中，`ORDER BY col1` 是基于 `SELECT` 子句中定义的别名 `col1` 进行排序的。这种方式通常是数据库系统支持的，但具体的支持情况可以有所不同。
+
+### 注意事项
+
+1. **数据库兼容性**：
+   - 虽然大多数现代关系数据库系统（如 MySQL、PostgreSQL、SQL Server、Oracle）都支持在 `ORDER BY` 中使用字段别名，但某些数据库可能对这种用法有特定的限制或行为。最好检查你所使用的数据库文档来确认支持情况。
+
+2. **使用别名的限制**：
+   - 在某些情况下，使用字段别名可能会受到限制，尤其是在复杂的查询中（例如，嵌套查询或视图）。在这些情况下，直接使用表中的字段名更为可靠。
+
+3. **性能考虑**：
+   - 使用字段别名可能会对查询的可读性产生影响，但通常不会对性能产生显著影响。性能更多地取决于索引和查询优化。
+
+### 示例
+
+#### 1. 使用表字段名：
+
+```sql
+SELECT employee_name, salary
+FROM employees
+ORDER BY salary;
+```
+
+#### 2. 使用字段别名：
+
+```sql
+SELECT employee_name AS name, salary AS pay
+FROM employees
+ORDER BY pay;
+```
+
+在这个示例中，`ORDER BY pay` 使用了 `SELECT` 子句中的别名 `pay` 来排序结果。
+
+总之，`ORDER BY` 子句既可以使用表中的字段名，也可以使用 `SELECT` 子句中的字段别名。在实际使用时，确保了解你的数据库系统对这种用法的支持情况，并在必要时进行验证。
