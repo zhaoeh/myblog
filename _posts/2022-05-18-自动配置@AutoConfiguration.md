@@ -2,7 +2,7 @@
 layout:     post
 title:      springboot自动配置原理
 subtitle:   springboot自动配置原理源码分析
-categories: [springboot]
+categories: [springboot专题]
 mermaid: false
 sequence: false
 flow: false

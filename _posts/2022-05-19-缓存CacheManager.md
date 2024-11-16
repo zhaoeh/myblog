@@ -2,7 +2,7 @@
 layout:     post
 title:      自动配置最佳实践-CacheManager
 subtitle:   spring缓存管理器详解
-categories: [springboot]
+categories: [springboot专题]
 mermaid: false
 sequence: false
 flow: false
