@@ -25,7 +25,7 @@ mindmap2: false
 ***关键在于如何理解getBean()方法***   
 请注意，spring容器启动的任何阶段，只要通过beanFactory调用了getBean()方法，它实际上就是在触发spring去管理目标bean(实例化目标bean以及组装依赖关系)。    
 它的逻辑如下：    
--  检查bean的scope，优先去scope对应的缓存容器=中查询，如果有就返回
+-  检查bean的scope，优先去scope对应的缓存容器中查询，如果有就返回
 -  如果没有，则直接调用对应scope生成bean的逻辑，然后将其缓存起来，并返回
 因此整个方法，实际上只要被调用了，就是在触发spring容器负责实例化目标bean了！！！
 
