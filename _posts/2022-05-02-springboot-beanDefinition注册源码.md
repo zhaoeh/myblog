@@ -12,7 +12,7 @@ mindmap2: false
 ---
 
 # 1. springboot启动流程简单回顾
-***springboot的启动阶段中，关于bean的管理，主要分为两个大阶段：***
+***springboot的启动阶段中，关于bean的管理，主要分为两个大阶段：***   
 1.将指定范围内的class转换为BeanDefinition，并注册到spring容器。
 -  扫描得到一批class，将其转换为对应的BeanDefinition对象，然后注册到spring容器中。
 
