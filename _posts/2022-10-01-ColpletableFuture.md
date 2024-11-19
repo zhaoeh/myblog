@@ -516,3 +516,15 @@ private static void thenCompose() throws Exception {
         System.out.println("thenCompose result : "+f.get());
     }
 ```
+
+# 3. CompletableFuture如何保证线程安全？   
+首先明确一点，不论是使用传统的线程Thread、还是线程池thread pool、还是更优雅的Future、CompletableFuture等工具，其底层只是对传统的thread进行了管理。   
+换言之，线程池是负责管理线程对象的容器，而Future和CompletableFuture在线程池的基础之上，提供了更优雅的控制异步任务、编排异步任务的能力。   
+因此，无论千变万化，线程对象本身才是最核心的东西。   
+
+CompletableFuture本身并不能保证线程安全，它只是将异步任务负责编排，按照约定的规则提交给线程池而已。   
+至于这些异步任务提交到线程池中，被某些线程调度，在调度的过程中是否存在线程安全的问题，主要取决于是否存在多个线程同时修改同一个共享变量的场景。   
+如果提交的任务中存在可能被多个线程对象共享修改的情况，那么CompletableFuture就不是线程安全的。    
+如果不存在这种场景，那么CompletableFuture对于任务的操作就是线程安全的。    
+
+因此，得出结果：不论是使用线程、线程池、Future、还是CompletableFuture去操作某些对象，是否存在线程安全问题，取决于这些对象本身是否存在共享修改操作。   
