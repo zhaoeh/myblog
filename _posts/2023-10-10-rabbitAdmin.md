@@ -2,7 +2,7 @@
 layout:     post
 title:      rabbitAdmin主要干啥
 subtitle:   从源码层面分析RabbitAdmin
-categories: [rabbitMQ]
+categories: [MQ系列]
 mermaid: false
 sequence: false
 flow: false

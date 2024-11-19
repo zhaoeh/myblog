@@ -2,7 +2,7 @@
 layout:     post
 title:      java原生客户端操作rabbitMQ
 subtitle:   通过java原生客户端代码去操作rabbitMQ
-categories: [rabbitMQ]
+categories: [MQ系列]
 mermaid: false
 sequence: false
 flow: false

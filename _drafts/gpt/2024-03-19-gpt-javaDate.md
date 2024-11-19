@@ -534,3 +534,125 @@ BigInteger probablePrime = BigInteger.probablePrime(64, new Random());
 ```
 
 这些方法基本涵盖了 `BigInteger` 的所有实例化方式。根据需要选择合适的方式来创建 `BigInteger` 实例。
+
+
+#10. 字符串 yyyy-MM-dd 格式，如何快速转换为 yyyy-MM-dd HH:mm:ss？
+你可以通过在Java中使用 `SimpleDateFormat` 或 `DateTimeFormatter` 来将 `yyyy-MM-dd` 格式的字符串转换为 `yyyy-MM-dd HH:mm:ss` 格式的字符串。下面是两种常见的方式：
+
+### 使用 `SimpleDateFormat` （Java 8 之前版本）
+```java
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+public class DateFormatExample {
+    public static void main(String[] args) throws ParseException {
+        String inputDate = "2024-10-09"; // yyyy-MM-dd 格式
+        SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd");
+        SimpleDateFormat outputFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+        // 将字符串转换为 Date 对象
+        Date date = inputFormat.parse(inputDate);
+        // 将 Date 对象格式化为新的字符串
+        String outputDate = outputFormat.format(date);
+
+        System.out.println(outputDate); // 输出：2024-10-09 00:00:00
+    }
+}
+```
+
+### 使用 `DateTimeFormatter` （Java 8 及以后版本）
+```java
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+public class DateFormatExample {
+    public static void main(String[] args) {
+        String inputDate = "2024-10-09"; // yyyy-MM-dd 格式
+
+        // 解析输入的日期字符串
+        LocalDate date = LocalDate.parse(inputDate, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+        // 将 LocalDate 转换为 LocalDateTime，设置时间部分为 00:00:00
+        LocalDateTime dateTime = date.atStartOfDay();
+
+        // 格式化为 yyyy-MM-dd HH:mm:ss 格式
+        String outputDate = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+        System.out.println(outputDate); // 输出：2024-10-09 00:00:00
+    }
+}
+```
+
+### 结果
+这两种方式都会将 `yyyy-MM-dd` 的日期格式转换为 `yyyy-MM-dd HH:mm:ss`，并且时间部分默认是 `00:00:00`。
+
+#11. 这种方式设置了时区了吗？
+上述两种方式默认没有设置时区，因此它们会使用系统默认的时区。如果你需要处理时区，可以在 `SimpleDateFormat` 或 `DateTimeFormatter` 中手动设置时区。
+
+### 1. 使用 `SimpleDateFormat` 设置时区
+你可以使用 `setTimeZone()` 方法来设置时区，例如设置为 `UTC` 或其他时区。
+
+```java
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
+
+public class DateFormatExample {
+    public static void main(String[] args) throws ParseException {
+        String inputDate = "2024-10-09"; // yyyy-MM-dd 格式
+        SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd");
+        SimpleDateFormat outputFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+        // 设置时区（例如 UTC）
+        inputFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+        outputFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+        // 将字符串转换为 Date 对象
+        Date date = inputFormat.parse(inputDate);
+        // 将 Date 对象格式化为新的字符串
+        String outputDate = outputFormat.format(date);
+
+        System.out.println(outputDate); // 输出：2024-10-09 00:00:00
+    }
+}
+```
+
+### 2. 使用 `DateTimeFormatter` 和 `ZonedDateTime` 设置时区
+在 Java 8 及以后版本中，可以通过 `ZonedDateTime` 来处理时区。
+
+```java
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.ZoneId;
+
+public class DateFormatExample {
+    public static void main(String[] args) {
+        String inputDate = "2024-10-09"; // yyyy-MM-dd 格式
+
+        // 解析输入的日期字符串
+        LocalDate date = LocalDate.parse(inputDate, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+        // 将 LocalDate 转换为 LocalDateTime，设置时间部分为 00:00:00
+        LocalDateTime dateTime = date.atStartOfDay();
+
+        // 设置时区（例如 UTC）
+        ZonedDateTime zonedDateTime = dateTime.atZone(ZoneId.of("UTC"));
+
+        // 格式化为 yyyy-MM-dd HH:mm:ss 格式
+        String outputDate = zonedDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+        System.out.println(outputDate); // 输出：2024-10-09 00:00:00
+    }
+}
+```
+
+### 关键点
+- `SimpleDateFormat` 中通过 `setTimeZone()` 设置时区。
+- `DateTimeFormatter` 中使用 `ZonedDateTime` 来处理时区。
+
+通过设置时区，你可以确保日期转换过程中使用的是正确的时区，而不是系统默认时区。

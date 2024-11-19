@@ -3833,3 +3833,911 @@ LEFT JOIN courses ON students.id = courses.student_id;
 ### 总结
 - **INNER JOIN**：当只需要两个表中都有匹配记录的数据时使用。
 - **LEFT JOIN**：当需要保留左表中的所有数据，并包含右表中的匹配记录时使用，即使右表中没有匹配记录。
+
+
+# 44. mybatisplus自己写了一个interceptor去篡改请求sql，实体类上通过@TableField指定了实体字段和数据表字段的映射，结果发现最终执行sql时候，那个interceptor的篡改不生效？
+在使用 MyBatis-Plus 时，自定义的 `Interceptor` 可能在修改 SQL 时不生效，尤其是当你在实体类上通过 `@TableField` 注解指定了实体字段与数据库表字段的映射。这可能是因为 MyBatis-Plus 的内部处理顺序导致了 SQL 的执行阶段已经被预处理，或者是你的拦截器没有在正确的阶段修改 SQL。
+
+这里是几个可能的原因以及解决方案：
+
+### 1. **拦截器的拦截阶段不对**
+拦截器通常可以设置在 MyBatis 的不同阶段执行，包括 `Executor`、`StatementHandler`、`ParameterHandler` 等。如果拦截的时机不对，修改 SQL 的效果可能不会生效。你需要确保你的拦截器是在 `StatementHandler` 的 `prepare` 或 `beforeExecute` 阶段拦截，因为在这些阶段 SQL 已经生成并且可以修改。
+
+示例拦截器代码：
+
+```java
+import org.apache.ibatis.executor.statement.StatementHandler;
+import org.apache.ibatis.plugin.*;
+import java.sql.Connection;
+import java.util.Properties;
+
+@Intercepts({
+    @Signature(type = StatementHandler.class, method = "prepare", args = {Connection.class, Integer.class})
+})
+public class MyCustomInterceptor implements Interceptor {
+
+    @Override
+    public Object intercept(Invocation invocation) throws Throwable {
+        // 获取 StatementHandler
+        StatementHandler statementHandler = (StatementHandler) invocation.getTarget();
+
+        // 通过反射获取到原始的SQL
+        String originalSql = statementHandler.getBoundSql().getSql();
+
+        // 修改SQL逻辑
+        String modifiedSql = modifySql(originalSql);  // 自定义的SQL修改逻辑
+
+        // 通过反射将修改后的SQL重新注入
+        Field sqlField = BoundSql.class.getDeclaredField("sql");
+        sqlField.setAccessible(true);
+        sqlField.set(statementHandler.getBoundSql(), modifiedSql);
+
+        // 执行
+        return invocation.proceed();
+    }
+
+    @Override
+    public Object plugin(Object target) {
+        // 仅拦截 StatementHandler
+        if (target instanceof StatementHandler) {
+            return Plugin.wrap(target, this);
+        }
+        return target;
+    }
+
+    @Override
+    public void setProperties(Properties properties) {
+        // 可选的配置项
+    }
+
+    private String modifySql(String originalSql) {
+        // 修改SQL的具体逻辑，比如增加过滤条件，修改字段等
+        return originalSql + " WHERE 1=1";  // 只是个示例
+    }
+}
+```
+
+在这个例子中，拦截器拦截了 `StatementHandler` 的 `prepare` 方法，确保你在 SQL 执行之前就可以对其进行修改。
+
+### 2. **`@TableField` 注解的影响**
+`@TableField` 注解用于指定实体字段与数据库表字段的映射。如果你的拦截器没有正确处理映射字段，它可能会直接使用原始的字段名，而不是数据库中实际的列名。因此，如果你在拦截器中手动修改 SQL，需要考虑如何处理字段与表的映射问题。
+
+MyBatis-Plus 在处理 `@TableField` 映射时，可能会在 SQL 生成的某些阶段替换实体字段为数据库字段名，所以你需要在映射发生之后再进行 SQL 修改。
+
+可以通过以下方法来确认问题：
+1. 在拦截器中打印原始 SQL，确认字段名称是否已经被正确映射。
+2. 确保你的拦截器是在 `prepare` 方法阶段之后生效的。
+
+### 3. **SQL 被缓存的问题**
+MyBatis-Plus 可能会缓存某些 SQL，如果你修改了 SQL，但发现拦截器不生效，可能是因为执行了缓存的 SQL，而不是你修改后的 SQL。
+
+解决办法：
+- 禁用 SQL 缓存，确保每次请求都会重新生成 SQL。
+- 检查 SQL 缓存配置，确保在你的拦截器生效之前 SQL 没有被缓存。
+
+### 4. **SQL 的最终执行顺序**
+MyBatis 的 SQL 执行有一定的生命周期，拦截器的生效顺序需要与 SQL 的生成和执行时机匹配。MyBatis-Plus 在处理字段映射时，可能会在特定阶段应用 `@TableField` 注解的映射，因此确保你的拦截器修改 SQL 的时机是在映射完成之后非常关键。
+
+### 5. **测试思路**
+你可以进行以下调试步骤，确保问题出现在哪个阶段：
+1. 在拦截器中输出 `originalSql`，确认生成的 SQL 是否是你预期的。
+2. 修改拦截器中的 SQL，输出修改后的 SQL，查看是否生效。
+3. 检查是否与 `@TableField` 注解的字段映射相关，如果相关，确保你在 SQL 生成后的合适阶段进行修改。
+
+### 总结
+为了让自定义的 `Interceptor` 能够篡改 MyBatis-Plus 生成的 SQL，你需要确保：
+- 拦截器是在正确的阶段生效，比如 `StatementHandler.prepare`。
+- 你正确处理了实体字段与数据库表字段的映射。
+- 检查 SQL 缓存机制是否影响了 SQL 修改。
+  
+通过这些方法，你应该能够确保拦截器对最终执行的 SQL 生效。
+
+#45. 我是拦截ParameterHandler修改实体字段的值的
+如果你是在 `ParameterHandler` 中修改实体字段的值，但发现修改后的值没有生效，可能是因为 `ParameterHandler` 拦截的时机不适合直接修改实体字段，或者修改方式不正确。这里有一些可能导致问题的原因以及相应的解决方案。
+
+### 1. **`ParameterHandler` 的拦截时机**
+`ParameterHandler` 主要用于处理 SQL 语句的参数绑定，它在 SQL 语句执行之前处理传入的参数。所以你可以在这个阶段修改传入的参数值（如实体字段的值）。但是，实体类字段值修改如果没有正确传递到 SQL 语句中，就可能导致拦截器的修改不生效。
+
+### 2. **确认是否正确修改了参数**
+`ParameterHandler` 拦截器可以修改 SQL 参数，你需要确保你修改了正确的参数，并且这些修改反映到了最终执行的 SQL 语句中。
+
+示例代码展示如何拦截 `ParameterHandler` 并修改参数：
+
+```java
+import org.apache.ibatis.executor.parameter.ParameterHandler;
+import org.apache.ibatis.plugin.*;
+import org.apache.ibatis.mapping.BoundSql;
+import org.apache.ibatis.session.Configuration;
+
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.Properties;
+
+@Intercepts({
+    @Signature(type = ParameterHandler.class, method = "setParameters", args = {PreparedStatement.class})
+})
+public class MyParameterInterceptor implements Interceptor {
+
+    @Override
+    public Object intercept(Invocation invocation) throws Throwable {
+        // 获取ParameterHandler
+        ParameterHandler parameterHandler = (ParameterHandler) invocation.getTarget();
+
+        // 获取BoundSql对象
+        BoundSql boundSql = parameterHandler.getBoundSql();
+
+        // 获取参数对象 (实体对象)
+        Object parameterObject = boundSql.getParameterObject();
+
+        // 假设要修改实体对象中的某个字段值
+        if (parameterObject instanceof MyEntity) {
+            MyEntity entity = (MyEntity) parameterObject;
+            // 修改实体字段值
+            entity.setSomeField("Modified Value");
+        }
+
+        // 执行原方法，继续处理
+        return invocation.proceed();
+    }
+
+    @Override
+    public Object plugin(Object target) {
+        // 仅拦截 ParameterHandler
+        if (target instanceof ParameterHandler) {
+            return Plugin.wrap(target, this);
+        }
+        return target;
+    }
+
+    @Override
+    public void setProperties(Properties properties) {
+        // 可选的配置项
+    }
+}
+```
+
+在这个拦截器中，拦截了 `ParameterHandler` 的 `setParameters` 方法，并且修改了传入的实体对象的字段值。**关键是确保你修改的实体对象的值在 `BoundSql` 中正确地反映到了最终的 SQL 参数中**。
+
+### 3. **实体对象值修改没有被传递到 SQL**
+如果修改后的实体字段值没有反映到 SQL 中，可能是因为 MyBatis-Plus 已经提前对实体进行了映射和 SQL 处理。你可以通过以下步骤来确保修改后的值被正确传递到 SQL：
+
+- **检查是否在正确的时机修改了实体字段**：`ParameterHandler` 是负责设置 SQL 语句中的参数，确保你是在合适的阶段修改参数值，而不是在 SQL 已经生成之后。
+- **确认参数值绑定是否正确**：可以通过打印 `BoundSql` 中的参数来检查修改是否生效。例如，你可以通过 `boundSql.getParameterObject()` 获取传入的参数对象，并检查它的值是否是你预期的修改后的值。
+
+### 4. **使用反射修改私有字段**
+如果实体类中的字段是私有的，你可能需要使用反射来修改这些字段的值。确保你正确地使用反射来设置字段值，例如：
+
+```java
+import java.lang.reflect.Field;
+
+public class ReflectionUtils {
+    public static void setFieldValue(Object target, String fieldName, Object value) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);  // 确保可以访问私有字段
+        field.set(target, value);
+    }
+}
+```
+
+你可以在 `intercept` 方法中调用 `ReflectionUtils.setFieldValue()` 来修改私有字段的值。
+
+### 5. **MyBatis-Plus 和字段映射的问题**
+如果你使用了 MyBatis-Plus 并且在实体类上使用了 `@TableField` 来指定字段与数据库列的映射，MyBatis-Plus 可能已经提前生成了 SQL 和参数映射，因此在 `ParameterHandler` 阶段修改实体字段的值不会影响 SQL。
+
+在这种情况下，解决方案包括：
+- **提前修改实体字段的值**：在 SQL 生成之前修改实体字段值，比如在业务逻辑层修改，而不是依赖 `ParameterHandler` 拦截器。
+- **修改生成的 SQL**：如果只是想修改最终执行的 SQL，你可以考虑拦截 `StatementHandler` 的 `prepare` 方法，而不是 `ParameterHandler`，因为此时 SQL 已经生成，你可以直接修改 SQL。
+
+### 6. **调试建议**
+1. **打印 SQL 和参数**：在拦截器中打印 `BoundSql` 和参数，查看修改是否成功传递到最终 SQL 中。
+2. **确保拦截器配置正确**：确认自定义的拦截器已经正确配置到 MyBatis 拦截器链中。
+3. **测试不同拦截阶段**：尝试在不同的拦截阶段（例如 `StatementHandler`）修改 SQL 或参数，确保修改时机正确。
+
+### 总结
+
+1. **`ParameterHandler` 的拦截器适合用于修改 SQL 的参数值**，如果你修改的是实体字段，确保修改后的值能够正确地传递到最终 SQL。
+2. 如果实体字段与数据库字段有复杂映射关系，确保修改后的值能通过 MyBatis-Plus 的映射机制正确传递。
+3. **调试拦截器** 以确保参数修改是否成功，并根据具体需求选择合适的拦截阶段。
+
+# 46. 我使用的是mybatisplus的insert方法直接插入entity的方式，拦截器篡改了实体的信息，但是可能因为有tableField映射，就是不生效
+在使用 MyBatis-Plus 的 `insert` 方法插入实体时，如果你通过 `ParameterHandler` 拦截器篡改了实体的信息但不生效，且怀疑是因为 `@TableField` 映射导致的问题，那么有以下几个可能的原因及解决方案：
+
+### 1. **MyBatis-Plus 的 SQL 生成顺序**
+MyBatis-Plus 在执行 `insert` 方法时，会根据实体类的字段与数据库表列的映射关系（`@TableField` 注解）来生成 SQL 语句。也就是说，MyBatis-Plus 在生成 SQL 之前，已经根据 `@TableField` 映射将实体的字段值处理好，并把它们绑定到 SQL 语句中。
+
+当你在 `ParameterHandler` 拦截器中篡改了实体字段的值时，这个修改可能并没有及时反映到已经生成好的 SQL 中，导致修改后的值没有被插入到数据库。
+
+### 2. **`ParameterHandler` 修改时机问题**
+如果你在 `ParameterHandler` 中篡改实体字段的值，可能出现的问题是：MyBatis-Plus 在 `insert` 方法中已经处理好了字段与表列的映射，所以你修改实体字段时，MyBatis-Plus 可能已经生成了对应的 SQL 并绑定了原始参数。
+
+在这种情况下，**你需要在 SQL 生成之前修改实体字段的值**，而不是在 `ParameterHandler` 里。这意味着修改时机很重要。
+
+### 3. **使用 `MetaObjectHandler` 自动填充**
+MyBatis-Plus 提供了一个 `MetaObjectHandler`，可以在执行 `insert` 或 `update` 时自动填充实体字段的值，这种方式适合在插入前动态修改某些字段的值。这可能比在 `ParameterHandler` 中拦截和修改字段更合适。
+
+你可以通过实现 `MetaObjectHandler` 来修改插入前的实体字段，确保你的篡改在 SQL 生成之前生效。
+
+#### 示例：自定义 `MetaObjectHandler` 修改实体字段
+```java
+import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
+import org.apache.ibatis.reflection.MetaObject;
+import org.springframework.stereotype.Component;
+
+@Component
+public class MyMetaObjectHandler implements MetaObjectHandler {
+
+    @Override
+    public void insertFill(MetaObject metaObject) {
+        // 在插入操作时，修改实体中的字段值
+        this.strictInsertFill(metaObject, "someField", String.class, "Modified Value");
+    }
+
+    @Override
+    public void updateFill(MetaObject metaObject) {
+        // 在更新操作时，修改实体中的字段值
+        this.strictUpdateFill(metaObject, "someField", String.class, "Updated Value");
+    }
+}
+```
+
+通过实现 `MetaObjectHandler`，你可以在插入前修改实体的字段值（即使使用了 `@TableField` 映射）。这比在 `ParameterHandler` 拦截器中修改字段的方式更可靠，因为此时 SQL 尚未生成，且字段映射还未完全处理。
+
+### 4. **考虑使用 `StatementHandler` 拦截器修改 SQL**
+如果你需要在 SQL 执行前篡改 SQL 而不是实体字段，你可以考虑使用 `StatementHandler` 拦截器来直接修改最终生成的 SQL。
+
+#### 示例：自定义 `StatementHandler` 拦截器修改 SQL
+```java
+@Intercepts({
+    @Signature(type = StatementHandler.class, method = "prepare", args = {Connection.class, Integer.class})
+})
+public class MyStatementInterceptor implements Interceptor {
+
+    @Override
+    public Object intercept(Invocation invocation) throws Throwable {
+        StatementHandler statementHandler = (StatementHandler) invocation.getTarget();
+        BoundSql boundSql = statementHandler.getBoundSql();
+        
+        // 获取生成的 SQL
+        String originalSql = boundSql.getSql();
+        
+        // 修改 SQL 逻辑，例如修改某个字段的值
+        String modifiedSql = originalSql.replace("originalValue", "modifiedValue");
+        
+        // 通过反射修改 BoundSql 中的 SQL
+        Field sqlField = BoundSql.class.getDeclaredField("sql");
+        sqlField.setAccessible(true);
+        sqlField.set(boundSql, modifiedSql);
+        
+        return invocation.proceed();
+    }
+
+    @Override
+    public Object plugin(Object target) {
+        if (target instanceof StatementHandler) {
+            return Plugin.wrap(target, this);
+        }
+        return target;
+    }
+
+    @Override
+    public void setProperties(Properties properties) {
+        // 可选的配置项
+    }
+}
+```
+
+在 `StatementHandler` 中，你可以直接修改生成的 SQL，而无需担心实体字段映射的问题。
+
+### 5. **推荐的解决方案**
+根据你的需求，建议使用以下方案：
+
+1. **使用 `MetaObjectHandler` 来修改实体字段**：在插入或更新之前修改实体的字段值，而不是依赖 `ParameterHandler`。
+2. **拦截 `StatementHandler` 修改最终生成的 SQL**：如果你希望直接修改生成的 SQL，可以使用 `StatementHandler` 拦截器。
+
+### 总结
+
+- `ParameterHandler` 拦截器可能无法在 `insert` 操作中生效，是因为 MyBatis-Plus 在此时已经生成了 SQL，且实体字段的映射已经处理完毕。
+- 使用 MyBatis-Plus 提供的 `MetaObjectHandler` 机制可以在插入前动态修改实体的字段值，这是更推荐的方式。
+- 如果你需要修改最终生成的 SQL，可以使用 `StatementHandler` 拦截器来修改。
+
+# 47. mybatisplus执行update操作时，如何根据传入的实体去灵活的更新我想要更新的某些字段呢？没有指定的那些字段不做任何更新？
+在 MyBatis-Plus 中，可以通过 `@TableField` 注解的 `updateStrategy` 属性以及条件构造器来实现根据传入实体字段动态更新部分字段。一般来说，MyBatis-Plus 提供了几种灵活的更新策略：
+
+### 方法1：使用 `updateById` 方法并结合 `updateStrategy`
+通过 `updateById` 方法，MyBatis-Plus 默认会更新实体中的所有非空字段。如果某个字段没有赋值，它不会被更新。可以使用 `@TableField` 注解的 `updateStrategy` 来控制字段的更新行为。
+
+例如：
+```java
+@Data
+public class User {
+    private Long id;
+
+    @TableField(updateStrategy = FieldStrategy.NOT_NULL)  // 仅当字段不为 null 时更新
+    private String name;
+
+    @TableField(updateStrategy = FieldStrategy.NOT_EMPTY)  // 仅当字段不为空时更新
+    private String email;
+}
+```
+
+在这种情况下，当你调用 `userMapper.updateById(user)` 时，只有 `name` 和 `email` 不为 `null` 或不为空的情况下，才会更新对应的字段。
+
+### 方法2：使用 `UpdateWrapper`
+如果需要更灵活的更新条件，可以使用 `UpdateWrapper` 来手动指定要更新的字段：
+
+```java
+User user = new User();
+user.setName("newName");
+
+UpdateWrapper<User> updateWrapper = new UpdateWrapper<>();
+updateWrapper.eq("id", 1);  // 更新 id = 1 的记录
+updateWrapper.set("name", user.getName());  // 设置要更新的字段
+
+userMapper.update(null, updateWrapper);
+```
+
+这种方式可以完全控制要更新的字段和条件。
+
+### 方法3：使用 `@DynamicUpdate`
+`@DynamicUpdate` 是 Hibernate 的一个注解，可以用来在 Spring Boot 中实现动态 SQL 更新，配合 MyBatis-Plus 的自定义 SQL 更新语句使用。此注解会让 SQL 更新语句中只包含实际需要更新的字段。
+
+但是，MyBatis-Plus 并没有提供类似的注解，因此可以通过动态 SQL 或者使用 `UpdateWrapper` 更灵活地实现。
+
+### 方法4：通过自定义 SQL 实现部分更新
+如果你需要更复杂的更新逻辑，可以直接在 Mapper 接口中编写自定义 SQL 来更新指定字段。以下是一个示例：
+
+```java
+@Update("<script>" +
+        "UPDATE user" +
+        "<set>" +
+        "<if test='name != null'>name = #{name},</if>" +
+        "<if test='email != null'>email = #{email},</if>" +
+        "</set>" +
+        "WHERE id = #{id}" +
+        "</script>")
+int updateUserSelective(User user);
+```
+
+在这个自定义 SQL 中，只有 `name` 和 `email` 不为 `null` 时，才会生成相应的更新语句。
+
+### 总结
+- 如果实体类中的某些字段为 `null`，你可以通过 `@TableField(updateStrategy)` 来控制是否更新。
+- 如果你需要完全手动控制更新字段，可以使用 `UpdateWrapper` 来设置条件和更新字段。
+- 自定义 SQL 是处理复杂更新逻辑的最终方案，可以根据业务需求动态拼接更新语句。
+
+选择最合适的方法取决于你的更新需求和数据的复杂程度。
+
+# 48. 它的update方法请详细解释一下
+MyBatis-Plus 的 `update` 方法主要用于更新数据库中的记录，其执行逻辑基于传入的更新条件和要更新的字段。这个方法在使用时有两种常见的调用方式：通过实体类和 `UpdateWrapper` 或者 `LambdaUpdateWrapper` 来灵活控制更新的字段和条件。
+
+### 方法签名
+
+MyBatis-Plus 中 `BaseMapper` 提供了以下 `update` 方法的定义：
+
+```java
+int update(@Param(Constants.ENTITY) T entity, @Param("ew") Wrapper<T> updateWrapper);
+```
+
+### 参数说明
+- **`entity`**：要更新的实体对象。它包含了需要更新的字段值，**注意**，如果字段值为 `null` 且没有特殊处理时，它可能会将数据库中对应字段更新为 `null`。
+- **`updateWrapper`**：`Wrapper` 对象，用于构造查询条件。它可以是 `UpdateWrapper` 或者 `LambdaUpdateWrapper`，用来灵活指定更新的条件和更新的字段。
+
+### `update` 方法的核心逻辑
+
+1. **根据 `entity` 更新**：该方法将会把 `entity` 中的字段更新到数据库中。默认情况下，`entity` 中所有非 `null` 的字段都会参与更新。
+   
+2. **根据 `updateWrapper` 进行条件构造**：`updateWrapper` 用来指定要更新的条件。如果没有传递条件，默认情况下可能会更新表中的所有记录，因此使用时需要谨慎。
+
+### 更新示例
+
+#### 示例1：基本使用
+
+假设你有一个用户表 `user`，它包含 `id`, `name`, `email` 等字段。
+
+```java
+User user = new User();
+user.setId(1L);  // 设置主键ID
+user.setName("newName");  // 更新的字段
+user.setEmail(null);  // 不更新这个字段，设置为null
+
+// 执行更新操作，id为1的记录将更新name字段
+int rows = userMapper.updateById(user);
+```
+
+在上面的例子中，`updateById` 是 `update` 方法的简化版本，实际上是通过 `id` 来更新用户信息。`name` 字段被更新，而 `email` 字段因为是 `null`，不会更新到数据库中。
+
+#### 示例2：使用 `UpdateWrapper`
+
+如果你需要更灵活的更新条件，比如按条件更新记录，可以使用 `UpdateWrapper`：
+
+```java
+User user = new User();
+user.setName("newName");
+
+UpdateWrapper<User> updateWrapper = new UpdateWrapper<>();
+updateWrapper.eq("id", 1);  // 指定更新的条件
+updateWrapper.set("email", "newEmail@example.com");  // 动态指定更新字段
+
+// 根据 updateWrapper 的条件，更新符合条件的记录
+int rows = userMapper.update(user, updateWrapper);
+```
+
+在这个例子中，`updateWrapper` 指定了更新的条件 `id = 1`，并且使用了 `set` 方法来手动指定需要更新的字段，即 `email`。`user` 实体中的 `name` 字段也会参与更新。
+
+#### 示例3：使用 `LambdaUpdateWrapper`
+
+`LambdaUpdateWrapper` 是 `UpdateWrapper` 的一个变体，主要是为了避免在 SQL 中硬编码字段名，使用 lambda 表达式来指定字段名，保证了字段名的安全性。
+
+```java
+User user = new User();
+user.setName("newName");
+
+LambdaUpdateWrapper<User> lambdaUpdateWrapper = new LambdaUpdateWrapper<>();
+lambdaUpdateWrapper.eq(User::getId, 1)  // 指定条件
+                  .set(User::getEmail, "newEmail@example.com");  // 动态指定要更新的字段
+
+// 执行更新操作
+int rows = userMapper.update(user, lambdaUpdateWrapper);
+```
+
+使用 `LambdaUpdateWrapper` 可以避免拼写错误或者字段名变动带来的问题。
+
+### 重要细节
+
+1. **`entity` 为 `null` 的字段不更新**：如果 `entity` 中的某个字段为 `null`，默认情况下 MyBatis-Plus 不会更新这个字段，除非你指定了其他策略（如 `@TableField(updateStrategy = FieldStrategy.IGNORED)` 会将 `null` 值字段更新到数据库中）。
+
+2. **`updateWrapper` 的作用**：`updateWrapper` 可以灵活地指定更新条件和更新的字段。如果你只传递了 `entity`，那么会根据主键（如 `id`）来更新；如果使用 `updateWrapper`，可以根据指定的条件更新任意字段。
+
+3. **`update` 与 `updateById` 的区别**：`updateById` 是 MyBatis-Plus 提供的简化方法，内部其实调用的是 `update` 方法，默认是根据 `id` 进行更新。而 `update` 方法可以让你传入更加复杂的条件和字段更新逻辑。
+
+### 总结
+
+MyBatis-Plus 的 `update` 方法通过 `entity` 和 `updateWrapper` 两者结合，可以灵活控制更新的字段和条件：
+
+- 通过 `entity` 可以指定要更新的字段。
+- 通过 `UpdateWrapper` 或 `LambdaUpdateWrapper` 可以灵活指定条件和更新字段。
+- `null` 值字段默认不更新，除非使用特殊的更新策略。
+
+
+# 49. 使用LambdaUpdateWrapper可以不传入实体对象吗？
+是的，在 MyBatis-Plus 中，使用 `LambdaUpdateWrapper` 可以不传入实体对象。实际上，`LambdaUpdateWrapper` 是专门设计用来在不依赖实体类的情况下，通过 Lambda 表达式直接构建更新条件和更新字段的，因此你可以完全通过 `LambdaUpdateWrapper` 来指定要更新的字段和条件，而不需要传入实体对象。
+
+### 使用 `LambdaUpdateWrapper` 更新字段而不传入实体对象
+
+以下是一个使用 `LambdaUpdateWrapper` 来更新记录的示例，不需要传入实体对象：
+
+```java
+LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
+
+// 设置更新的条件
+updateWrapper.eq(User::getId, 1);
+
+// 设置要更新的字段
+updateWrapper.set(User::getName, "newName");
+updateWrapper.set(User::getEmail, "newEmail@example.com");
+
+// 执行更新操作，不传入实体对象
+int rows = userMapper.update(null, updateWrapper);
+```
+
+### 代码详解
+
+1. **`LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>()`**：创建一个 `LambdaUpdateWrapper` 对象，用来构建 SQL 的更新条件和更新字段。
+   
+2. **`updateWrapper.eq(User::getId, 1)`**：通过 Lambda 表达式指定更新的条件，这里表示要更新 `id = 1` 的记录。
+
+3. **`updateWrapper.set(User::getName, "newName")` 和 `updateWrapper.set(User::getEmail, "newEmail@example.com")`**：通过 `set` 方法指定要更新的字段和值。
+
+4. **`userMapper.update(null, updateWrapper)`**：执行更新操作，传入 `null` 作为第一个参数，因为不需要传入实体对象，所有的更新操作都由 `updateWrapper` 控制。
+
+### 适用场景
+使用 `LambdaUpdateWrapper` 而不传入实体对象适用于以下场景：
+- 你只想更新部分字段，并且不需要传入整个实体。
+- 你不关心实体类中的其他字段，而是根据条件和字段进行精确控制更新。
+- 你想避免实体类中可能存在的 `null` 值影响更新。
+
+### 注意事项
+- 当你不传入实体对象时，**`updateWrapper`** 负责定义所有的更新逻辑。此时，MyBatis-Plus 不会从实体中提取任何信息。
+- 如果需要复杂的条件或字段更新，可以使用多个 `set` 方法和条件方法组合。
+
+### 小结
+使用 `LambdaUpdateWrapper` 时，不需要传入实体对象，你可以直接通过 `LambdaUpdateWrapper` 来设置条件和更新字段，非常灵活，特别适合只需要更新部分字段或按特定条件更新记录的场景。
+
+# 50. mybatisplus中，根据条件排序，然后手动limit一条记录，通过Lambada怎么写呢？
+在 MyBatis-Plus 中，可以使用 `LambdaQueryWrapper` 来构建查询条件，包括排序和限制查询条数（通过 `LIMIT` 实现）。虽然 `LambdaQueryWrapper` 本身没有提供直接的 `limit` 方法，但是你可以通过 `last` 方法手动追加 `LIMIT` 语句。
+
+### 示例：根据条件排序并手动 `LIMIT` 一条记录
+
+假设你有一个 `User` 表，需要根据某个条件查询用户，并按某个字段排序，同时只查询一条记录。
+
+```java
+LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+
+// 构建查询条件
+queryWrapper.eq(User::getStatus, 1)   // 例如查询 status 为 1 的用户
+            .orderByDesc(User::getCreateTime)  // 按 createTime 字段倒序排序
+            .last("LIMIT 1");  // 手动添加 LIMIT 1
+
+// 查询符合条件的第一条记录
+User user = userMapper.selectOne(queryWrapper);
+```
+
+### 代码详解
+
+1. **`LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>()`**：创建 `LambdaQueryWrapper` 实例，用于构建查询条件。
+   
+2. **`queryWrapper.eq(User::getStatus, 1)`**：通过 `eq` 方法添加查询条件，这里表示查询 `status` 等于 `1` 的用户。
+
+3. **`queryWrapper.orderByDesc(User::getCreateTime)`**：通过 `orderByDesc` 方法添加排序条件，这里表示按照 `createTime` 字段进行倒序排列。
+
+4. **`queryWrapper.last("LIMIT 1")`**：通过 `last` 方法手动追加 SQL 片段。此方法可以直接附加任何合法的 SQL 语句，这里我们追加了 `LIMIT 1`，表示只查询一条记录。
+
+5. **`userMapper.selectOne(queryWrapper)`**：使用 `selectOne` 方法执行查询，返回符合条件的第一条记录。
+
+### 注意事项
+
+- `last` 方法的参数是一个直接拼接到 SQL 末尾的字符串，**使用时需谨慎**，确保拼接的 SQL 片段是合法的，且不会引起 SQL 注入风险。
+- 如果查询的记录超过一条而你使用了 `selectOne` 方法，会抛出异常，因此在使用 `last("LIMIT 1")` 时，`selectOne` 是安全的选择，因为它最多返回一条记录。
+
+### 小结
+
+通过 `LambdaQueryWrapper` 和 `last("LIMIT 1")` 方法，你可以实现手动限制查询条数，并结合条件查询和排序功能。这个方法非常适合需要灵活控制 SQL 生成的场景。
+
+# 51. 使用mybatisplus的update方法，如果同时传入了entity和LambdaUpdate会怎么样？
+在 MyBatis-Plus 中，当你同时传入了实体对象 `entity` 和 `LambdaUpdateWrapper` 作为参数来执行 `update` 操作时，系统的行为是结合两者的特点来执行更新操作。具体来说：
+
+1. **`entity`** 的作用是提供要更新的字段和值。`entity` 中非空的字段会被用来更新数据库中的相应字段。
+2. **`LambdaUpdateWrapper`** 的作用是指定更新的条件，也可以通过 `set` 方法动态指定一些额外的要更新的字段。
+
+### 同时传入 `entity` 和 `LambdaUpdateWrapper` 的行为
+
+- **`entity` 中的字段**：会根据实体类中非空的字段来生成 `SET` 语句，也就是实体类中哪些字段不为 `null`，这些字段会参与更新。
+  
+- **`LambdaUpdateWrapper` 中的 `eq` 等条件**：用于生成 `WHERE` 子句，决定哪些记录会被更新。
+
+- **`LambdaUpdateWrapper` 中的 `set`**：如果在 `LambdaUpdateWrapper` 中使用了 `set` 方法手动指定了要更新的字段，这些字段会覆盖 `entity` 中对应的字段设置。
+
+### 示例
+
+假设你有一个 `User` 表，需要根据用户 ID 更新用户信息。`entity` 提供了 `name` 字段的更新，而 `LambdaUpdateWrapper` 用于设置更新的条件（根据用户 ID），并且动态更新 `email` 字段。
+
+```java
+// 实体对象，提供要更新的字段和值
+User user = new User();
+user.setName("newName");  // 需要更新的name字段
+
+// 使用LambdaUpdateWrapper来指定更新的条件和额外的字段更新
+LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
+updateWrapper.eq(User::getId, 1)  // 更新条件，指定id为1的用户
+             .set(User::getEmail, "newEmail@example.com");  // 动态更新email字段
+
+// 执行更新操作
+int rows = userMapper.update(user, updateWrapper);
+```
+
+### 结果
+
+- **更新的条件**：`LambdaUpdateWrapper` 中的 `eq(User::getId, 1)` 指定了更新条件，即更新 `id = 1` 的记录。
+- **更新的字段**：
+  - `user` 实体对象中的 `name` 字段将被更新为 `"newName"`。
+  - `LambdaUpdateWrapper` 中使用 `set` 方法显式指定的 `email` 字段将被更新为 `"newEmail@example.com"`。
+  - 如果 `user` 对象中还有其他字段（如 `email` 字段），则 `LambdaUpdateWrapper` 中的 `set` 方法会覆盖实体对象中相同字段的值。
+
+### 小结
+
+当同时传入 `entity` 和 `LambdaUpdateWrapper` 时：
+
+- **`entity`** 用于提供要更新的字段和值，`LambdaUpdateWrapper` 用于构建更新条件。
+- 如果 `LambdaUpdateWrapper` 使用了 `set` 方法手动指定要更新的字段，这些字段会覆盖 `entity` 中的同名字段。
+- `LambdaUpdateWrapper` 中的 `eq` 或其他条件方法用于生成 `WHERE` 子句，决定哪些记录会被更新。
+
+因此，使用这种方式可以灵活地结合实体对象和动态条件更新字段，实现复杂的更新操作。
+
+# 52. mybatisplus在执行更新update动作时，返回的int值表示什么？
+在 MyBatis-Plus 中，当执行更新操作（`update` 方法）时，返回的 `int` 值表示的是 **受影响的行数**（即更新了多少条记录）。也就是说，执行更新操作后，返回的这个 `int` 值可以用来判断操作是否成功，以及成功更新了多少条记录。
+
+### 常见场景
+
+1. **更新成功**：如果更新操作成功，并且有一条或多条记录被更新，返回的 `int` 值会是大于 0 的数字，这个数字表示实际更新的记录条数。
+
+2. **没有符合条件的记录**：如果没有任何记录符合更新条件，或者传入的更新内容和原始记录内容相同（无变化），那么返回值将是 `0`，表示没有记录被更新。
+
+3. **更新失败**：如果在更新操作过程中出现异常，可能会抛出异常（如 SQL 错误），此时你可以捕获异常，而不会有返回的 `int` 值。
+
+### 示例
+
+假设有一个 `User` 表，你要根据 `id` 更新用户的姓名：
+
+```java
+User user = new User();
+user.setName("newName");  // 更新的字段
+
+LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
+updateWrapper.eq(User::getId, 1);  // 更新条件，更新id为1的用户
+
+// 执行更新操作
+int result = userMapper.update(user, updateWrapper);
+
+// 判断更新结果
+if (result > 0) {
+    System.out.println("更新成功，受影响的行数: " + result);
+} else {
+    System.out.println("更新失败或没有记录被更新");
+}
+```
+
+### 返回值 `int` 的意义
+
+- **`> 0`**：表示更新成功，返回的 `int` 值是受影响的行数。
+- **`= 0`**：表示没有符合条件的记录，或更新的内容没有变化（即原始数据和要更新的数据相同）。
+- **异常**：如果出现异常，如 SQL 执行错误，操作会抛出异常，而不会有返回的 `int` 值。
+
+### 总结
+
+MyBatis-Plus 执行 `update` 操作时返回的 `int` 值表示受影响的行数。你可以根据这个返回值来判断更新操作是否成功，以及更新了多少条记录。
+
+# 53. 如何在更新的时候更加细致的判断，到底是没有记录，还是和更新的数据相同？
+在 MyBatis-Plus 中，如果你想更细致地判断更新操作的结果——例如区分**没有符合条件的记录**和**数据相同导致没有实际更新**——你需要结合多个步骤来实现。这是因为 MyBatis-Plus 默认返回的 `int` 值仅表示受影响的行数，不会自动区分这两种情况。
+
+### 解决方案
+
+1. **在更新前查询**：你可以在更新操作之前查询一下记录是否存在。
+2. **对比数据是否相同**：在更新之前，比较当前数据库中的数据与待更新的数据，判断是否存在实际差异。
+
+### 示例
+
+假设我们有一个 `User` 表，现在需要根据 `id` 更新用户的姓名。我们希望在执行更新之前：
+1. 先检查记录是否存在；
+2. 如果记录存在，则比较要更新的字段与当前字段的值；
+3. 然后决定是否进行更新。
+
+```java
+public String updateUserById(Long userId, String newName) {
+    // 先查询数据库中对应ID的用户信息
+    User existingUser = userMapper.selectById(userId);
+    
+    if (existingUser == null) {
+        return "用户不存在";
+    }
+    
+    // 比较待更新的数据和现有数据是否相同
+    if (existingUser.getName().equals(newName)) {
+        return "更新失败，数据相同，未做任何更新";
+    }
+    
+    // 如果数据不同，执行更新操作
+    User updateUser = new User();
+    updateUser.setName(newName);
+
+    LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
+    updateWrapper.eq(User::getId, userId);
+    
+    int result = userMapper.update(updateUser, updateWrapper);
+    
+    if (result > 0) {
+        return "更新成功，受影响的行数: " + result;
+    } else {
+        return "更新失败，没有符合条件的记录";
+    }
+}
+```
+
+### 代码解析
+
+1. **查询记录是否存在**：通过 `userMapper.selectById(userId)` 查询数据库中是否存在指定 ID 的用户。
+   - 如果查询结果为 `null`，则说明没有符合条件的记录，返回 `"用户不存在"`。
+
+2. **比较待更新的数据与当前数据**：通过 `existingUser.getName().equals(newName)` 比较数据库中的值和即将更新的值。
+   - 如果两者相同，说明数据没有变化，返回 `"更新失败，数据相同，未做任何更新"`。
+
+3. **执行更新操作**：如果数据不同，则执行更新操作，并根据返回值判断更新是否成功。
+
+### 优化方案
+
+如果你不想查询整个对象，只查询更新字段的值，可以优化查询的字段范围，减少数据库查询的开销。你可以在 MyBatis-Plus 中使用自定义 SQL 或者只选择部分字段的查询来达到这一点。
+
+### 结论
+
+- 通过 **查询记录是否存在** 可以判断是否有符合条件的记录。
+- 通过 **比较待更新的数据与现有数据** 可以判断是否因为数据相同导致没有实际更新。
+- 最终，更新操作可以根据这两个步骤的结果来更细致地判断执行结果。
+
+这种方式不仅能够精确判断没有符合条件的记录，还可以判断由于数据相同导致的“未更新”情况。
+
+# 54. mysql where 条件中，如何去除某个字段值的前3位和后4位之后，再和传入的参数进行等于匹配
+在 MySQL 中，如果需要去除某个字段值的前3位和后4位之后，再和传入的参数进行匹配，可以使用 `SUBSTRING` 函数来截取中间的部分。
+
+假设你有一个表 `my_table`，表中有一个字段 `my_field`，并且你需要去掉该字段的前3位和后4位，来与传入的参数 `param` 进行等于匹配。可以这样写查询语句：
+
+```sql
+SELECT *
+FROM my_table
+WHERE SUBSTRING(my_field, 4, LENGTH(my_field) - 7) = 'param';
+```
+
+解释：
+- `SUBSTRING(my_field, 4, LENGTH(my_field) - 7)`:
+  - `SUBSTRING` 函数用于从 `my_field` 中截取子字符串。
+  - `4` 表示从第四个字符开始截取（跳过前3位）。
+  - `LENGTH(my_field) - 7` 计算从第四个字符开始后剩下的子字符串长度，也就是总长度减去前3位和后4位。
+
+这样，你就可以将去除前3位和后4位之后的值与传入的参数 `param` 进行比较了。
+
+#55. 在mybatisplus中如何处理呢？
+在 MyBatis-Plus 中，如果需要在 `WHERE` 条件中去掉某个字段的前3位和后4位，然后与传入的参数进行匹配，可以结合 MyBatis-Plus 的 `LambdaQueryWrapper` 和 MySQL 的 `SUBSTRING` 函数来实现。
+
+MyBatis-Plus 提供了强大的 `Wrapper` 来构造查询条件，但由于这种字段操作需要用到数据库的原生函数（如 `SUBSTRING`），因此你需要使用 `apply` 方法来写原生 SQL 片段。
+
+假设你有一个字段 `myField`，并且有一个传入的参数 `param`，代码可以像这样写：
+
+```java
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+
+public List<MyEntity> findByCustomField(String param) {
+    LambdaQueryWrapper<MyEntity> queryWrapper = Wrappers.lambdaQuery();
+    queryWrapper.apply("SUBSTRING(my_field, 4, LENGTH(my_field) - 7) = {0}", param);
+
+    return myEntityMapper.selectList(queryWrapper);
+}
+```
+
+### 代码说明：
+1. **`apply` 方法**：用来插入原生 SQL 片段，`SUBSTRING(my_field, 4, LENGTH(my_field) - 7)` 是 MySQL 的原生语法。
+   - `{0}` 是占位符，会自动用 `param` 参数进行替换，防止 SQL 注入。
+2. **`Wrappers.lambdaQuery()`**：用于构造一个 `LambdaQueryWrapper`，让代码更具可读性和类型安全。
+
+这种方式允许你在 MyBatis-Plus 中灵活地使用数据库的原生函数来处理复杂的查询逻辑，同时保持了 MyBatis-Plus 的查询风格和简洁性。
+
+# 56. 详细解释下呢，我现在使用的是wapper.select方法进行的查询
+在 MyBatis-Plus 中，`Wrapper.select` 用于指定查询时需要返回的字段，而对于复杂的 `WHERE` 条件，尤其涉及到像 `SUBSTRING` 这样的数据库原生函数，你需要使用 `Wrapper.apply` 来进行自定义 SQL 查询片段。
+
+你提到你正在使用 `Wrapper.select` 方法进行查询，结合你需要操作的字段（去掉前3位和后4位后与参数匹配），我会详细说明如何将 `SUBSTRING` 和 `WHERE` 条件与 `Wrapper.select` 一起使用。
+
+### 示例场景
+
+假设：
+- 你有一个表 `my_table`，对应的实体类为 `MyEntity`。
+- 你想查询其中 `my_field` 字段，要求去掉其前3位和后4位，然后与传入的参数 `param` 进行等于匹配。
+
+### 使用 `Wrapper.select` 和 `apply` 的详细实现步骤
+
+1. **实体类 (`MyEntity`)**：
+   假设你的实体类结构如下：
+
+   ```java
+   @TableName("my_table")
+   public class MyEntity {
+       private Long id;
+       private String myField;
+       // 其他字段的getter和setter
+   }
+   ```
+
+2. **`Mapper` 接口**：
+   MyBatis-Plus 提供了 `BaseMapper`，假设你的 `Mapper` 接口如下：
+
+   ```java
+   public interface MyEntityMapper extends BaseMapper<MyEntity> {
+   }
+   ```
+
+3. **查询代码实现**：
+
+   下面是通过 `Wrapper.select` 和 `apply` 的完整代码示例：
+
+   ```java
+   import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+   import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+   import org.springframework.beans.factory.annotation.Autowired;
+   import org.springframework.stereotype.Service;
+
+   @Service
+   public class MyEntityService {
+
+       @Autowired
+       private MyEntityMapper myEntityMapper;
+
+       public List<MyEntity> findByCustomField(String param) {
+           // 构建查询条件
+           LambdaQueryWrapper<MyEntity> queryWrapper = Wrappers.lambdaQuery();
+
+           // 使用 apply 添加自定义 SQL 片段进行字段截取和匹配
+           queryWrapper.apply("SUBSTRING(my_field, 4, LENGTH(my_field) - 7) = {0}", param);
+
+           // 使用 select 方法只选择需要的字段，假设你只想返回 id 和 myField 字段
+           queryWrapper.select(MyEntity::getId, MyEntity::getMyField);
+
+           // 执行查询，返回匹配的结果
+           return myEntityMapper.selectList(queryWrapper);
+       }
+   }
+   ```
+
+### 代码解释
+
+1. **`Wrappers.lambdaQuery()`**：
+   创建一个 `LambdaQueryWrapper` 对象，它允许通过 lambda 表达式方式去构建查询条件，避免手写字符串字段名可能带来的错误。
+
+2. **`apply("SUBSTRING(my_field, 4, LENGTH(my_field) - 7) = {0}", param)`**：
+   - `apply` 方法用于向 SQL 语句中注入自定义的 SQL 片段。在这里，我们通过 `SUBSTRING` 函数截取 `my_field` 字段的中间部分（去掉前3位和后4位）。
+   - `{0}` 是占位符，用来替代传入的参数 `param`，MyBatis-Plus 会自动为你处理这个参数的绑定，防止 SQL 注入。
+
+3. **`select(MyEntity::getId, MyEntity::getMyField)`**：
+   - `Wrapper.select` 用于指定查询中需要返回的字段。在这个例子中，我们仅查询 `id` 和 `myField` 字段。
+   - 这里使用的是 `LambdaQueryWrapper` 提供的 lambda 表达式形式来指定字段，保证了代码的类型安全性。
+
+4. **`myEntityMapper.selectList(queryWrapper)`**：
+   - `selectList` 方法执行查询，返回所有符合条件的记录，并以 `List<MyEntity>` 的形式返回结果。
+
+### 对 `apply` 的深入理解
+
+`apply` 是 MyBatis-Plus 用于自定义 SQL 片段的一个强大工具。与其他条件构造器方法不同，它允许你直接将原生 SQL 写入查询条件中。
+
+- **使用场景**：在需要调用数据库的特定函数（如 `SUBSTRING`、`DATE_FORMAT`、`CONCAT` 等）或者进行复杂的条件判断时，可以通过 `apply` 来注入这些函数和条件。
+- **参数绑定**：通过使用 `{0}`、`{1}` 这样的占位符，MyBatis-Plus 能够自动为你处理 SQL 参数的绑定，确保安全性，避免 SQL 注入风险。
+
+### 查询结果示例
+
+假设你的表中有以下数据：
+
+| id  | my_field       |
+|-----|----------------|
+| 1   | abc1234567890  |
+| 2   | def9876543210  |
+
+如果传入参数为 `'123456'`，则执行上述查询时会匹配 `my_field` 字段去掉前3位和后4位后的值为 `123456` 的记录，查询结果如下：
+
+```json
+[
+  {
+    "id": 1,
+    "myField": "abc1234567890"
+  }
+]
+```
+
+### 总结
+
+通过 MyBatis-Plus 的 `Wrapper.apply` 方法，结合数据库的 `SUBSTRING` 等原生函数，可以灵活地处理字段的复杂操作。同时，使用 `Wrapper.select` 可以指定查询时返回的字段，保证查询结果精确满足业务需求。
+
+# 57. SUBSTRING(my_field, 4, LENGTH(my_field) - 7) = {0}这个里面字段名传入实体的字段，还是表中的字段列名呢？
+在 MyBatis-Plus 中，`apply` 方法中的 SQL 语句是直接传递给数据库的原生 SQL 片段，因此，**你需要使用表中的字段列名**，而不是实体类中的字段名。
+
+### 具体解释
+
+- **表中的字段列名**：这是数据库表中的实际列名。例如，如果数据库表中的列名是 `my_field`，那么在 `apply` 中就需要使用 `my_field` 这个表的列名。
+- **实体类中的字段名**：这是 Java 实体类中定义的字段名称，通常会通过 `@TableField` 注解与数据库的列名进行映射。如果列名和字段名不同，你在 MyBatis-Plus 查询条件中使用原生 SQL 时仍然需要基于数据库中的列名。
+
+### 回到你的例子
+
+假设你的表字段名为 `my_field`，实体类字段名也是 `myField`（常见的驼峰式命名）。在 `apply` 方法中，应该使用表字段 `my_field` 来构建 SQL 片段，如下所示：
+
+```java
+queryWrapper.apply("SUBSTRING(my_field, 4, LENGTH(my_field) - 7) = {0}", param);
+```
+
+这里的 `my_field` 是表中的列名，不是实体类的字段 `myField`。MyBatis-Plus 不会自动将实体类的字段名转换为表列名，所以你必须明确地使用表的列名。
+
+### 如果表字段名和实体类字段名不一致
+
+假如你的实体类字段名和数据库表的列名不同，例如：
+- 数据库表的列名是 `my_column`
+- 实体类的字段名是 `myField`
+
+你仍然需要在 `apply` 中使用数据库表的列名 `my_column`，如下所示：
+
+```java
+queryWrapper.apply("SUBSTRING(my_column, 4, LENGTH(my_column) - 7) = {0}", param);
+```
+
+### 如何处理字段映射
+
+如果你的实体类字段和数据库列名不一致，可以通过 `@TableField` 注解进行字段映射，例如：
+
+```java
+@TableField("my_column")
+private String myField;
+```
+
+但无论是否使用了字段映射，在使用 `apply` 编写自定义 SQL 片段时，依然需要使用数据库中的字段名，而不是实体类中的字段名。

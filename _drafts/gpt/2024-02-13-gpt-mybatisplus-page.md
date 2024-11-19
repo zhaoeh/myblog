@@ -4839,3 +4839,254 @@ SELECT * FROM table_name WHERE BINARY text_field = 'Hello  World'; -- Notice the
 - **应用层处理**: 在插入和查询时进行字符串标准化处理。
 
 这些方法可以帮助你更灵活地处理字符串中的空格和其他字符，以实现你所需的比较逻辑。
+
+
+# 64. mybatisplus如何使用Page对象进行分页查询？
+在MyBatis-Plus中，`Page`对象是用于处理分页查询的工具类。通过它可以轻松实现分页功能。以下是一个常见的使用示例，包括如何将分页逻辑集成到服务层中：
+
+### 1. 引入依赖
+首先，确保你的`pom.xml`文件中已经引入了MyBatis-Plus相关依赖：
+
+```xml
+<dependency>
+    <groupId>com.baomidou</groupId>
+    <artifactId>mybatis-plus-boot-starter</artifactId>
+    <version>最新版本</version>
+</dependency>
+```
+
+### 2. 实现分页查询
+
+在MyBatis-Plus中，你可以通过`Page`对象结合Mapper层方法来进行分页查询。示例如下：
+
+#### 2.1 创建实体类
+```java
+@Data
+public class User {
+    private Long id;
+    private String name;
+    private Integer age;
+}
+```
+
+#### 2.2 创建Mapper接口
+```java
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+public interface UserMapper extends BaseMapper<User> {
+
+    // 使用 MyBatis 注解的分页查询方法
+    @Select("SELECT * FROM user WHERE age >= #{age}")
+    Page<User> selectUserByAge(Page<?> page, @Param("age") Integer age);
+}
+```
+
+#### 2.3 配置分页插件
+为了支持分页查询，MyBatis-Plus需要配置分页插件。可以在Spring Boot项目的配置类中配置分页插件：
+
+```java
+import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class MybatisPlusConfig {
+    @Bean
+    public MybatisPlusInterceptor mybatisPlusInterceptor() {
+        MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+        interceptor.addInnerInterceptor(new PaginationInnerInterceptor()); // 添加分页插件
+        return interceptor;
+    }
+}
+```
+
+#### 2.4 在Service层调用分页查询
+```java
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class UserService {
+
+    @Autowired
+    private UserMapper userMapper;
+
+    public Page<User> getUserPage(int pageNo, int pageSize, int minAge) {
+        // 创建分页对象，传入当前页码和每页大小
+        Page<User> page = new Page<>(pageNo, pageSize);
+        
+        // 调用分页查询方法
+        return userMapper.selectUserByAge(page, minAge);
+    }
+}
+```
+
+#### 2.5 Controller层处理分页请求
+```java
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+
+    @Autowired
+    private UserService userService;
+
+    @GetMapping("/users")
+    public Page<User> getUsers(@RequestParam int pageNo,
+                               @RequestParam int pageSize,
+                               @RequestParam int minAge) {
+        return userService.getUserPage(pageNo, pageSize, minAge);
+    }
+}
+```
+
+### 3. 执行效果
+当访问`/users?pageNo=1&pageSize=10&minAge=20`时，系统将返回第1页，每页10条年龄大于等于20的用户记录。
+
+#### 4. `Page` 对象说明
+- `Page<T>` 是 MyBatis-Plus 自带的分页对象。
+- 主要属性：
+  - `current`: 当前页码。
+  - `size`: 每页条数。
+  - `total`: 总记录数。
+  - `pages`: 总页数。
+  - `records`: 当前页的查询结果数据。
+
+### 总结
+MyBatis-Plus通过`Page`对象结合`分页插件`，能够方便高效地实现分页查询，并支持自定义分页逻辑，适用于多种业务场景。
+
+# 65. spring中的@Nullable注解有啥实际的作用吗？
+在Spring框架中，`@Nullable`注解主要用于表示某个方法参数、方法返回值或字段**可以为`null`**。虽然它不会改变代码的执行逻辑，但它有一些实际的作用，尤其在代码的可读性、可维护性和工具支持方面。下面列出它的主要作用：
+
+### 1. **增强代码可读性**
+`@Nullable`注解表明某个参数或返回值**允许为空**。这对阅读代码的人来说，提供了非常直观的提示，表明该变量或方法结果可能为`null`，从而促使开发者在使用时更加小心。
+  
+```java
+public String getUserName(@Nullable String userId) {
+    // userId 可以为 null
+    if (userId == null) {
+        return "Default User";
+    }
+    return findUserById(userId);
+}
+```
+在这个例子中，`userId`可以为`null`，所以调用该方法的地方需要注意检查参数。
+
+### 2. **帮助工具和IDE提供警告或提示**
+许多现代IDE（如IntelliJ IDEA、Eclipse）在识别到`@Nullable`注解后，会在可能导致`NullPointerException`的代码处发出警告。例如，如果你在传递或使用一个标记为`@Nullable`的变量时没有处理`null`情况，IDE可能会发出警告。
+
+```java
+@Nullable
+public String getUserById(String id) {
+    return findUserInDatabase(id);  // 可能返回null
+}
+
+// 在其他地方使用
+String user = getUserById("123");
+int length = user.length();  // IDE 可能会警告：此处可能抛出 NullPointerException
+```
+
+### 3. **与Spring框架内的工具和API集成**
+在某些Spring API中，`@Nullable`可以用于参数注入。例如，在构造器或方法参数上标记为`@Nullable`的参数可以省略，Spring会自动处理`null`的情况。
+
+```java
+@Service
+public class UserService {
+    private final UserRepository userRepository;
+    private final Logger logger;
+
+    public UserService(UserRepository userRepository, @Nullable Logger logger) {
+        this.userRepository = userRepository;
+        this.logger = logger != null ? logger : Logger.getLogger(UserService.class.getName());
+    }
+}
+```
+在这个例子中，如果没有配置`Logger`，则Spring会传递`null`给构造器，`@Nullable`标注的参数处理了这种情况。
+
+### 4. **与静态代码分析工具集成**
+静态代码分析工具（如FindBugs、SonarQube等）能够检测`@Nullable`注解并进行更细致的静态分析，以识别可能的`null`安全性问题。
+
+### 5. **与`@NonNull`配合使用**
+`@Nullable`通常与`@NonNull`配合使用，明确标记哪些地方可以为`null`，哪些地方不允许`null`，从而提高代码的健壮性和可维护性。
+
+```java
+public void process(@Nullable String name, @NonNull String email) {
+    if (name != null) {
+        // do something
+    }
+    // email 不能为null
+    sendEmail(email);
+}
+```
+
+### 6. **防止不必要的空指针检查**
+通过明确声明某个方法的返回值或参数是`@Nullable`，可以在调用时确保开发者采取适当的`null`检查逻辑，从而避免运行时的空指针异常（`NullPointerException`）。
+
+---
+
+### 总结
+`@Nullable`在Spring中的主要作用是提供**语义化的代码提示**，提高代码的**可读性**和**可维护性**，并结合IDE、静态分析工具等进行代码质量的改进。虽然它不会改变业务逻辑，但对于代码的健壮性、安全性有着潜在的提升作用。
+
+# 66. mybatisplus通过page对象进行分页查询时，如果查询不到数据，返回的list是null还是一个空的list对象？
+在MyBatis-Plus中，使用`Page`对象进行分页查询时，即使查询不到数据，返回的`list`也是一个**空的List对象**，而不是`null`。也就是说，当查询结果为空时，MyBatis-Plus会确保`Page`对象中的`records`属性是一个空的集合，而不是`null`。
+
+### 示例代码
+
+假设你进行了一次分页查询：
+
+```java
+Page<User> page = new Page<>(1, 10);  // 第1页，每页查询10条记录
+Page<User> result = userMapper.selectPage(page, null);
+```
+
+当查询不到任何数据时，返回的 `Page<User>` 对象的 `records`（即查询结果的列表）会是一个空的 `List`，而不会是 `null`。
+
+### 验证查询结果
+
+你可以这样验证：
+
+```java
+if (result.getRecords().isEmpty()) {
+    System.out.println("查询结果为空，返回了空列表");
+} else {
+    System.out.println("查询结果不为空");
+}
+```
+
+### 结论
+当使用MyBatis-Plus通过`Page`对象进行分页查询时，如果查询不到数据，返回的`records`是一个**空的`List`对象**，而不是`null`。
+
+# 67. sql中in和=的性能区别
+在SQL中，`IN` 和 `=` 的使用场景和性能有一些区别：
+
+### 1. 使用场景
+- **`=`**：适用于比较单一的值，比如 `WHERE id = 1`。
+- **`IN`**：适用于比较多个值的场景，比如 `WHERE id IN (1, 2, 3)`，即匹配多个可能的值。
+
+### 2. 性能区别
+- **`=` 的性能通常更优**：因为 `=` 只涉及单个值的比较，数据库只需要查找并匹配一个值，所以在大多数情况下，`=` 的查询速度会快于 `IN`。
+  
+- **`IN` 的性能稍慢**：`IN` 涉及多个值的比较，数据库需要将每个条件值逐一进行匹配和过滤。因此，`IN` 可能会引入更多的计算量，尤其当列表中的值较多时，可能影响查询性能。
+
+### 3. 优化建议
+- **较少的 `IN` 值**：当 `IN` 中的值数量较少时，性能差异不明显，`IN` 的效率基本可以接受。
+- **大量的 `IN` 值**：如果 `IN` 中的值非常多，数据库在处理时可能需要做更多的查找操作，查询性能会显著下降。在这种情况下，考虑使用 `JOIN`、子查询或者临时表来优化查询。
+- **`IN` 列表的顺序**：对性能的影响微乎其微，数据库通常会自动优化处理。
+
+### 4. 特殊情况
+在某些数据库中，比如 MySQL，如果 `IN` 列表中的值较多，数据库会尝试将其转换为优化过的形式，比如使用临时表或者索引加速查询。但这也取决于数据库的版本和查询计划器的优化策略。
+
+### 5. 总结
+- 对于单值比较，`=` 的性能通常优于 `IN`。
+- 对于多值比较，如果 `IN` 列表较短，性能差异不大；但如果列表较长，`IN` 的性能可能会受到影响。
+- 优化查询时，尽量避免过长的 `IN` 列表，可以考虑其他优化方式。
+

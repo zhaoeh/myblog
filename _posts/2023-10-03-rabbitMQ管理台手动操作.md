@@ -2,7 +2,7 @@
 layout:     post
 title:      rabbitMQ 管理台操作
 subtitle:   安装好rabbitMQ后，可以登录管理台手动操作它
-categories: [rabbitMQ]
+categories: [MQ系列]
 mermaid: false
 sequence: false
 flow: false

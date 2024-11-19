@@ -528,3 +528,5 @@ CompletableFuture本身并不能保证线程安全，它只是将异步任务负
 如果不存在这种场景，那么CompletableFuture对于任务的操作就是线程安全的。    
 
 因此，得出结果：不论是使用线程、线程池、Future、还是CompletableFuture去操作某些对象，是否存在线程安全问题，取决于这些对象本身是否存在共享修改操作。   
+
+# 4. 

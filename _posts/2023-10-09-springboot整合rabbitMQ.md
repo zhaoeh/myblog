@@ -2,7 +2,7 @@
 layout:     post
 title:      springboot整合rabbitMQ
 subtitle:   我们将主要研究springboot整合MQ
-categories: [rabbitMQ]
+categories: [MQ系列]
 mermaid: false
 sequence: false
 flow: false
