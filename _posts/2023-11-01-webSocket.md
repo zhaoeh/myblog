@@ -1468,3 +1468,45 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 **总结**：
 Spring WebSocket 是对 Tomcat WebSocket 的增强，适合需要与 Spring 框架集成的复杂应用场景。
 
+
+
+# 10. spring webSocket编码实战
+如果使用的是 Spring WebSocket，你不需要在 controller 上标注 `@ServerEndpoint` 注解。`@ServerEndpoint` 是用于 Java EE 的 WebSocket API，它是用于在服务器端创建 WebSocket 端点的注解，但在 Spring WebSocket 中，我们通常使用的是 Spring 自己的 WebSocket 支持。
+
+在 Spring WebSocket 中，你的 WebSocket 配置通常会使用 `@EnableWebSocket` 或 `@EnableWebSocketMessageBroker` 注解来启用 WebSocket 功能。然后，你可以通过 `@Controller` 或 `@MessageMapping` 来定义 WebSocket 控制器，而不需要使用 `@ServerEndpoint`。
+
+一个典型的 Spring WebSocket 控制器示例：
+
+```java
+@Controller
+public class WebSocketController {
+
+    @MessageMapping("/chat")
+    @SendTo("/topic/messages")
+    public Message sendMessage(Message message) {
+        return message;
+    }
+}
+```
+
+你还需要一个 WebSocket 配置类来配置消息代理和 WebSocket 端点：
+
+```java
+@Configuration
+@EnableWebSocketMessageBroker
+public class WebSocketConfig extends WebSocketMessageBrokerConfigurer {
+    
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry config) {
+        config.enableSimpleBroker("/topic");
+        config.setApplicationDestinationPrefixes("/app");
+    }
+
+    @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+        registry.addEndpoint("/ws").withSockJS();
+    }
+}
+```
+
+在这种方式下，你通过 `@MessageMapping` 来定义 WebSocket 消息处理方法，而不是使用 `@ServerEndpoint`。
