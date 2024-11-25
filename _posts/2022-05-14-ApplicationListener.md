@@ -1912,6 +1912,194 @@ class ApplicationListenerDetector implements DestructionAwareBeanPostProcessor, 
 （2）自定义事件，并让感兴趣的监听器感知订阅到（事件）。   
 （3）自定义事件源，在合适的时机发布指定的事件，从而触发监听器的回调执行（事件源）。      
 
-## 5.1 自定义事件监听器
+## 7.1 自定义事件监听器
 通过前面的分析，要想自定义一个监听器并同时注册到spring容器自身初始化的广播器中，我们猜测有如下方式可以实现：   
 （1）
+
+
+
+
+
+
+
+
+
+# 8. springboot中的所有内置事件（包括spring）
+Spring Boot 和 Spring 的启动生命周期中会发布多个内置事件，贯穿应用启动的各个阶段。这些事件允许开发者通过自定义 `ApplicationListener` 或事件机制进行扩展和控制。以下是详细的事件列表及其触发顺序。
+
+---
+
+## **Spring Boot 启动生命周期中的内置事件**
+
+### **1. Spring Boot 应用启动关键步骤**
+1. **准备环境 (`Environment` 初始化)**  
+   包括系统环境变量、配置文件解析等。
+   
+2. **准备应用上下文 (`ApplicationContext` 创建)**  
+   初始化并配置 Spring 容器。
+   
+3. **刷新上下文 (`ApplicationContext` 刷新)**  
+   完成 Bean 加载、依赖注入和容器初始化。
+   
+4. **运行阶段 (`CommandLineRunner` 和 `ApplicationRunner`)**  
+   应用启动完成，执行运行时逻辑。
+
+---
+
+### **2. 内置事件及其触发顺序**
+
+| 事件名称                         | 发布阶段                                 | 说明                                                                                                                                 |
+|----------------------------------|----------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| **`ApplicationStartingEvent`**   | 应用启动的最早阶段                       | 在 `SpringApplication` 初始化时发布，`Environment` 和 `ApplicationContext` 都未创建。                                               |
+| **`ApplicationEnvironmentPreparedEvent`** | `Environment` 准备完成                 | 在 `Environment` 准备好之后发布，此时 `ApplicationContext` 尚未创建，用于加载 `bootstrap.yml`。                                      |
+| **`ApplicationContextInitializedEvent`** | `ApplicationContext` 初始化完成         | 在 `ApplicationContext` 准备完成，但还未加载 Bean 定义时发布，用于扩展上下文配置。                                                   |
+| **`ApplicationPreparedEvent`**  | `ApplicationContext` 加载完成           | 在 `ApplicationContext` 已加载，但未刷新之前发布，Bean 定义已加载，未实例化。                                                       |
+| **`ApplicationStartedEvent`**   | `ApplicationContext` 已刷新             | 在 `ApplicationContext` 刷新并启动，但未执行 `CommandLineRunner` 和 `ApplicationRunner` 之前发布。                                   |
+| **`ApplicationReadyEvent`**     | 应用完全启动完成                         | 在应用启动完成后发布，表示应用已准备好接收请求或任务。                                                                               |
+| **`ApplicationFailedEvent`**    | 启动失败                                | 如果启动过程中抛出异常，会发布该事件，允许开发者捕获失败信息并处理。                                                                |
+
+---
+
+## **Spring 应用启动生命周期中的内置事件**
+
+Spring 的启动生命周期更底层，涉及 `ApplicationContext` 的初始化和刷新阶段。以下是 Spring 定义的事件及其触发顺序。
+
+| 事件名称                              | 发布阶段                                 | 说明                                                                                  |
+|---------------------------------------|----------------------------------------|-------------------------------------------------------------------------------------|
+| **`ContextRefreshedEvent`**           | `ApplicationContext` 刷新完成           | 在 `ApplicationContext` 完成刷新（`refresh()` 方法调用后）时发布，用于通知 Bean 初始化完成。                           |
+| **`ContextStartedEvent`**             | `ApplicationContext` 启动               | 在调用 `ApplicationContext` 的 `start()` 方法时发布，用于支持显式启动操作的应用。                                         |
+| **`ContextStoppedEvent`**             | `ApplicationContext` 停止               | 在调用 `ApplicationContext` 的 `stop()` 方法时发布，用于支持显式停止操作的应用。                                         |
+| **`ContextClosedEvent`**              | `ApplicationContext` 关闭               | 在调用 `ApplicationContext` 的 `close()` 方法时发布，表示应用上下文即将关闭。                                             |
+| **`RequestHandledEvent`**             | Web 请求被处理完成（Web 应用）            | 在 Web 应用中，当 HTTP 请求被处理完成时发布，用于跟踪请求处理情况。                                                     |
+
+---
+
+## **启动事件的时序及详细说明**
+
+以下为详细启动事件触发顺序及其执行逻辑。
+
+### **1. `ApplicationStartingEvent`**
+- **触发时机**:  
+  在 `SpringApplication.run()` 方法刚开始时触发。
+- **典型用途**:  
+  - 打印启动横幅（Banner）。
+  - 初始化启动日志。
+  
+- **关键代码**:  
+  在 `SpringApplication` 构造函数中触发：
+  ```java
+  listeners.starting();
+  ```
+
+---
+
+### **2. `ApplicationEnvironmentPreparedEvent`**
+- **触发时机**:  
+  在 `Environment` 准备完成，且未创建 `ApplicationContext` 之前。
+- **典型用途**:  
+  - 加载 `bootstrap.yml`（由 `BootstrapApplicationListener` 实现）。
+  - 自定义环境属性加载。
+  
+- **关键代码**:  
+  在 `prepareEnvironment` 方法中触发：
+  ```java
+  listeners.environmentPrepared(environment);
+  ```
+
+---
+
+### **3. `ApplicationContextInitializedEvent`**
+- **触发时机**:  
+  在创建并配置 `ApplicationContext` 之后，但未加载 Bean 定义之前。
+- **典型用途**:  
+  - 定制上下文加载器。
+  - 注册自定义 `BeanFactoryPostProcessor`。
+
+---
+
+### **4. `ApplicationPreparedEvent`**
+- **触发时机**:  
+  在 `ApplicationContext` 加载完成，但未刷新时。
+- **典型用途**:  
+  - 配置上下文的最后阶段。
+  - 注册动态 Bean 或修改现有的 Bean 定义。
+  
+- **关键代码**:  
+  在 `prepareContext` 方法中触发：
+  ```java
+  listeners.contextPrepared(context);
+  ```
+
+---
+
+### **5. `ApplicationStartedEvent`**
+- **触发时机**:  
+  在 `ApplicationContext` 刷新完成后，但未运行 `CommandLineRunner` 或 `ApplicationRunner` 时。
+- **典型用途**:  
+  - 执行启动后逻辑（如打印状态信息）。
+  - 启动外部任务。
+
+---
+
+### **6. `ApplicationReadyEvent`**
+- **触发时机**:  
+  在 `CommandLineRunner` 和 `ApplicationRunner` 执行完成后触发。
+- **典型用途**:  
+  - 通知外部系统应用已准备好处理请求。
+  - 执行延迟启动任务。
+
+---
+
+### **7. `ApplicationFailedEvent`**
+- **触发时机**:  
+  如果在启动过程中发生异常。
+- **典型用途**:  
+  - 捕获启动失败异常。
+  - 清理资源，记录日志。
+
+---
+
+## **扩展：如何监听这些事件**
+
+使用自定义 `ApplicationListener`，如下：
+```java
+@Component
+public class MyApplicationListener implements ApplicationListener<ApplicationReadyEvent> {
+    @Override
+    public void onApplicationEvent(ApplicationReadyEvent event) {
+        System.out.println("Application is ready!");
+    }
+}
+```
+
+或者直接通过 Lambda 表达式在启动时注册：
+```java
+SpringApplication app = new SpringApplication(MyApplication.class);
+app.addListeners(event -> {
+    if (event instanceof ApplicationReadyEvent) {
+        System.out.println("Application is ready!");
+    }
+});
+app.run(args);
+```
+
+---
+
+## **总结**
+
+### **Spring Boot 启动事件顺序**
+1. `ApplicationStartingEvent`
+2. `ApplicationEnvironmentPreparedEvent`
+3. `ApplicationContextInitializedEvent`
+4. `ApplicationPreparedEvent`
+5. `ApplicationStartedEvent`
+6. `ApplicationReadyEvent`
+7. `ApplicationFailedEvent`
+
+### **Spring 应用上下文事件顺序**
+1. `ContextRefreshedEvent`
+2. `ContextStartedEvent`
+3. `ContextStoppedEvent`
+4. `ContextClosedEvent`
+
+了解这些事件，可以帮助我们更好地在应用生命周期中嵌入自定义逻辑。
