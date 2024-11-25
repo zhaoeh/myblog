@@ -363,6 +363,7 @@ public class CustomApplicationContextInitializer implements ApplicationContextIn
 - 如果目标是修改环境变量、加载配置文件或调整环境属性，请使用 **`EnvironmentPostProcessor`**。
 - 如果目标是对 `ApplicationContext` 进行自定义，如注册 Bean 或初始化逻辑，请使用 **`ApplicationContextInitializer`**。
 - 两者可以结合使用，先用 `EnvironmentPostProcessor` 准备环境，再用 `ApplicationContextInitializer` 初始化上下文。
+- 实际上EnvironmentPostProcessor的回调是在容器启动时发布ApplicationEnvironmentPreparedEvent事件时进行调用的。   
 
 # 3. EnvironmentPostProcessor 无法覆盖nacos已有的配置，这是为什么？
 你理解得非常正确！如果你尝试通过实现 `EnvironmentPostProcessor` 来覆盖 Nacos 配置，是无法实现的。这是因为 Nacos 配置的加载基于 `ApplicationContextInitializer`，而 `EnvironmentPostProcessor` 的执行时机**早于** `ApplicationContextInitializer`。
