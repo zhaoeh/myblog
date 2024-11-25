@@ -1276,3 +1276,671 @@ public void handleClientReconnect(String userId) {
 - **连接失效时消息会丢失，必须通过持久化机制保存待推送消息**。
 - **常见的解决方案是使用数据库或消息队列持久化消息，并在客户端重新上线时继续推送**。
 - Spring WebSocket 配合 `SimpMessagingTemplate` 和持久化机制，可以轻松实现上述功能，适合大多数场景。
+
+# 9. 如果用户换了设备重新登录上线了，此时如何确定用户的webSocketSession呢？webSocketSession应该会发生变化吧？
+是的，当用户换设备或者重新登录上线时，由于重新建立了 WebSocket 连接，服务端的 `WebSocketSession` 会发生变化。这会引发一个关键问题：**如何在用户切换设备或者重新连接时，正确关联新的 WebSocketSession？**
+
+以下是详细的分析和解决方案：
+
+---
+
+### **1. 用户换设备或重新登录的场景分析**
+
+#### **WebSocketSession 的特性**
+- 每次建立 WebSocket 连接，服务端都会为该连接分配一个新的 `WebSocketSession` 对象。
+- 如果同一个用户在不同设备上登录，或者断开后重新登录，新的连接会导致之前的 `WebSocketSession` 失效。
+
+#### **问题**
+- 用户切换设备或重新登录后，服务端需要将新的 `WebSocketSession` 与用户正确绑定。
+- 如果用户的旧 `WebSocketSession` 没有被清理，可能会导致消息推送到失效的连接上。
+
+---
+
+### **2. 解决方案：通过用户标识管理 WebSocketSession**
+
+要正确管理用户的 WebSocketSession，需要使用用户的唯一标识（如用户 ID）将 WebSocketSession 映射到具体的用户。
+
+#### **步骤：**
+
+##### **(1) 用户标识的获取**
+- 在 WebSocket 握手阶段，通过认证方式获取用户的唯一标识（如 Token 或 UserID）。
+- 常见方式：
+  1. **在 URL 或 Header 中携带 Token**：
+     - WebSocket 握手时，客户端通过 URL 或 Header 携带 Token。
+     - 服务端解析 Token，获取用户 ID。
+  2. **通过 Spring Security 提供的认证信息**：
+     - 如果应用已集成 Spring Security，可直接从 `Principal` 中获取用户信息。
+
+##### **(2) 维护用户与 WebSocketSession 的映射**
+- 使用 `ConcurrentHashMap` 或类似的数据结构，维护用户 ID 和 WebSocketSession 的映射关系。
+- 每当用户建立新连接时，更新此映射。
+
+##### **(3) 清理旧的 WebSocketSession**
+- 如果用户已有连接，断开旧连接，避免多端冲突。
+- 清理无效的会话，释放资源。
+
+---
+
+### **3. 核心实现代码**
+
+以下是基于 Spring WebSocket 的实现：
+
+#### **(1) 维护用户与 WebSocketSession 的映射**
+
+```java
+import org.springframework.web.socket.WebSocketSession;
+import java.util.concurrent.ConcurrentHashMap;
+
+@Component
+public class WebSocketSessionManager {
+    // 用户ID和WebSocketSession的映射
+    private final ConcurrentHashMap<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>();
+
+    // 添加用户会话
+    public void addSession(String userId, WebSocketSession session) {
+        // 如果已存在会话，断开旧会话
+        WebSocketSession oldSession = sessionMap.put(userId, session);
+        if (oldSession != null && oldSession.isOpen()) {
+            try {
+                oldSession.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    // 获取用户会话
+    public WebSocketSession getSession(String userId) {
+        return sessionMap.get(userId);
+    }
+
+    // 删除用户会话
+    public void removeSession(String userId) {
+        sessionMap.remove(userId);
+    }
+}
+```
+
+#### **(2) 在握手阶段绑定用户 ID**
+
+通过 WebSocket 握手拦截器获取用户信息：
+
+```java
+import org.springframework.web.socket.WebSocketHandler;
+import org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor;
+
+import java.util.Map;
+
+public class CustomHandshakeInterceptor extends HttpSessionHandshakeInterceptor {
+    @Override
+    public boolean beforeHandshake(
+        ServerHttpRequest request, 
+        ServerHttpResponse response, 
+        WebSocketHandler wsHandler, 
+        Map<String, Object> attributes) throws Exception {
+
+        // 从 URL 参数或 Header 中获取用户 ID（例如通过 Token）
+        String userId = extractUserIdFromRequest(request);
+
+        if (userId != null) {
+            attributes.put("userId", userId); // 将用户ID存入WebSocket会话属性
+            return true;
+        }
+        return false; // 未找到用户ID，拒绝连接
+    }
+
+    private String extractUserIdFromRequest(ServerHttpRequest request) {
+        // 解析用户 ID 的逻辑，例如从Token中解析
+        return "mockedUserId"; // 示例返回值
+    }
+}
+```
+
+#### **(3) 在连接建立时绑定 WebSocketSession**
+
+使用 `WebSocketSessionManager` 来管理连接：
+
+```java
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+@Component
+public class CustomWebSocketHandler extends TextWebSocketHandler {
+
+    @Autowired
+    private WebSocketSessionManager sessionManager;
+
+    @Override
+    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+        // 获取握手时存储的用户 ID
+        String userId = (String) session.getAttributes().get("userId");
+
+        if (userId != null) {
+            // 将用户ID和Session绑定
+            sessionManager.addSession(userId, session);
+        }
+    }
+
+    @Override
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+        // 清理用户的会话
+        String userId = (String) session.getAttributes().get("userId");
+        if (userId != null) {
+            sessionManager.removeSession(userId);
+        }
+    }
+}
+```
+
+---
+
+### **4. 用户重新登录后的行为**
+
+1. **绑定新 WebSocketSession：**
+   - 当用户在新设备或重新登录时，会重新建立 WebSocket 连接。
+   - 服务端通过用户 ID 绑定新的 WebSocketSession，同时清理旧的会话。
+
+2. **消息推送到新的 WebSocketSession：**
+   - 在消息推送时，直接从 `WebSocketSessionManager` 中获取用户的最新会话。
+   - 如果用户在线，推送消息。
+   - 如果用户不在线，消息持久化，等待用户重新上线后推送。
+
+#### **推送消息示例**
+```java
+public void pushMessageToUser(String userId, String message) {
+    WebSocketSession session = sessionManager.getSession(userId);
+    if (session != null && session.isOpen()) {
+        try {
+            session.sendMessage(new TextMessage(message));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    } else {
+        // 用户不在线，持久化消息
+        saveMessageToDatabase(userId, message);
+    }
+}
+```
+
+---
+
+### **5. 总结**
+
+1. **WebSocketSession 是会随用户重连而变化的，必须基于用户 ID 维护映射关系。**
+2. **通过拦截器或其他手段获取用户 ID，绑定到 WebSocketSession。**
+3. **使用 `ConcurrentHashMap` 等数据结构管理用户 ID 和 WebSocketSession 的关系。**
+4. **清理旧会话，确保消息推送到最新的 WebSocketSession 上。**
+5. **对于离线用户，持久化消息，等待用户重新上线时继续推送。**
+
+# 10. 对于用户变更webSocketSession的场景，当用户下线后，消息的持久化应该是和用户的唯一标识比如用户id绑定在一起的吧？
+是的，消息的持久化通常应该与用户的**唯一标识（例如用户 ID）**绑定在一起。这是因为用户在不同设备或多次重新登录后，`WebSocketSession` 会发生变化，而用户的唯一标识是稳定且不变的。通过绑定用户 ID，可以确保消息准确无误地推送到对应的用户，即使用户的会话发生了变化。
+
+---
+
+### **具体实现的逻辑**
+
+#### **1. 消息与用户 ID 绑定**
+
+持久化离线消息时，需要以用户的唯一标识（如 `userId`）作为关联键，保存到数据库或其他持久化存储中。例如：
+
+- 数据库结构可以是：
+  ```plaintext
+  +-----------+----------------+---------------------+
+  | messageId | userId         | content             |
+  +-----------+----------------+---------------------+
+  | 1         | 1001           | "Hello User 1001"   |
+  | 2         | 1002           | "Your order is ..." |
+  +-----------+----------------+---------------------+
+  ```
+- 保存消息时，绑定 `userId`，确保用户可以在重新上线时重新接收到这些消息。
+
+#### **2. 消息的生命周期**
+
+1. **消息产生：**
+   - 当服务端需要推送消息给某个用户时，会检查用户的 `WebSocketSession` 是否存在且有效。
+   - 如果用户离线（`WebSocketSession` 不存在或已关闭），将消息与用户 ID 绑定后存入持久化存储。
+
+2. **用户上线：**
+   - 用户重新连接时，服务端从存储中查询该用户的离线消息。
+   - 推送这些消息到用户的新 `WebSocketSession` 后，清理已发送的离线消息。
+
+3. **消息过期：**
+   - 根据业务需要，定期清理过期的或已处理的消息，避免持久化存储无限增长。
+
+---
+
+### **核心实现代码示例**
+
+以下是一个完整示例，展示如何处理消息持久化和推送的逻辑。
+
+#### **(1) 消息存储管理**
+
+假设我们用一个简单的内存数据结构来模拟数据库：
+
+```java
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.List;
+
+@Component
+public class OfflineMessageStore {
+
+    // 模拟数据库：userId -> 消息列表
+    private final ConcurrentHashMap<String, List<String>> messageMap = new ConcurrentHashMap<>();
+
+    // 保存离线消息
+    public void saveMessage(String userId, String message) {
+        messageMap.computeIfAbsent(userId, key -> new CopyOnWriteArrayList<>()).add(message);
+    }
+
+    // 获取离线消息
+    public List<String> getMessages(String userId) {
+        return messageMap.getOrDefault(userId, new CopyOnWriteArrayList<>());
+    }
+
+    // 清除已发送的消息
+    public void removeMessages(String userId) {
+        messageMap.remove(userId);
+    }
+}
+```
+
+#### **(2) 推送逻辑**
+
+在用户上线时推送离线消息：
+
+```java
+@Component
+public class MessagePusher {
+
+    @Autowired
+    private WebSocketSessionManager sessionManager;
+
+    @Autowired
+    private OfflineMessageStore messageStore;
+
+    public void pushMessage(String userId, String message) {
+        WebSocketSession session = sessionManager.getSession(userId);
+        if (session != null && session.isOpen()) {
+            try {
+                // 在线推送消息
+                session.sendMessage(new TextMessage(message));
+            } catch (Exception e) {
+                e.printStackTrace();
+                // 推送失败，重新保存为离线消息
+                messageStore.saveMessage(userId, message);
+            }
+        } else {
+            // 用户离线，存储消息
+            messageStore.saveMessage(userId, message);
+        }
+    }
+
+    public void pushOfflineMessages(String userId) {
+        WebSocketSession session = sessionManager.getSession(userId);
+        if (session != null && session.isOpen()) {
+            // 获取离线消息
+            List<String> messages = messageStore.getMessages(userId);
+            for (String message : messages) {
+                try {
+                    // 推送离线消息
+                    session.sendMessage(new TextMessage(message));
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    // 推送失败，保留消息
+                    messageStore.saveMessage(userId, message);
+                }
+            }
+            // 清除已推送的消息
+            messageStore.removeMessages(userId);
+        }
+    }
+}
+```
+
+#### **(3) 用户上线时处理离线消息**
+
+当用户重新连接后，可以直接调用 `pushOfflineMessages` 方法：
+
+```java
+@Override
+public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+    // 获取用户 ID
+    String userId = (String) session.getAttributes().get("userId");
+
+    if (userId != null) {
+        // 绑定用户与 WebSocketSession
+        sessionManager.addSession(userId, session);
+
+        // 推送离线消息
+        messagePusher.pushOfflineMessages(userId);
+    }
+}
+```
+
+---
+
+### **关键点总结**
+
+1. **消息持久化与用户 ID 绑定：**
+   - 将消息与用户的唯一标识绑定，保证消息的针对性和一致性。
+
+2. **离线消息存储：**
+   - 如果用户离线，消息会存储在持久化系统中（如数据库、Redis 等）。
+
+3. **重新上线处理：**
+   - 用户重新上线时，拉取并推送离线消息，同时清理已处理的消息。
+
+4. **扩展到分布式：**
+   - 如果服务是分布式部署，可以用 Redis 或 MQ 替代本地的 `ConcurrentHashMap` 来存储离线消息，确保多节点之间的数据一致性。
+
+---
+
+### **持久化存储选择**
+
+根据业务需求，选择适合的持久化存储方式：
+
+1. **轻量级方案：**
+   - 使用内存（`ConcurrentHashMap`）或本地文件。
+   - 适用于小规模、单节点部署。
+
+2. **中大型方案：**
+   - 使用 Redis 存储离线消息，支持快速读写和分布式部署。
+   - 消息格式：`key = userId, value = [message1, message2, ...]`。
+
+3. **企业级方案：**
+   - 使用消息队列（如 RabbitMQ 或 Kafka）管理离线消息，结合数据库存储持久化历史记录。
+   - 消息推送时从队列消费，确保消息可靠性。
+
+---
+
+通过这种方式，可以确保消息的推送准确性和可靠性，即使用户频繁切换设备或重新连接，消息也不会丢失。
+
+# 11. webSocket消息的持久化，一般都有哪些存储策略？请列举业界比较成熟的持久化方案
+在业界，**WebSocket 消息持久化**方案通常需要根据具体业务场景选择不同的策略。这些方案的目标是确保消息在用户离线、网络异常或系统故障时不会丢失，并在适当的时候重新推送给客户端。以下是一些成熟的持久化方案及其特点：
+
+---
+
+### **1. 基于内存的方案**
+
+#### **描述**
+- 使用服务器内存（如 `ConcurrentHashMap` 或其他内存存储结构）暂存离线消息。
+- 通常作为短期存储方案，适用于小规模部署和实时性较高的系统。
+
+#### **特点**
+- **优点**：
+  - 实现简单，访问速度快。
+  - 适合轻量级应用或单节点服务。
+- **缺点**：
+  - 无法持久化，服务器重启或宕机会丢失消息。
+  - 不适合分布式架构，难以支持高并发。
+
+#### **使用场景**
+- 单节点小型应用，消息无需长期保存。
+
+---
+
+### **2. 使用 Redis 作为离线消息存储**
+
+#### **描述**
+- 将离线消息存储在 Redis 中，通过用户 ID 或其他唯一标识进行分组。
+- Redis 的数据结构（如 `List` 或 `SortedSet`）可以方便地管理用户的离线消息。
+
+#### **特点**
+- **优点**：
+  - 支持高并发和快速读写，适合分布式部署。
+  - 方便实现消息的超时删除（通过 TTL 设置）。
+  - 可以灵活管理每个用户的消息队列（如基于优先级排序）。
+- **缺点**：
+  - 消息量大时可能增加存储成本。
+  - 需要定期清理过期或已处理的消息。
+
+#### **Redis 实现示例**
+- 消息存储格式：
+  - Key：`offline:messages:{userId}`
+  - Value：`List`（存储消息内容）
+
+```java
+// 保存消息
+redisTemplate.opsForList().leftPush("offline:messages:1001", "Hello User 1001");
+
+// 获取消息
+List<String> messages = redisTemplate.opsForList().range("offline:messages:1001", 0, -1);
+
+// 删除消息
+redisTemplate.delete("offline:messages:1001");
+```
+
+#### **使用场景**
+- 中小型分布式应用，消息需要短期持久化（如 7 天内有效）。
+
+---
+
+### **3. 基于消息队列（MQ）**
+
+#### **描述**
+- 使用消息队列（如 RabbitMQ、Kafka、RocketMQ 等）存储和转发消息。
+- 当用户离线时，将消息存入队列；用户重新上线后，从队列中消费并推送消息。
+
+#### **特点**
+- **优点**：
+  - 高吞吐量，支持大规模分布式系统。
+  - 自带消息重试、延时投递等特性，可靠性高。
+  - 可以设置消息过期时间或持久化到磁盘。
+- **缺点**：
+  - 需要额外维护 MQ 集群。
+  - 开发和部署成本较高。
+
+#### **RabbitMQ 示例**
+- 消息存储在 `queue` 中，消费者（推送逻辑）会在用户上线后消费消息。
+
+```java
+// 推送消息到队列
+rabbitTemplate.convertAndSend("exchange", "routingKey", "Hello User 1001");
+
+// 消费消息
+@RabbitListener(queues = "queueName")
+public void consumeMessage(String message) {
+    System.out.println("Received message: " + message);
+}
+```
+
+#### **使用场景**
+- 大型分布式系统，尤其是需要严格消息顺序或高可靠性场景。
+
+---
+
+### **4. 使用数据库（如 MySQL、PostgreSQL）**
+
+#### **描述**
+- 将离线消息持久化存储到数据库表中。
+- 每条消息记录与用户唯一标识绑定，支持查询和定期清理。
+
+#### **特点**
+- **优点**：
+  - 持久化程度高，适合存储历史消息。
+  - 容易扩展，可以记录消息状态（已读、未读）。
+  - 与现有业务数据库集成方便。
+- **缺点**：
+  - 性能瓶颈明显，不适合高并发场景。
+  - 对实时性要求高的场景可能存在延迟。
+
+#### **数据库结构示例**
+```sql
+CREATE TABLE offline_messages (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'UNREAD',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+```java
+// 保存消息
+offlineMessageRepository.save(new OfflineMessage(userId, content));
+
+// 获取消息
+List<OfflineMessage> messages = offlineMessageRepository.findByUserIdAndStatus(userId, "UNREAD");
+
+// 标记消息为已读
+offlineMessageRepository.updateStatusByUserId(userId, "READ");
+```
+
+#### **使用场景**
+- 需要长期保存历史消息，或需要对消息进行状态管理的场景。
+
+---
+
+### **5. 使用分布式存储（如 HBase、Cassandra）**
+
+#### **描述**
+- 对于消息量巨大的系统，可以使用分布式存储（如 HBase、Cassandra）来持久化消息。
+- 这些存储系统擅长处理大规模数据的写入和读取。
+
+#### **特点**
+- **优点**：
+  - 适合大规模消息存储和查询。
+  - 支持分布式架构，高可用。
+- **缺点**：
+  - 部署和维护复杂度高。
+  - 需要额外开发高效的消息查询接口。
+
+#### **使用场景**
+- 超大规模社交网络或消息系统，如社交媒体、即时通信平台。
+
+---
+
+### **6. 结合多种方案**
+
+在实际系统中，往往会结合多种存储策略，以满足不同的业务需求。例如：
+
+- **短期离线消息存储：** 使用 Redis 暂存最近 7 天的消息。
+- **长期消息记录：** 使用数据库（如 MySQL）存储历史消息。
+- **消息队列：** 使用 RabbitMQ 或 Kafka 转发实时消息。
+
+---
+
+### **对比总结**
+
+| 方案             | 性能      | 持久化程度 | 实现复杂度 | 适用场景                       |
+|------------------|-----------|------------|------------|--------------------------------|
+| 内存（如 Map）    | 高        | 无         | 低         | 小型系统，实时性高             |
+| Redis            | 较高      | 中         | 中         | 中型分布式系统，短期离线消息存储 |
+| 消息队列（MQ）   | 高        | 中         | 高         | 分布式系统，消息可靠性要求高   |
+| 数据库（如 MySQL）| 中        | 高         | 中         | 需要长期保存消息               |
+| 分布式存储       | 高        | 高         | 高         | 超大规模消息系统               |
+
+---
+
+### **推荐实践**
+
+1. **中小型系统：**
+   - 使用 Redis 作为离线消息的短期存储。
+   - 数据库用于存储消息历史记录。
+
+2. **大型分布式系统：**
+   - 引入消息队列（如 RabbitMQ/Kafka）处理实时消息。
+   - Redis 暂存离线消息 + 数据库保存历史消息。
+
+3. **超大规模系统：**
+   - 使用分布式存储（如 HBase）和 Kafka 配合，处理高并发和海量消息存储需求。
+
+通过合理选择存储方案，可以有效提升系统的可靠性、性能和扩展性，同时满足 WebSocket 消息推送的业务需求。
+
+# 12. 像国内的微信，这种离线消息一般存储多久？
+像微信这样的大型即时通讯应用，其离线消息存储时间通常**受多种因素影响**，包括**用户体验需求、存储成本、隐私保护政策**等。以下是微信或类似即时通讯应用中离线消息存储的一些通用做法和时间范围（并非官方数据，而是基于业界经验的推测）：
+
+---
+
+### **1. 离线消息存储时间**
+
+#### **短期存储**
+- **一般为 7 天到 30 天**。
+- 适合未读的离线消息，消息在一定时间内保持可用。
+- 如果用户在这段时间内上线，服务端会推送离线消息。
+
+#### **长期存储**
+- 部分关键消息（如系统通知、付费相关的信息）可能会存储更久，例如 **90 天到 1 年**。
+- 如果用户长时间不在线，普通聊天消息可能会被删除，而不是无限期保存。
+
+---
+
+### **2. 不同消息类型的存储策略**
+
+1. **普通聊天消息**
+   - **存储时间**：7 天到 30 天（微信的普通聊天消息据推测为 7 天）。
+   - **处理方式**：如果用户未在规定时间内上线，未读消息可能被丢弃，或仅保留消息摘要。
+
+2. **群聊消息**
+   - **存储时间**：与普通消息相似，但可能增加对群成员的消息分发优化。
+   - **处理方式**：部分消息可能在分发后清除，减少存储压力。
+
+3. **系统通知/关键消息**
+   - **存储时间**：更长，通常至少 90 天甚至更久（如交易相关信息）。
+   - **处理方式**：用户上线后强制推送，确保用户接收。
+
+4. **音视频和大文件**
+   - **存储时间**：短期存储（7 天到 15 天）。
+   - **处理方式**：音视频消息可能仅存储引用链接或缩略图，真正的媒体内容通过 CDN 提供下载，超期后删除。
+
+---
+
+### **3. 影响存储时长的因素**
+
+#### **隐私政策**
+- 根据中国《个人信息保护法》和《网络安全法》，即时通讯应用需要遵循“**最小化原则**”，只保存必要的信息，避免长期或无期限存储用户消息。
+
+#### **用户体验**
+- 短期存储可以满足大多数用户的正常使用场景，同时避免积压过多消息，影响推送效率。
+- 对于长期离线的用户，可以提示他们“消息已过期”而非重发所有消息。
+
+#### **存储成本**
+- 微信这类应用的用户规模庞大，每天产生的消息量可能达到数十亿条甚至更多。离线消息通常存储在高性能分布式存储中（如分布式数据库或对象存储），过长的保存周期会导致存储和运维成本快速增长。
+
+#### **场景和功能**
+- 企业微信或其他工作场景的即时通讯工具，可能提供更长的消息存储时间，甚至支持消息永久存储（如对企业管理员开放历史查询）。
+
+---
+
+### **4. 如何优化离线消息存储**
+
+#### **1. 短期与长期结合**
+- **短期存储：** Redis 或消息队列保存最近 7 天内的离线消息。
+- **长期存储：** 重要消息（如系统通知、交易相关）转存到数据库或分布式文件系统。
+
+#### **2. 压缩与分片**
+- 对离线消息进行压缩存储。
+- 按用户分片存储，减少单点瓶颈。
+
+#### **3. 消息摘要**
+- 对于过期的消息，保留摘要（如“您有未读消息”），而不是保留完整内容。
+
+#### **4. CDN 加速**
+- 对于音视频消息或大文件，将内容存储到 CDN，提高分发效率，超期自动清理。
+
+---
+
+### **5. 国内其他即时通讯工具的实践**
+
+1. **钉钉**
+   - 商业用户和企业级服务支持更长的消息存储时间。
+   - 部分功能提供“消息回执”，确保重要消息不丢失。
+
+2. **QQ**
+   - 离线消息存储时间较短（可能为 7 天），普通用户无法查询过期消息。
+   - 会员服务可能会提供更长的消息历史查看功能。
+
+3. **企业微信**
+   - 为企业用户提供消息永久存储和记录功能。
+   - 开发者可以接入历史消息存档 API，满足审计和合规需求。
+
+---
+
+### **6. 结论与建议**
+
+- **普通用户：** 微信等应用的离线消息存储时间较短（通常为 7 天）。建议用户尽快上线读取未读消息。
+- **业务需求：** 如果您的系统需要实现类似的功能，可以结合 Redis 和分布式数据库实现短期和长期消息存储。
+- **关键消息处理：** 针对重要消息，确保离线消息能够以持久化方式与用户标识（如用户 ID）绑定，直到确认推送成功。
+
+通过合理设计存储策略，不仅能满足业务需求，还能控制存储成本，提升系统性能。
