@@ -12,7 +12,7 @@ mindmap2: false
 ---
 
 # 1. 什么是CacheManager?
-在 Spring 框架中，`CacheManager` 是缓存管理的核心接口，负责管理和提供缓存的抽象，方便开发者通过统一的接口操作不同的缓存实现，如本地缓存、Redis 缓存、EhCache 等。
+在 Spring 框架中，`CacheManager` 是缓存管理的核心接口，负责管理和提供缓存的抽象，方便开发者通过统一的接口操作不同的缓存实现，如本地Local缓存、caffeine缓存、Redis 缓存、EhCache 等。
 
 ### `CacheManager` 的职责
 
