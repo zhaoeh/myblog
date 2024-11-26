@@ -11,17 +11,19 @@ mindmap: false
 mindmap2: false
 ---
 
-# 1. 对webSocket的理解还是比较困惑，它如何实现将消息发送个某个客户端？或者发送给一批客户端？是基于session去操作吗？具体编码案例到底是怎么样的？请结合spring webSocket详细解释并给出明确的操作案例
+# 1. webSocket实现客户端-服务端互发消息的底层原理
 在Spring中，WebSocket是一种全双工的通信协议，允许服务器和客户端实时双向传输数据。WebSocket非常适合需要实时更新的场景，比如即时聊天、通知系统、实时数据推送等。
 
 ### **核心理解**
 1. **消息推送给某个客户端**  
    通过唯一的标识（通常是用户ID或Session ID）来确定目标客户端。
+   当然，因为用户可能更换浏览器或者设备，因此一般都使用用户id作为唯一标识来识别不同的客户端，当然需要维护用户id和webSocketSession的映射关系，因为互发消息的本质是通过webSocketSession进行操作的。   
    
-2. **消息推送给一批客户端**  
+3. **消息推送给一批客户端**  
    可以根据组、标签或特定条件筛选出一批客户端，并将消息广播给这些客户端。
+   此处筛选出来的客户端，本质上是一堆webSocketSession对象，对于服务器来讲，一个webSocket客户端就是一个webSocketSession对象。   
 
-3. **是否基于Session操作**  
+5. **是否基于Session操作**  
    Spring WebSocket的默认实现是通过`Session`（或者`StompSession`）来管理客户端连接。你可以通过WebSocket会话ID来操作特定的连接。
 
 ---
@@ -193,7 +195,7 @@ public class WebSocketController {
 3. **集群环境**  
    在多实例情况下，可以通过Redis或其他共享存储来管理WebSocket连接。
 
-# 2. 广播的操作如何理解呢？它如何确定哪些客户端可以接收到？请你全面、系统的向我解释
+# 2. webSocket服务端实现消息的广播
 在Spring WebSocket中，广播操作是将一条消息发送给符合某些条件的一组客户端。理解广播的关键在于消息的目标路径和客户端订阅的路径是否匹配，以及如何使用消息代理（Message Broker）管理这些消息。
 
 ---
