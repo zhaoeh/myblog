@@ -2,7 +2,7 @@
 layout:     post
 title:      webSocket
 subtitle:   webSocket入门
-categories: [通信]
+categories: [rpc]
 mermaid: false
 sequence: false
 flow: false
