@@ -7,3 +7,4 @@ webSocket消息推送中心
 当客户端重新建立连接实现历史消息的顺序广播，基本原理是从redis中获取用户id，从而拿到有序的历史消息，当用户和服务器重新建立webSocket连接时，触发回调，使用新的webSessionId按照顺序发送redis中缓存的历史消息。
 
 使用hystrix进行api动态熔断探测、api服务降级、以及api限流等
+熟练使用spring cache缓存
