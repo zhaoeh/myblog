@@ -153,11 +153,12 @@ public class MyWebSocketHandler extends TextWebSocketHandler {
 ### **实战案例：实现一个实时消息推送系统**
 
 #### **需求**：
-- 实现一个系统，用户可以通过浏览器向服务器发送消息，服务器将消息推送给所有连接的客户端。
+- 实现一个系统，用户可以通过浏览器向服务器发送消息，服务器将消息推送给所有连接它的webSocket客户端。
 
 #### **代码实现**：
 
 1. **使用 `SimultaneousWebSocketHandler` 处理多客户端连接**
+***webSocketHandler是客户端和服务端进行互发消息的关键组件，不论是客户端发送的消息，还是服务端向客户端发送的消息，都是通过webSocketHandler处理器负责处理的***   
 
    ```java
    import org.springframework.web.socket.TextMessage;
@@ -172,12 +173,14 @@ public class MyWebSocketHandler extends TextWebSocketHandler {
 
        private final Set<WebSocketSession> sessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
+       // 当webSocket客户端和服务端成功建立连接之后回调的方法，一般用于将“客户端和服务端”建立的webSocketSession对象进行保存，以便后续互发消息
        @Override
        public void afterConnectionEstablished(WebSocketSession session) throws Exception {
            sessions.add(session);
            System.out.println("新客户端连接: " + session.getId());
        }
 
+       // 当“客户端和服务端”进行互发消息时，收到消息后回调的方法
        @Override
        protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
            System.out.println("收到消息: " + message.getPayload());
@@ -187,6 +190,7 @@ public class MyWebSocketHandler extends TextWebSocketHandler {
            }
        }
 
+       // 当“客户端和服务端”的连接断开时回调的方法
        @Override
        public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
            sessions.remove(session);
@@ -195,13 +199,15 @@ public class MyWebSocketHandler extends TextWebSocketHandler {
    }
    ```
 
-2. **修改 `WebSocketConfig` 配置**
+3. **修改 `WebSocketConfig` 配置**
 
    ```java
    @Configuration
+   // 用于开启webSocket配置
    @EnableWebSocket
    public class WebSocketConfig implements WebSocketConfigurer {
 
+       // 进行webSocket连接配置，用于注册webSocket的消息处理器，拦截路径，是否支持跨域等
        @Override
        public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
            registry.addHandler(new SimultaneousWebSocketHandler(), "/broadcast")
@@ -210,16 +216,17 @@ public class MyWebSocketHandler extends TextWebSocketHandler {
    }
    ```
 
-3. **测试**
+4. **测试**
 
    在前端页面连接 `/broadcast` 路径，多个客户端可以互相发送和接收广播消息。
+   一旦客户端页面连接'/broadcast'路径，则客户端和服务端就成功建立了webSocket连接，此后不论是客户端主动向服务端发送消息，还是服务端主动向客户端发送消息，都可以实现消息互发。
 
 ---
 
 ### **进阶功能**
 
 1. **使用 STOMP 实现消息队列支持**：
-   配合 Spring WebSocket 和 STOMP 协议，可以实现更复杂的消息队列功能。
+   配合 Spring WebSocket 和 STOMP 协议，可以实现更复杂的消息队列功能。这意味着当服务端主动向所有连接的webSocket客户端发送消息时，可以先将消息缓存到MQ中，然后通过消费MQ再将消息推送给所有连接的webSocket客户端。
 
 2. **添加认证**：
    可以通过拦截器或认证机制限制 WebSocket 的访问权限。
@@ -237,8 +244,8 @@ public class MyWebSocketHandler extends TextWebSocketHandler {
 WebSocket和HTTP是两种不同的通信协议，各有适用场景。以下是WebSocket相对于HTTP的主要优势：
 
 #### **1. 双向通信**
-- **HTTP**：基于请求-响应模型，客户端必须发起请求后，服务器才能返回响应。不能主动向客户端推送数据。
-- **WebSocket**：全双工通信，连接建立后，客户端和服务器可以实时互相发送数据，无需请求触发。
+- **HTTP**：基于请求-响应模型，客户端必须发起请求后，服务器才能返回响应。服务器不能主动向客户端推送数据。
+- **WebSocket**：全双工通信，客户端和服务器建立webSocket连接后，客户端和服务器可以实时互相发送数据，无需请求触发。
 
 #### **2. 持久连接**
 - **HTTP**：连接通常是短暂的，请求完成后连接关闭，后续请求需要重新建立连接（除非使用 HTTP/2 的长连接）。
@@ -260,9 +267,9 @@ WebSocket和HTTP是两种不同的通信协议，各有适用场景。以下是W
 
 ---
 
-### **如何通过POST请求调试WebSocket**
+### **如何通过POSTMAN请求调试WebSocket**
 
-WebSocket本身是一种独立的协议，建立连接时需要使用 HTTP 协议完成握手，因此可以使用 POST 或其他 HTTP 工具调试 WebSocket 的握手过程。
+WebSocket本身是一种独立的协议，建立连接时需要使用 HTTP 协议完成握手，因此可以使用 POSTMAN 或其他 HTTP 工具调试 WebSocket 的握手过程。
 
 #### **步骤1：查看握手请求**
 WebSocket 握手使用 HTTP 协议的升级机制，首先发送一个 HTTP 请求头（通常是 GET 请求），并带上 `Upgrade` 头部字段：
