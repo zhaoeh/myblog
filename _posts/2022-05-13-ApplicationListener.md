@@ -296,10 +296,10 @@ SpringApplicationRunListeners构造器如下：
         this.applicationStartup = applicationStartup;
     }
 ```
-SpringApplicationRunListeners是springboot中定义的一个类，这个类用来对SpringApplicationRunListener的运行监听器集合做包装。   
+SpringApplicationRunListeners是springboot中定义的一个类，这个类用来对SpringApplicationRunListener的**运行监听器**集合做包装。   
 
 SpringApplicationRunListener：   
-SpringApplicationRunListener 同样是springboot中定义的一个钩子接口，俗称运行监听器。   
+SpringApplicationRunListener 同样是springboot中定义的一个钩子接口，俗称**运行监听器**。   
 ```java
 // 很关键的一点是，这个方法从spring.factories文件中读取类型为SpringApplicationRunListener的所有实现类对象。
 this.getSpringFactoriesInstances(SpringApplicationRunListener.class, types, this, args)
@@ -343,7 +343,7 @@ org.springframework.boot.context.event.EventPublishingRunListener
 ```java
 package org.springframework.boot.context.event;
 
-// EventPublishingRunListener 是springboot内部对运行监听器 SpringApplicationRunListener 的唯一实现。
+// EventPublishingRunListener 是springboot内部对**运行监听器** SpringApplicationRunListener 的唯一实现。
 // 顾名思义，核心功能就是用来在springboot各个生命周期阶段来发布对应的事件的一个监听器。
 public class EventPublishingRunListener implements SpringApplicationRunListener, Ordered 
 ```
@@ -474,15 +474,15 @@ getRunListeners方法返回一个SpringApplicationRunListeners实例：
     }
 ```
 （1）getRunListeners方法返回一个SpringApplicationRunListeners实例对象。SpringApplicationRunListeners对象是springboot容器的。      
-（2）SpringApplicationRunListeners对象构造器初始化了一堆SpringApplicationRunListener运行监听器集合，从spring.factories中反射初始化实现类的，实际上只有一个EventPublishingRunListener实现类。   
+（2）SpringApplicationRunListeners对象构造器初始化了一堆SpringApplicationRunListener**运行监听器**集合，从spring.factories中反射初始化实现类的，实际上只有一个EventPublishingRunListener实现类。   
 （3）反射实例化EventPublishingRunListener对象时，其构造器中创建了一个spring时期的广播器SimpleApplicationEventMulticaster，并且把springboot容器中注册的ApplicationListener事件监听器集注册到了广播器中。   
 所以，这一通操作下来，核心的目的就是将前面注册的监听器集合注册到了广播器中了。   
 
 ## 3.2 使用SpringApplicationRunListeners
 初始化完SpringApplicationRunListeners对象后，就需要在合适的时机使用它。   
 <b><u><font color="#dc143c">重点关注3个易混淆的对象：</font>  </u></b>      
-（1）SpringApplicationRunListeners：springboot中定义的一个类，其委托SpringApplicationRunListener运行监听器集合干活。   
-（2）SpringApplicationRunListener：springboot中定义的一个运行监听器钩子，只有一个实现类EventPublishingRunListener，核心功能就是在springboot的不同生命周期阶段广播不同的事件，但它自己不负责广播，而是委托spring时期的广播器SimpleApplicationEventMulticaster进行广播。   
+（1）SpringApplicationRunListeners：springboot中定义的一个类，其委托SpringApplicationRunListener**运行监听器**集合干活。   
+（2）SpringApplicationRunListener：springboot中定义的一个**运行监听器**钩子，只有一个实现类EventPublishingRunListener，核心功能就是在springboot的不同生命周期阶段广播不同的事件，但它自己不负责广播，而是委托spring时期的广播器SimpleApplicationEventMulticaster进行广播。   
 （3）ApplicationListener：spring中定义的一个事件监听器钩子，当指定的事件被发布后，将会回调执行该监听器逻辑。SimpleApplicationEventMulticaster持有这些监听器对象，并在广播事件后根据事件类型回调对应的监听器逻辑。   
 
 ### 3.2.1 SpringApplicationRunListeners源码
@@ -1149,13 +1149,13 @@ AbstractApplicationContext:
 
 ## 3.4 总结springboot中注册的ApplicationListener使用
 整个流程分析下来，大概如下：   
-（1）初始化一个SpringApplicationRunListeners对象，这个对象是对SpringApplicationRunListener运行监听器的包装；SpringApplicationRunListener的实现类EventPublishingRunListener在被构造时，从springboot中获取到了前期注册到springboot容器中的所有ApplicationListener监听器集合，并注册到了其自身（自身指的是springboot容器）负责实例化好的事件广播器SimpleApplicationEventMulticaster中。         
+（1）初始化一个SpringApplicationRunListeners对象，这个对象是对SpringApplicationRunListener**运行监听器**的包装；SpringApplicationRunListener的实现类EventPublishingRunListener在被构造时，从springboot中获取到了前期注册到springboot容器中的所有ApplicationListener监听器集合，并注册到了其自身（自身指的是springboot容器）负责实例化好的事件广播器SimpleApplicationEventMulticaster中。         
 （2）调用SpringApplicationRunListeners的对应方法实际上是在委托EventPublishingRunListener中实例化好的广播器SimpleApplicationEventMulticaster，进行对应事件的广播。   
 （3）也可以直接通过spring上下文进行事件的广播，底层也是委托SimpleApplicationEventMulticaster广播器进行事件的广播。   
 （4）广播器广播事件的原理很简单，就是从当前广播器中注册的所有ApplicationListener监听器集合中找到订阅了当前事件的目标监听器，然后回调执行目标监听器的逻辑。      
 
 核心就是两个步骤：      
-（1）向一个事件广播器对象中注册一堆事件监听器（你只管向一个广播器中注册一堆你想要注册的事件监听器，不用管它什么时候被触发执行，随便注册）；      
+（1）向一个事件广播器对象中注册一堆**事件监听器**（你只管向一个广播器中注册一堆你想要注册的事件监听器，不用管它什么时候被触发执行，随便注册）；      
 （2）在某个生命周期阶段，通过该事件广播器对象发布指定事件，从该事件广播器中检索到订阅当前事件的监听器有哪些，然后遍历回调执行这些监听器的逻辑。      
 <b><u><font color="#dc143c">这意味着，最终我们注册监听器，和进行事件广播的广播器，必须得是同一个广播器对象。</font>  </u></b>    
 <b>你不能把事件监听器注册到了A广播器上，然后用B广播器去广播一个事件出去，这样肯定无法找到指定的监听器，因为B广播器广播一个事件出去，其自身根据找不到对应的监听器（监听器注册到A广播器上了），也就无法触发监听器的执行了。</b>   
@@ -1913,7 +1913,7 @@ class ApplicationListenerDetector implements DestructionAwareBeanPostProcessor, 
 # 7. 自定义spring事件模型
 上面从源码角度分析了那么多，目的只有一个，那就是我们可以借助spring提供的事件监听机制，来自定义我们自己的事件模型。   
 依赖spring的这套事件模型，我们需要实现如下：   
-（1）自定义事件监听器，并想办法注册到spring的广播器中（监听器）。    
+（1）自定义**事件监听器**，并想办法注册到spring的广播器中（监听器）。    
 （2）自定义事件，并让感兴趣的监听器感知订阅到（事件）。   
 （3）自定义事件源，在合适的时机发布指定的事件，从而触发监听器的回调执行（事件源）。      
 
