@@ -15,6 +15,11 @@ mindmap2: false
 监听器基于观察者模式，简而言之监听器的本质就是一个钩子对象，当服务器发生某个动作时，就会触发该钩子对象的逻辑执行，从而达到该钩子对象貌似在监听服务器的某些行为的表象。   
 对于监听器的原理探究，请参考： [监听器和事件驱动模型](https://zhaoehcode.gitee.io/2021/04/06/%E4%BA%8B%E4%BB%B6%E9%A9%B1%E5%8A%A8%E6%A8%A1%E5%9E%8B/)   
 
+**扩展**
+宏观上来讲，监听器一般的实现分为两种具体的方案：   
+- 从编码角度，通过向服务端注册钩子接口对象作为监听器，当服务端发布某个事件时会触发回调执行该钩子对象的逻辑，从而从表象上看达到了钩子对象在监听服务器行为的假象。比如spring中的事件机制。
+- 从操作系统层面来看，通过在服务器端启动一个线程或者某些线程专门轮询的去探测监控服务器中某些目标是否有指定的事件发生，一旦有事件发生，这个监听线程就会触发某些逻辑调用，这种是真正的事件监听器，通过独立的线程轮询的探测监听某些事件是否发生。比如NIO、Netty等。
+
 # 2. 向springboot中注册ApplicationListener
 这里先springboot中注册的监听器，实际上是ApplicationListener对象，该对象是spring容器中定义的接口。   
 如果我们想让自定定义的ApplicationListener监听器对象，直接对springboot容器以及整个spring容器中发布的早期事件都感兴趣（感兴趣实际上就是可以对这些事件进行订阅），那么我们自定义的ApplicationListener对象就必须从springboot容器一开始启动就要注册到事件广播器中去。   
@@ -1929,9 +1934,9 @@ Spring Boot 和 Spring 的启动生命周期中会发布多个内置事件，贯
 
 ---
 
-## **Spring Boot 启动生命周期中的内置事件**
+## 8.1 Spring Boot 启动生命周期中的内置事件
 
-### **1. Spring Boot 应用启动关键步骤**
+### 8.1.1 Spring Boot 应用启动关键步骤
 1. **准备环境 (`Environment` 初始化)**  
    包括系统环境变量、配置文件解析等。
    
@@ -1946,7 +1951,7 @@ Spring Boot 和 Spring 的启动生命周期中会发布多个内置事件，贯
 
 ---
 
-### **2. 内置事件及其触发顺序**
+### 8.1.2 内置事件及其触发顺序
 
 | 事件名称                         | 发布阶段                                 | 说明                                                                                                                                 |
 |----------------------------------|----------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
@@ -1960,7 +1965,7 @@ Spring Boot 和 Spring 的启动生命周期中会发布多个内置事件，贯
 
 ---
 
-## **Spring 应用启动生命周期中的内置事件**
+## 8.2 Spring 应用启动生命周期中的内置事件
 
 Spring 的启动生命周期更底层，涉及 `ApplicationContext` 的初始化和刷新阶段。以下是 Spring 定义的事件及其触发顺序。
 
@@ -1974,11 +1979,11 @@ Spring 的启动生命周期更底层，涉及 `ApplicationContext` 的初始化
 
 ---
 
-## **启动事件的时序及详细说明**
+## 8.3 启动事件的时序及详细说明
 
 以下为详细启动事件触发顺序及其执行逻辑。
 
-### **1. `ApplicationStartingEvent`**
+### 8.3.1 `ApplicationStartingEvent`
 - **触发时机**:  
   在 `SpringApplication.run()` 方法刚开始时触发。
 - **典型用途**:  
@@ -1993,7 +1998,7 @@ Spring 的启动生命周期更底层，涉及 `ApplicationContext` 的初始化
 
 ---
 
-### **2. `ApplicationEnvironmentPreparedEvent`**
+### 8.3.2 `ApplicationEnvironmentPreparedEvent`
 - **触发时机**:  
   在 `Environment` 准备完成，且未创建 `ApplicationContext` 之前。
 - **典型用途**:  
@@ -2008,7 +2013,7 @@ Spring 的启动生命周期更底层，涉及 `ApplicationContext` 的初始化
 
 ---
 
-### **3. `ApplicationContextInitializedEvent`**
+### 8.3.3 `ApplicationContextInitializedEvent`
 - **触发时机**:  
   在创建并配置 `ApplicationContext` 之后，但未加载 Bean 定义之前。
 - **典型用途**:  
@@ -2017,7 +2022,7 @@ Spring 的启动生命周期更底层，涉及 `ApplicationContext` 的初始化
 
 ---
 
-### **4. `ApplicationPreparedEvent`**
+### 8.3.4 `ApplicationPreparedEvent`
 - **触发时机**:  
   在 `ApplicationContext` 加载完成，但未刷新时。
 - **典型用途**:  
@@ -2032,7 +2037,7 @@ Spring 的启动生命周期更底层，涉及 `ApplicationContext` 的初始化
 
 ---
 
-### **5. `ApplicationStartedEvent`**
+### 8.3.5 `ApplicationStartedEvent`
 - **触发时机**:  
   在 `ApplicationContext` 刷新完成后，但未运行 `CommandLineRunner` 或 `ApplicationRunner` 时。
 - **典型用途**:  
@@ -2041,7 +2046,7 @@ Spring 的启动生命周期更底层，涉及 `ApplicationContext` 的初始化
 
 ---
 
-### **6. `ApplicationReadyEvent`**
+### 8.3.6 `ApplicationReadyEvent`
 - **触发时机**:  
   在 `CommandLineRunner` 和 `ApplicationRunner` 执行完成后触发。
 - **典型用途**:  
@@ -2050,7 +2055,7 @@ Spring 的启动生命周期更底层，涉及 `ApplicationContext` 的初始化
 
 ---
 
-### **7. `ApplicationFailedEvent`**
+### 8.3.7 `ApplicationFailedEvent`
 - **触发时机**:  
   如果在启动过程中发生异常。
 - **典型用途**:  
@@ -2059,7 +2064,7 @@ Spring 的启动生命周期更底层，涉及 `ApplicationContext` 的初始化
 
 ---
 
-## **扩展：如何监听这些事件**
+## 8.4 扩展：如何监听这些事件
 
 使用自定义 `ApplicationListener`，如下：
 ```java
@@ -2085,9 +2090,9 @@ app.run(args);
 
 ---
 
-## **总结**
+## 8.5 总结
 
-### **Spring Boot 启动事件顺序**
+### 8.5.1 Spring Boot 启动事件顺序
 1. `ApplicationStartingEvent`
 2. `ApplicationEnvironmentPreparedEvent`
 3. `ApplicationContextInitializedEvent`
@@ -2096,7 +2101,7 @@ app.run(args);
 6. `ApplicationReadyEvent`
 7. `ApplicationFailedEvent`
 
-### **Spring 应用上下文事件顺序**
+### 8.5.2 Spring 应用上下文事件顺序
 1. `ContextRefreshedEvent`
 2. `ContextStartedEvent`
 3. `ContextStoppedEvent`
