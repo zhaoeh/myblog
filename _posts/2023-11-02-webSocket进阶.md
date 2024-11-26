@@ -372,19 +372,22 @@ messagingTemplate.convertAndSend("/topic/user/123", "针对用户123的消息");
 
 广播适合多用户实时数据更新的场景，熟悉路径配置和匹配机制是掌握WebSocket广播操作的关键。
 
-# 3. 我的代码中根本就没有看到使用SimpMessagingTemplate 去发送weSocket消息，而是使用webSocketSession去发送的。请你详细列举在实际项目中到底如何发送webSocket消息给客户端？
+# 3. SimpMessagingTemplate和webSocketSession
 在实际项目中，通过 `WebSocketSession` 发送 WebSocket 消息是一种较底层的操作方式，相对于基于 `SimpMessagingTemplate` 的高层次实现，它允许开发者直接与 WebSocket 会话交互。这种方式常用于需要直接控制会话或处理高级需求的场景，例如点对点通信或精确推送。
 
 ### **使用 `WebSocketSession` 发送消息的原理**
 
 1. **会话管理**  
-   每个客户端连接成功后，服务器端会生成一个唯一的 `WebSocketSession`，通过这个会话可以直接向特定客户端发送消息。
+   每个客户端连接成功后，服务器端会生成一个唯一的 `WebSocketSession`对象，通过这个会话可以直接向特定客户端发送消息。
+   也就是说，实现消息发送的前提是webSocket客户端必须成功和服务器建立webSocket连接后，服务端生成一个webSocketSession对象之后才可以实现消息互发。   
 
-2. **消息发送**  
+3. **消息发送**  
    使用 `WebSocketSession` 的 `sendMessage` 方法，可以向客户端推送文本消息或二进制消息。
+   当然，当客户端主动向服务端进行消息发送时，只需要调用webSocket服务器的api接口，当作http请求一样调用即可。   
 
-3. **会话存储**  
+5. **会话存储**  
    为了向特定客户端发送消息，服务器需要保存所有连接的 `WebSocketSession`，通常会使用一个线程安全的容器来管理这些会话。
+   这也是webSocket能够实现服务器主动向客户端发送消息的关键，因为所有与服务器建立的会话对象webSocketSession都被服务器缓存起来了，进而才能通过webSocketSession进行消息的推送，推送到指定的客户端。   
 
 ---
 
