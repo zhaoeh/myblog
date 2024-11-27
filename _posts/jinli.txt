@@ -8,3 +8,4 @@ webSocket消息推送中心
 
 使用hystrix进行api动态熔断探测、api服务降级、以及api限流等
 熟练使用spring cache缓存
+熟悉开源分布式事务框架seata，并有实战经验，全局事务id xid，基于二PC提交
