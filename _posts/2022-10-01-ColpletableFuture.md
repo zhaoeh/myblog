@@ -1,7 +1,7 @@
 ---
 layout:     post
-title:      spring自动注入依赖
-subtitle:   和手动注入依赖相比，自动注入依赖显得方便多了
+title:      CompletableFuture
+subtitle:   深入学习高级的java异步任务编排框架CompletableFuture
 categories: [java高并发]
 mermaid: false
 sequence: false
