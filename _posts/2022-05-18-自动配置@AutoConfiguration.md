@@ -55,6 +55,9 @@ springboot扫描解析处理bean，核心类如下：
 ```java
 org.springframework.context.annotation.ConfigurationClassPostProcessor
 ```
+**关于ConfigurationClassPostProcessor解析注解bean定义**，请参考：[beanDefinition注册源码](https://zhaoeh.github.io/myblog/2022/05/02/springboot-beanDefinition%E6%B3%A8%E5%86%8C%E6%BA%90%E7%A0%81/)   
+
+
 上面那个类是入口类，本质上是一个实现了 org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor 接口的实现类。   
 我们知道，org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor接口是spring容器启动早期的一个接口，它比BeanFactoryPostProcessor执行时机还早。    
 主要用于向spring容器中遍历的注册每一个符合规则的BeanDefinition对象。      
