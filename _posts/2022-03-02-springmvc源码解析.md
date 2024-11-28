@@ -202,8 +202,8 @@ Spring MVC 的处理流程分为以下关键阶段：
 3. **拦截器**：`HandlerExecutionChain` 执行拦截器链。
 4. **执行处理器**：使用 `HandlerAdapter` 调用控制器方法。
 5. **返回值处理**：`HandlerMethodReturnValueHandler` 处理返回值。
-6. **响应增强**：使用 `ResponseBodyAdvice` 对响应数据进行增强。
-7. **异常处理**：`HandlerExceptionResolver` 捕获和处理异常。
+6. **异常处理**：`HandlerExceptionResolver` 捕获和处理异常。
+7. **响应增强**：使用 `ResponseBodyAdvice` 对响应数据进行增强。
 8. **视图渲染**：通过 `ViewResolver` 渲染视图或直接写入响应。
 
 这些阶段通过 `DispatcherServlet` 调度，层次清晰且高度可扩展。
