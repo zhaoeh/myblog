@@ -304,3 +304,126 @@ private void mergeBootstrapProperties(ConfigurableEnvironment environment, Confi
 - 合并逻辑保证了 `bootstrap.yml` 的优先级低于 `application.yml`，但高于默认配置。
 
 如果还有疑问或需要具体场景代码解析，可以进一步探讨！
+
+# 3. application.yml等文件以及环境变量等属性何时被spring容器解析？
+`ConfigFileApplicationListener` 被废弃，改为使用 `ConfigDataApplicationListener` 是因为 Spring Boot 从 2.4.0 开始引入了新的配置数据加载机制，旨在提高配置文件的灵活性和可扩展性。以下是具体原因和改动的背景：
+
+---
+
+### 1. **新配置加载机制的目标**
+   - **统一配置加载**：`ConfigDataApplicationListener` 引入了统一的配置加载流程，支持从多种来源加载配置（如文件、环境变量、远程服务器等）。
+   - **增强的灵活性**：新机制允许在应用程序上下文刷新之前解析配置，这为配置的优先级、动态性和依赖关系提供了更大的灵活性。
+   - **模块化设计**：新机制采用模块化设计，便于扩展，例如可以自定义配置数据源。
+
+---
+
+### 2. **新机制的主要特性**
+   - **支持多种配置来源**：不仅支持 `application.properties` 和 `application.yml` 文件，还支持远程配置服务（如 Spring Cloud Config）。
+   - **配置文件分层**：支持加载多个配置文件并合并配置值，例如通过 `spring.config.import` 导入文件。
+   - **配置导入**：提供 `spring.config.import` 属性来加载嵌套的或外部的配置文件。
+   - **新的配置绑定**：提供更好的配置绑定和验证支持。
+
+---
+
+### 3. **为什么废弃 `ConfigFileApplicationListener`**
+   - **复杂的配置需求**：`ConfigFileApplicationListener` 主要用于从文件加载配置，但随着 Spring Boot 应用的复杂化，仅支持文件不足以满足需求。
+   - **扩展性不足**：旧的机制在扩展其他配置源时需要大量定制，难以灵活地适应动态配置需求。
+   - **代码维护性**：新机制通过 `ConfigDataEnvironment` 和 `ConfigDataLoader` 提供了更清晰的 API，简化了代码维护。
+
+---
+
+### 4. **过渡期的兼容性**
+   - 如果你的项目从 `ConfigFileApplicationListener` 升级到 `ConfigDataApplicationListener`，通常不需要额外修改代码，只需按照 Spring Boot 的配置指南确保正确设置配置文件即可。
+   - 如果需要兼容旧配置，可以通过启用 `spring.config.use-legacy-processing=true` 使用旧的配置文件处理逻辑（仅限过渡期）。
+
+---
+
+### 5. **如何适应新的配置机制**
+   - **检查配置文件**：确保使用了新的配置选项，例如 `spring.config.import`。
+   - **理解优先级**：新的加载机制引入了更细粒度的优先级控制，需要了解 `spring.config.name` 和 `spring.config.location` 的行为。
+   - **测试远程配置**：尝试使用远程配置源验证新机制的灵活性。
+
+---
+
+### 6. **总结**
+`ConfigFileApplicationListener` 的废弃是为了适应更加现代化和动态化的配置需求。`ConfigDataApplicationListener` 提供了更强大的功能和更清晰的逻辑，可以更好地支持复杂场景和未来扩展。对于开发者来说，理解和适应新机制能够充分利用 Spring Boot 的强大能力。
+
+# 4. spring cloud如何确保解析bootstrap文件早于解析其他环境属性呢？以及和nacos篡改配置的关系
+您的问题非常深入，涉及 Spring Boot 和 Spring Cloud 配置机制的设计哲学和实现细节。下面逐一分析 **优先级控制** 和 **设计取向** 两个核心问题。
+
+---
+
+### **1. `BootstrapConfigFileApplicationListener` 如何优先于 `ConfigDataApplicationListener` 执行**
+
+#### **1.1 优先级控制的关键**
+Spring Boot 和 Spring Cloud 通过监听器的注册顺序与执行优先级控制机制来确保 `BootstrapConfigFileApplicationListener` 在 `ConfigDataApplicationListener` 之前执行。
+
+具体机制：
+1. **`SpringApplicationRunListeners`**：
+   - Spring Boot 会通过 `META-INF/spring.factories` 文件加载 `ApplicationListener`。
+   - `BootstrapConfigFileApplicationListener` 是 Spring Cloud 定义的特殊监听器，通过扩展 Spring Boot 的 `ApplicationListener`，并明确其加载优先级。
+
+2. **优先级声明：`@Order` 或 `Ordered` 接口**：
+   - `BootstrapConfigFileApplicationListener` 明确声明了较高的优先级（较低的数值表示更高的优先级）。
+   - `ConfigDataApplicationListener` 的优先级较低，通常在 Spring Boot 内部排序机制中位于后面。
+
+3. **`spring.factories` 的注册顺序**：
+   - Spring Cloud 在 `spring.factories` 中注册了 `BootstrapConfigFileApplicationListener`，它会优先加载并执行。
+   - 配置文件和监听器的执行顺序基于 `SpringApplicationRunListeners` 的加载策略。
+
+#### **1.2 为什么需要优先于 `ConfigDataApplicationListener`**
+- `BootstrapConfigFileApplicationListener` 是 Spring Cloud 的核心，主要用于加载 `bootstrap.yml` 和 `bootstrap.properties`，这些配置通常包含应用程序初始化的关键信息（如注册中心地址、加密信息等）。
+- **配置时机的关键性**： 
+  - 如果不在 `ConfigDataApplicationListener` 之前执行，就无法确保 `Environment` 中的必要配置被优先加载，可能导致应用启动失败。
+
+---
+
+### **2. 为什么 Nacos 选择 `ApplicationContextInitializer` 改变环境？**
+
+#### **2.1 两种方式的比较**
+- **通过 `EnvironmentPostProcessor` 篡改 `Environment`**
+  - Spring Boot 提供的扩展机制，允许在应用启动时修改 `Environment`。
+  - 在 Spring Boot 2.4+ 中，这种机制主要被 `ConfigDataApplicationListener` 取代，用于加载配置数据。
+  - 适用于需要调整 `Environment` 或引入配置数据的场景。
+
+- **通过 `ApplicationContextInitializer` 篡改上下文**
+  - Spring 容器的扩展机制，允许在 `ApplicationContext` 刷新之前做初始化操作。
+  - 可以更早地控制上下文初始化过程，例如注册 BeanFactory 后置处理器、调整上下文配置等。
+  - 适用于需要更深层次调整的场景，例如定制化的上下文刷新逻辑。
+
+#### **2.2 为什么 Nacos 选择 `ApplicationContextInitializer`**
+1. **启动时机的考虑**：
+   - Nacos 的部分配置依赖于 `ApplicationContext` 初始化的更早阶段，而不是单纯的 `Environment` 配置。
+   - `ApplicationContextInitializer` 提供的扩展点更靠近 Spring 容器的核心，可以在配置加载之前做出必要的调整。
+
+2. **动态注册能力**：
+   - Nacos 可能需要动态注入一些与配置管理相关的组件，例如配置监听器、动态属性更新支持。
+   - 通过 `ApplicationContextInitializer`，可以直接与 `ApplicationContext` 交互，方便实现这些功能。
+
+3. **与 Spring Cloud 的契合**：
+   - Spring Cloud 和 Nacos 的设计目标是为微服务提供配置中心服务，`ApplicationContextInitializer` 更符合这种集成需求，便于扩展注册中心、动态刷新等功能。
+
+4. **与 Spring Boot 加载机制的兼容性**：
+   - Spring Boot 的 `ConfigDataApplicationListener` 已经接管了许多配置加载的职责。通过 `ApplicationContextInitializer`，可以避免与 `ConfigDataApplicationListener` 的加载流程冲突。
+
+#### **2.3 设计哲学上的差异**
+- **`EnvironmentPostProcessor` 的哲学**：
+  - 偏向于 *数据驱动* 的设计，主要专注于配置加载的扩展。
+  - 面向简单的配置调整需求。
+- **`ApplicationContextInitializer` 的哲学**：
+  - 偏向于 *上下文控制* 的设计，更适合复杂的场景。
+  - 面向动态注册组件、深度集成第三方框架等高级需求。
+
+---
+
+### **3. 总结**
+
+#### **优先级的设计意图**
+- `BootstrapConfigFileApplicationListener` 的高优先级确保 Spring Cloud 的核心配置可以优先加载，满足微服务框架的需求。
+- `ConfigDataApplicationListener` 则专注于 Spring Boot 2.4+ 的配置机制，用于整合文件和远程配置源。
+
+#### **设计哲学**
+- Spring Boot 的设计倾向模块化、职责分离，`EnvironmentPostProcessor` 是基于配置加载的职责延伸。
+- Spring Cloud 和 Nacos 偏向于灵活性和深度控制，`ApplicationContextInitializer` 提供了更大的操作自由度，适合高度定制化的需求。
+
+两种机制在不同场景中各有优势，而 Nacos 选择 `ApplicationContextInitializer` 的背后，是为了实现更强的控制能力和集成深度。
