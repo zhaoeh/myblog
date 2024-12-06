@@ -529,4 +529,145 @@ CompletableFuture本身并不能保证线程安全，它只是将异步任务负
 
 因此，得出结果：不论是使用线程、线程池、Future、还是CompletableFuture去操作某些对象，是否存在线程安全问题，取决于这些对象本身是否存在共享修改操作。   
 
-# 4. 
+# 4. delayedExecutor
+在 Java 的 **CompletableFuture** 中，`delayedExecutor` 是一种工具，用于在指定的延迟之后执行任务。它返回一个 `Executor`，这个 `Executor` 会在给定的延迟时间后调度任务的执行，而不是立即执行任务。
+
+## 4.1 `delayedExecutor` 方法定义
+```java
+public static Executor delayedExecutor(long delay, TimeUnit unit)
+public static Executor delayedExecutor(long delay, TimeUnit unit, ScheduledExecutorService executor)
+```
+
+**参数说明**
+1. **`delay`**: 延迟时间。
+2. **`unit`**: 延迟时间的单位，例如 `TimeUnit.SECONDS`。
+3. **`executor`** *(可选)*: 一个 `ScheduledExecutorService`，用于调度任务。如果未提供，默认使用全局的 `ForkJoinPool`。
+
+
+**工作原理**
+- **延迟执行**：当你将任务提交给由 `delayedExecutor` 创建的 `Executor` 时，任务不会立刻执行，而是在指定的延迟时间后才会执行。
+- **线程管理**：如果没有提供自定义的 `ScheduledExecutorService`，`delayedExecutor` 会利用全局的 `ForkJoinPool`，或内部使用 `CompletableFuture` 的默认线程池。
+
+**常见用法**
+
+**1. 使用默认线程池**
+以下代码会在 3 秒后执行任务：
+```java
+Executor delayedExecutor = CompletableFuture.delayedExecutor(3, TimeUnit.SECONDS);
+
+CompletableFuture.runAsync(() -> {
+    System.out.println("Task executed after 3 seconds");
+}, delayedExecutor);
+```
+
+**2. 使用自定义的 `ScheduledExecutorService`**
+你可以提供自己的线程池进行调度：
+```java
+ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+Executor delayedExecutor = CompletableFuture.delayedExecutor(5, TimeUnit.SECONDS, scheduler);
+
+CompletableFuture.runAsync(() -> {
+    System.out.println("Task executed after 5 seconds using custom scheduler");
+}, delayedExecutor);
+
+scheduler.shutdown(); // 用完记得关闭线程池
+```
+
+**典型场景**
+1. **实现超时控制**：在 `CompletableFuture` 中，结合 `orTimeout` 或 `completeOnTimeout` 使用，用于实现操作的延时触发或超时机制。
+2. **模拟延迟**：用于测试和模拟延时操作，例如网络请求或耗时操作。
+3. **定时任务**：实现一些简单的定时任务调度。
+
+**完整示例：超时控制**
+结合 `delayedExecutor` 和 `supplyAsync` 实现超时机制：
+```java
+Executor delayedExecutor = CompletableFuture.delayedExecutor(3, TimeUnit.SECONDS);
+
+CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+    try {
+        Thread.sleep(1000); // 模拟耗时任务
+    } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+    }
+    return "Task completed";
+});
+
+// 3 秒后触发超时，任务未完成时将使用默认值
+future.completeOnTimeout("Timeout occurred", 3, TimeUnit.SECONDS)
+      .thenAccept(System.out::println);
+```
+
+**注意事项**
+1. **线程池管理**：如果使用自定义的 `ScheduledExecutorService`，务必在适当的时候关闭线程池以释放资源。
+2. **任务堆积问题**：在高并发情况下，如果大量任务被提交到延迟的 `Executor` 中，可能会导致任务堆积，需要监控线程池的容量和使用率。
+
+**总结**
+`delayedExecutor` 是一种强大的工具，可以轻松实现延时任务的调度。在异步编程中，尤其是需要结合超时处理或定时操作的场景下，它可以大大简化代码的实现。
+
+# 5. delayedExecutor针对的是任务
+`delayedExecutor` 的延迟是针对**任务**的，而不是针对自定义的线程池。具体来说：
+
+- **延迟针对任务**：任务被提交到由 `delayedExecutor` 创建的 `Executor` 时，会按照指定的延迟时间调度任务的执行，而不会立即运行任务。
+- **线程池的作用**：如果提供了自定义的 `ScheduledExecutorService`，它仅作为任务调度的底层实现，而延迟逻辑由 `delayedExecutor` 管理，与线程池的配置无关。
+
+**运行机制解析**
+1. 当调用 `delayedExecutor` 创建的 `Executor` 时，任务不会立即交给线程池执行。
+2. `delayedExecutor` 会记录下延迟时间，并通过提供的 `ScheduledExecutorService` 或默认的调度器，在延迟时间到达后再调度任务。
+3. 延迟只针对每个任务的调度，而不会改变线程池的运行方式或行为。
+
+**关键点：任务与线程池的关系**
+**如果没有提供自定义线程池**
+`delayedExecutor` 使用全局的 `ForkJoinPool` 或默认的线程池：
+```java
+Executor delayedExecutor = CompletableFuture.delayedExecutor(2, TimeUnit.SECONDS);
+
+CompletableFuture.runAsync(() -> {
+    System.out.println("Task executed after 2 seconds");
+}, delayedExecutor);
+```
+- **延迟行为**：任务将在 2 秒后开始执行。
+- **线程池行为**：`ForkJoinPool` 管理线程的实际执行，但延迟逻辑由 `delayedExecutor` 管理。
+
+**如果提供了自定义线程池**
+延迟逻辑仍然在任务级别，而线程池只是负责具体的任务执行：
+```java
+ScheduledExecutorService customScheduler = Executors.newScheduledThreadPool(1);
+
+Executor delayedExecutor = CompletableFuture.delayedExecutor(3, TimeUnit.SECONDS, customScheduler);
+
+CompletableFuture.runAsync(() -> {
+    System.out.println("Task executed after 3 seconds using custom scheduler");
+}, delayedExecutor);
+
+customScheduler.shutdown();
+```
+- **延迟行为**：任务将在 3 秒后开始调度。
+- **线程池行为**：`customScheduler` 只是负责实际运行任务的线程，延迟逻辑仍由 `delayedExecutor` 控制。
+
+**验证：多个任务是否独立延迟**
+每个任务的延迟时间是独立的，与线程池的行为无关。
+
+示例：
+```java
+ScheduledExecutorService customScheduler = Executors.newScheduledThreadPool(2);
+
+Executor delayedExecutor = CompletableFuture.delayedExecutor(2, TimeUnit.SECONDS, customScheduler);
+
+// 提交多个任务
+CompletableFuture.runAsync(() -> System.out.println("Task 1 executed at " + System.currentTimeMillis()), delayedExecutor);
+CompletableFuture.runAsync(() -> System.out.println("Task 2 executed at " + System.currentTimeMillis()), delayedExecutor);
+
+customScheduler.shutdown();
+```
+输出（假设开始时间为 1000 毫秒）：
+```
+Task 1 executed at 3000
+Task 2 executed at 3000
+```
+说明两个任务都独立延迟了 2 秒，即每个任务都有自己的延迟，不会因线程池行为受到影响。
+
+**总结**
+1. **延迟针对任务**：`delayedExecutor` 控制任务的延迟调度，而不是改变线程池的行为。
+2. **线程池只是执行**：自定义的 `ScheduledExecutorService` 仅用于运行任务，延迟逻辑独立于线程池的配置。
+3. **任务独立延迟**：即使多个任务使用相同的 `delayedExecutor`，它们的延迟时间也是相互独立的，不受其他任务或线程池的影响。
