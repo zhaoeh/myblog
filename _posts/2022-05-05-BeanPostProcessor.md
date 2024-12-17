@@ -45,7 +45,7 @@ post 表示在....之后，postProcessor的意思表示“后置处理器”，�
 Initialization表示初始化。      
 
 ## 1.2 BeanPostProcessor在bean生命周期的什么阶段进行介入？
-我们回顾下spring控制bean的基本生命周期步骤如下：   
+**我们回顾下spring控制bean的基本生命周期步骤如下：**     
 ```youtrack
 1.根据扫描范围或者配置的范围确认那些bean需要被spring容器进行管理
 2.全局扫描这些bean，将这些bean的定义封装成对应的beanDefinition对象，全部注册到spring容器中
@@ -89,7 +89,7 @@ spring容器创建bean大概分为如下步骤：
 （1）通过@PostConstruct注解标注一个void的非静态方法作为bean的初始化方法；   
 （2）目标bean实现InitializingBean接口，实现其 afterPropertiesSet方法；   
 （3）创建bean时指定initMethod（xml配置指定标签属性init-method，java配置在@Bean中指定initMethod）。   
-上面3种初始化方法的执行优先级是：   
+**上面3种初始化方法的执行优先级是：**      
 ```
 @PostConstruct -》 InitializingBean -》 initMethod   
 ```
@@ -182,7 +182,7 @@ public class Code04ControllerApplication {
     }
 }
 ```
-进入run方法：
+**进入run方法：**    
 ```java
     public static ConfigurableApplicationContext run(Class<?> primarySource, String... args) {
         return run(new Class[]{primarySource}, args);
@@ -236,13 +236,13 @@ public class Code04ControllerApplication {
         }
     }
 ```
-进入refresh方法：
+**进入refresh方法：**    
 ```java
     protected void refresh(ConfigurableApplicationContext applicationContext) {
         applicationContext.refresh();
     }
 ```
-进入到spring容器的refresh方法：
+**进入到spring容器的refresh方法：**    
 ```java
     public void refresh() throws BeansException, IllegalStateException {
         Object var1 = this.startupShutdownMonitor;
@@ -284,7 +284,7 @@ public class Code04ControllerApplication {
         }
     }
 ```
-获取容器中的beanPostProcessor对象并排序：
+**获取容器中的beanPostProcessor对象并排序：**    
 ```java
     public static void registerBeanPostProcessors(ConfigurableListableBeanFactory beanFactory, AbstractApplicationContext applicationContext) {
         // 获取spring容器中所有类型为 BeanPostProcessor 的bean名称
@@ -379,7 +379,7 @@ public class Code04ControllerApplication {
 前面分析了在spring容器启动时，何时注册了内部的BeanPostProcessor，何时又注册了容器中我们自定义的BeanPostProcessor等，那么当这些BeanPostProcessor注册到spring容器中后，我们又是何时使用这些处理器的逻辑的呢？   
 从上面的内容我们大概知道，这些BeanPostProcessor的触发使用是在每一个普通bean的初始化方法的前后分别进行的。   
 
-refresh方法中的finishBeanFactoryInitialization方法，如下：   
+**refresh方法中的finishBeanFactoryInitialization方法，如下：**    
 org.springframework.context.support.AbstractApplicationContext#refresh      
 ```java
     public void refresh() throws BeansException, IllegalStateException {
@@ -398,7 +398,7 @@ org.springframework.context.support.AbstractApplicationContext#refresh
         }
     }
 ```   
-org.springframework.context.support.AbstractApplicationContext#finishBeanFactoryInitialization：      
+**org.springframework.context.support.AbstractApplicationContext#finishBeanFactoryInitialization：**          
 ```java
     protected void finishBeanFactoryInitialization(ConfigurableListableBeanFactory beanFactory) {
         
@@ -417,7 +417,7 @@ org.springframework.context.support.AbstractApplicationContext#finishBeanFactory
         beanFactory.preInstantiateSingletons();
     }
 ```
-org.springframework.beans.factory.support.DefaultListableBeanFactory#preInstantiateSingletons：      
+**org.springframework.beans.factory.support.DefaultListableBeanFactory#preInstantiateSingletons：**          
 ```java
 public void preInstantiateSingletons() throws BeansException {
         if (this.logger.isTraceEnabled()) {
@@ -494,14 +494,14 @@ public void preInstantiateSingletons() throws BeansException {
     }
 ```
 
-org.springframework.beans.factory.support.AbstractBeanFactory#getBean(java.lang.String)：
+**org.springframework.beans.factory.support.AbstractBeanFactory#getBean(java.lang.String)：**    
 ```java
     public Object getBean(String name) throws BeansException {
         this.assertBeanFactoryActive();
         return this.getBeanFactory().getBean(name);
     }
 ```
-org.springframework.beans.factory.support.AbstractBeanFactory#doGetBean：
+**org.springframework.beans.factory.support.AbstractBeanFactory#doGetBean：**    
 ```java
 protected <T> T doGetBean(String name, @Nullable Class<T> requiredType, @Nullable Object[] args, boolean typeCheckOnly) throws BeansException {
         String beanName = this.transformedBeanName(name);
@@ -640,7 +640,7 @@ protected <T> T doGetBean(String name, @Nullable Class<T> requiredType, @Nullabl
         return this.adaptBeanInstance(name, beanInstance, requiredType);
     }
 ```
-org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#createBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])：      
+**org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#createBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])：**      
 ```java
     protected Object createBean(String beanName, RootBeanDefinition mbd, @Nullable Object[] args) throws BeanCreationException {
         if (this.logger.isTraceEnabled()) {
@@ -685,7 +685,7 @@ org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#cre
         }
     }
 ```
-doCreateBean：正式创建bean的核心逻辑
+**doCreateBean：正式创建bean的核心逻辑**    
 ```java
 protected Object doCreateBean(String beanName, RootBeanDefinition mbd, @Nullable Object[] args) throws BeanCreationException {
         BeanWrapper instanceWrapper = null;
@@ -779,9 +779,11 @@ protected Object doCreateBean(String beanName, RootBeanDefinition mbd, @Nullable
         }
     }
 ```
-initializeBean方法：负责触发bean的初始化方法调用，触发后置处理器方法的执行，执行bean的各种Aware方法
+**initializeBean方法：负责触发bean的初始化方法调用，触发后置处理器方法的执行，执行bean的各种Aware方法**    
 ```java
  protected Object initializeBean(String beanName, Object bean, @Nullable RootBeanDefinition mbd) {
+        // invokeAwareMethods：判定当前bean是否是指定的Aware实例，如果是，则执行对应的回调
+        // BeanNameAware，BeanClassLoaderAware，BeanFactoryAware，这3种钩子接口对应的回调方法就是在invokeAwareMethods中进行调用的
         if (System.getSecurityManager() != null) {
             AccessController.doPrivileged(() -> {
                 this.invokeAwareMethods(beanName, bean);
@@ -812,7 +814,34 @@ initializeBean方法：负责触发bean的初始化方法调用，触发后置�
         return wrappedBean;
     }
 ```
-执行前置方法：applyBeanPostProcessorsBeforeInitialization
+**执行Aware方法**
+```java
+private void invokeAwareMethods(String beanName, Object bean) {
+    if (bean instanceof Aware) {
+        // 实例化完bean对象后，首先判定是不是Aware类型
+        if (bean instanceof BeanNameAware) {
+            // 如果是BeanNameAware类型，则转型后回调setBeanName方法，将当前bean的名称设置进去
+            ((BeanNameAware)bean).setBeanName(beanName);
+        }
+
+        if (bean instanceof BeanClassLoaderAware) {
+            // 如果是BeanClassLoaderAware类型，则转型后回调setBeanClassLoader方法，将对应的类加载器设置进去
+            ClassLoader bcl = this.getBeanClassLoader();
+            if (bcl != null) {
+                ((BeanClassLoaderAware)bean).setBeanClassLoader(bcl);
+            }
+        }
+
+        if (bean instanceof BeanFactoryAware) {
+            // 如果是BeanFactoryAware类型，则转型后回调setBeanFactory方法，将当前的beanFactory对象设置进去
+            ((BeanFactoryAware)bean).setBeanFactory(this);
+        }
+    }
+
+}
+```
+
+**执行前置方法：applyBeanPostProcessorsBeforeInitialization**
 ```java
     public Object applyBeanPostProcessorsBeforeInitialization(Object existingBean, String beanName) throws BeansException {
         Object result = existingBean;
@@ -832,7 +861,7 @@ initializeBean方法：负责触发bean的初始化方法调用，触发后置�
         return result;
     }
 ```
-执行后置方法：applyBeanPostProcessorsAfterInitialization
+**执行后置方法：applyBeanPostProcessorsAfterInitialization**
 ```java
     public Object applyBeanPostProcessorsAfterInitialization(Object existingBean, String beanName) throws BeansException {
         Object result = existingBean;
