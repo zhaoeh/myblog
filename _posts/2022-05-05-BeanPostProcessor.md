@@ -779,7 +779,7 @@ protected Object doCreateBean(String beanName, RootBeanDefinition mbd, @Nullable
         }
     }
 ```
-initializeBean方法：触发后置处理器方法的执行
+initializeBean方法：负责触发bean的初始化方法调用，触发后置处理器方法的执行，执行bean的各种Aware方法
 ```java
  protected Object initializeBean(String beanName, Object bean, @Nullable RootBeanDefinition mbd) {
         if (System.getSecurityManager() != null) {
