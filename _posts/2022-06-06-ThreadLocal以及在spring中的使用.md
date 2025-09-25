@@ -22,4 +22,9 @@ pageHelper源码中设计如下：
 ```java
 com.github.pagehelper.page.PageMethod
 ```
+mybatisplus动态数据源中的设计：
+```java
+com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder
+
+```
 如果自己要尝试设计ThreadLocal，可以参考如上代码的设计。
