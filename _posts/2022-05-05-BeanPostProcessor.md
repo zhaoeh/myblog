@@ -50,7 +50,7 @@ Initialization表示初始化。
 1.根据扫描范围或者配置的范围确认那些bean需要被spring容器进行管理
 2.全局扫描这些bean，将这些bean的定义封装成对应的beanDefinition对象，全部注册到spring容器中
 3.开始遍历这些beanDefinition对象，反射其构造方法按个实例化bean对象
-4.反射出一个bean对象后，开始为这个bean填充属性，即确定这个bean依赖的属性值都来自于哪里，然后或者这些属性值，将其填充到这个bean的字段上
+4.反射出一个bean对象后，开始为这个bean填充属性，即确定这个bean依赖的属性值都来自于哪里，然后获取这些属性值，将其填充到这个bean的字段上
 5.当一个bean的属性填充完毕后，开始执行这个bean的初始化方法，为这个bean做一些初始化动作，当然初始化逻辑中可以执行任意自己想插入的逻辑都行
 6.当bean的初始化方法执行完毕，这个bean就完整的被创建出来了，随后会被注册到spring容器中缓存起来以供后续业务使用
 7.创建完一个bean之后开始重复执行3-6步骤，将容器中所有的beanDefinition对象都挨个实例化、填充属性、初始化、然后注册到spring容器中
@@ -59,7 +59,7 @@ Initialization表示初始化。
 ..........
 
 ```
-<font color="#dc143c"><b>从spring的bean生命周期可以看出来，BeanPostProcessor主要介入的是bean的初始化阶段，它在每一个bean的初始化阶段前后开始被回调。</b></font>         
+<font color="#dc143c"><b>从spring的bean生命周期可以看出来，BeanPostProcessor主要介入的是bean的初始化阶段，它在每一个bean的初始化阶段前后开始被回调（注意，它是在每一个普通bean的初始化前后都进行回调的）。</b></font>         
 
 ## 1.3 为什么需要使用 BeanPostProcessor ？
 有时候我们希望spring容器在创建bean对象的过程中，能够执行我们自定义的逻辑，对创建的bean做一些处理，或者执行一些业务（实际上就是拦截bean的创建过程，介入bean的生命周期）。   
