@@ -899,8 +899,9 @@ private void invokeAwareMethods(String beanName, Object bean) {
 （2）容器内自身bean实例化完毕后，对应的回调方法的触发过程。    
 每一个早期内部bean实现了 BeanPostProcessor 接口，其 postProcessAfterInitialization() 等方法都是对容器中的其他bean生效的。    
 这一点始终要铭记：    
-早期bean的 postProcessAfterInitialization() 等方法，永远是在其他bean的实例化过程前后介入的，而不是自己的实例化过程前后介入的。     
-自身的实例化过程，只有那些早于自身实例化之前，已经实例化好的 BeanPostProcessor 实例的 postProcessAfterInitialization() 等方法才会对自身的实例化产生介入。   
+早期bean的 postProcessAfterInitialization() 等方法，永远是在其他bean的实例化过程前后介入的，而不是自己的实例化过程前后介入的，即自己的 postProcessAfterInitialization() 等方法没法在自己的实例化过程中回调。  自身的实例化过程，只有那些早于自身实例化之前，已经实例化好的 BeanPostProcessor 实例的 postProcessAfterInitialization() 等方法才会对自身的实例化产生介入。     
+如何理解这句话？    
+从源码可以看出，早期bean自己的bean定义已经全部注册到spring容器中了，然后随着容器启动，会一次性获取容器中所有类型为 BeanPostProcessor 接口类型的所有beanNames，请注意，此时获取到的是容器中所有BeanPostProcessor类型的bean名称，然后进行排序，排序后然后依次遍历，在循环中挨个实例化早期bean自身，这就说明，循环中实例化每一个早期bean时，能够介入其自身的处理器链路，永远是在它之前已经实例化完毕的那些 BeanPostProcessor 实例，它自身以及晚于它自身之后注册的 BeanPostProcessor 实例链没法对其自身的实例化过程产生任何介入。   
 并且永远记住，在这些实现了 BeanPostProcessor 的早期bean的自身实例化过程中，依赖其他bean是高风险行为，因此早期bean的自身实例化过程阶段比较早，spring容器中的处理器链本身还没有实例化完毕（自身实例化正处于这一阶段中），因此尝试直接注入其他bean实例是高风险行为。   
 
 （3）其他普通bean的实例化过程，请注意，每一个普通bean的实例化前后都会全量执行容器中所有早期bean的回调方法，此时所有早期bean早已经优先实例化完毕了，也就是说第（2）步早期bean的 postProcessAfterInitialization() 等方法实际上就是在普通bean的实例化前后才进行触发的，而且此时所有的处理器链路都是完整的。   
