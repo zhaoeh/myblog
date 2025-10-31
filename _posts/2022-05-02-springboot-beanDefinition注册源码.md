@@ -835,6 +835,9 @@ processConfigBeanDefinitions()方法如下：
                 configClasses.removeAll(alreadyParsed);
                 if (this.reader == null) {
                     // 这个 ConfigurationClassBeanDefinitionReader 对象，负责将`@Bean`方法注册为BeanDefinition
+                    // 这个类在后续负责从已经解析过的配置类的BeanDefinition对象中，进一步解析@Bean标注的方法，然后负责将@Bean标注的方法转换为对应的BeanDefinition对象后注册到IOC容器中
+                    // 其中，在解析 @Bean 标注的方法时，会首先进行条件注解的评估，判断当前这个 @Bean 标注的方法是否需要被转换为BeanDefinition然后注册到容器中
+                    // 此处对于 @Bean 方法的条件评估，处于 ConfigurationPhase.REGISTER_BEAN 阶段，可以仔细看下这块的源码
                     this.reader = new ConfigurationClassBeanDefinitionReader(registry, this.sourceExtractor, this.resourceLoader, this.environment, this.importBeanNameGenerator, parser.getImportRegistry());
                 }
 
@@ -1148,3 +1151,38 @@ public abstract class ConfigurationClassUtils {
 -  如果一个类有@Configuration注解，或者间接标注了@Configuration注解，则是“完整配置类”
 -  一个类有@Controller、@Service、@Component、@Import、@ComponentScan、@ImportResource等，则是“部分配置类”
 -  一个类没有spring的相关bean注解，但存在@Bean工厂方法，也认为是“部分配置类”；这一点很重要，意味着“@Bean”注解可以标注在一个普通类上，这个类可以不存在任何spring的bean管理注解。
+
+# 7. ConfigurationPhase
+这是一个枚举类，里面标注了两个枚举类型：   
+```java
+package org.springframework.context.annotation;
+
+public interface ConfigurationCondition extends Condition {
+    ConfigurationCondition.ConfigurationPhase getConfigurationPhase();
+
+    public static enum ConfigurationPhase {
+        PARSE_CONFIGURATION,
+        REGISTER_BEAN;
+
+        private ConfigurationPhase() {
+        }
+    }
+}
+```
+详细解释如上两个枚举类型参与条件评估的阶段：   
+PARSE_CONFIGURATION：该类型，表示是在spring容器最早按照Resource的加载顺序一个个加载classpath下面的每一个class对象后，然后判断class对象是否有指定的注解或者否和配置类的标准（即是否存在那些spring的组件注解等），如果存在则这些class就符合spring的配置类规则。    
+然后开始解析这些配置类，所谓解析，即将这些配置类从class对象转换为IOC容器内部的BeanDefinition对象后进行注册。    
+但是，在开始解析这些配置类前，会判断这些配置类上面的条件注解，即：    
+开始解析当前配置类A，如果A上存在条件注解，那么就从IOC容器中去获取条件注解中指定的条件（即那些已经注册到IOC容器中的BeanDefinition）是否通过评估。   
+如果通过评估，则开始解析该配置类A，将其转换为BeanDefinition对象后，注册到IOC容器中。    
+如果没有通过评估，就不对配置类A进行解析，此时配置类A本身就不会转换为BeanDefinition对象，当然也就不会进行注册。   
+所以，PARSE_CONFIGURATION阶段，一般是用来评估一个候选者组件，是否满足条件评估，满足，才开始解析它，将其转换为BeanDefinition后注册，不满足，则不进行任何解析。   
+这意味着，当一堆配置类彼此都标注了条件注解时，我们必须保证，当前解析的配置类A，假如条件注解中依赖配置类B，则B必须确保在配置类A之前就被解析，这也是为什么需要@AutoConfigureAfter、@AutoConfigureBefore等注解来标注一堆配置类的解析优先级的原因。     
+所以，配置类（包括@Component等标注的组件也算配置类）上的条件注解，是在解析当前配置类的阶段进行评估的。评估失败，则当前配置类就不会被解析为BeanDefinition。   
+
+REGISTER_BEAN：该类型，实际上和上述的阶段类似，只不过该阶段是用于解析配置类里面的@Bean方法时，进行评估的。    
+请注意，此时@Bean所属的配置类肯定优先被解析了，才会进入到对@Bean方法的解析。    
+而处理@Bean方法的本质，也是将其返回值类型解析为对应的BeanDefinition后，注册到容器中。   
+只不过此时，一旦条件评估通过，则这个@Bean标注的方法就会被成功解析为BeanDefinition对象，最后成功注册到IOC容器中。    
+如果评估失败，则@Bean标注的方法，最终不会被转换为BeanDefinition对象，容器中也就不会进行注册。    
+因此，两者区别的本质就是，前者决定@Bean所在的配置类是否会被解析（即配置类本身是否会被转换为BeanDefinition对象然后注册到容器中），后者决定的是配置类中通过@Bean标注的方法是否会被解析为对应的BeanDefinition然后注册到容器中。   
