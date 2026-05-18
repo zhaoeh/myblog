@@ -57,9 +57,9 @@ spring.profiles.active=dev
 
 #default is /，应用的上下文路径。此处配置的路径作为该应用所有访问url的一部分，如果是默认的/，则url访问不用加，如果是显式配置，则需要加。   
 
-# 如果是默认的/，则访问：http://127.0.0.1:8088/zhaoerhu/hello   
+# 如果是默认的/，则访问：http://127.0.0.1:8088/zhaoguanlan/hello   
 
-# 如果是/myspringbootservice，则访问：http://127.0.0.1:8088/myspringbootservice/zhaoerhu/hello   
+# 如果是/myspringbootservice，则访问：http://127.0.0.1:8088/myspringbootservice/zhaoguanlan/hello   
 
 #server.servlet-path=/myspringbootservice   
 
@@ -263,7 +263,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 功能描述：测试springboot读取文件的各种方式
  *
  * @ClassName Demo03GetConfigController
- * @Author zhaoerhu
+ * @Author zhaoguanlan
  * @Date 2023/10/6 21:59
  */
 @RestController
@@ -930,7 +930,7 @@ user.properties
 
 # 下面两个配置项是这个自定义文件中单独搞的   
 
-eric.englishName=Zhaoerhu
+eric.englishName=zhaoguanlan
 eric.englishAge=22
 
 # 下面两个配置项和application.properties中的配置项定义的一样，使用@ConfigurationProperties指定前缀去映射   
@@ -1078,7 +1078,7 @@ http://localhost:8088/demo03GetConfigController/getConfigByPropertySource
 日志：   
 ```
 进入 getConfigByPropertySource() 方法...
-@PropertySource注解方式 获取的配置 eric.englishName 为：Zhaoerhu
+@PropertySource注解方式 获取的配置 eric.englishName 为：zhaoguanlan
 @PropertySource注解方式 获取的配置 eric.englishAge 为：22
 @PropertySource注解方式 获取的配置 zeh.test.username 为：Yurui
 @PropertySource注解方式 获取的配置 zeh.test.userAge 为：18

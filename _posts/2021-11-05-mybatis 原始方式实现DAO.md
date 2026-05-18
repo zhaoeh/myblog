@@ -845,7 +845,7 @@ public class BaseDaoRun {
     @Test
     public void testFindUserByName3() throws Exception {
         IBaseDao<CommonPo> userDao = new BaseDaoImpl(sqlSessionFactory);
-        List<CommonPo> list = userDao.findUserByName3("赵二虎");
+        List<CommonPo> list = userDao.findUserByName3("赵观澜");
         Iterator<CommonPo> iterator = list.iterator();
         System.out.println("根据用户名称查询到的users表的record如下：");
         while (iterator.hasNext()) {
@@ -857,7 +857,7 @@ public class BaseDaoRun {
     @Test
     public void testFindUserByName4() throws Exception {
         IBaseDao<CommonPo> userDao = new BaseDaoImpl(sqlSessionFactory);
-        List<CommonPo> list = userDao.findUserByName4("赵二虎");
+        List<CommonPo> list = userDao.findUserByName4("赵观澜");
         Iterator<CommonPo> iterator = list.iterator();
         System.out.println("根据用户名称查询到的users表的record如下：");
         while (iterator.hasNext()) {
@@ -869,7 +869,7 @@ public class BaseDaoRun {
     @Test
     public void testFindUserByName5() throws Exception {
         IBaseDao<CommonPo> userDao = new BaseDaoImpl(sqlSessionFactory);
-        List<CommonPo> list = userDao.findUserByName5("'赵二虎' or '1' = '1'");
+        List<CommonPo> list = userDao.findUserByName5("'赵观澜' or '1' = '1'");
         Iterator<CommonPo> iterator = list.iterator();
         System.out.println("根据用户名称查询到的users表的record如下：");
         while (iterator.hasNext()) {
@@ -883,8 +883,8 @@ public class BaseDaoRun {
     public void testFindUserByName6() throws Exception {
         IBaseDao<CommonPo> userDao = new BaseDaoImpl(sqlSessionFactory);
         // 调用UserDao的方法，注入输入参数，完整的sql输出后如下，会自动为单引号进行转义
-        // select * from users where name = '''赵二虎'' or ''1'' = ''1''';
-        List<CommonPo> list = userDao.findUserByName6("'赵二虎' or '1' = '1'");
+        // select * from users where name = '''赵观澜'' or ''1'' = ''1''';
+        List<CommonPo> list = userDao.findUserByName6("'赵观澜' or '1' = '1'");
 
         if (list != null && list.size() > 0) {
             Iterator<CommonPo> iterator = list.iterator();
@@ -906,10 +906,10 @@ public class BaseDaoRun {
         IBaseDao<CommonPo> userDao = new BaseDaoImpl(sqlSessionFactory);
         // 封装map
         Map<String, String> params = new HashMap<String, String>();
-        params.put("key1", "'赵二虎' or '1' = '1'");// key1使用${}传递
+        params.put("key1", "'赵观澜' or '1' = '1'");// key1使用${}传递
         params.put("key2", "发呆");// key2使用#{}传递
         // 调用UserDao的方法，注入输入参数，完整的sql输出后如下，会自动为单引号进行转义
-        // select * from users where name = '''赵二虎'' or ''1'' = ''1''';
+        // select * from users where name = '''赵观澜'' or ''1'' = ''1''';
         List<CommonPo> list = userDao.findUserByName7(params);
         Iterator<CommonPo> iterator = list.iterator();
         System.out.println("根据用户名称模糊查询到的users表的record如下：");
@@ -928,10 +928,10 @@ public class BaseDaoRun {
         IBaseDao<CommonPo> userDao = new BaseDaoImpl(sqlSessionFactory);
         // 封装map
         Map<String, String> params = new HashMap<String, String>();
-        params.put("key1", "'赵二虎' or '1' = '1'");// key1使用${}传递
+        params.put("key1", "'赵观澜' or '1' = '1'");// key1使用${}传递
         params.put("key2", "'发呆'");// key2使用#{}传递
         // 调用UserDao的方法，注入输入参数，完整的sql输出后如下，会自动为单引号进行转义
-        // select * from users where name = '''赵二虎'' or ''1'' = ''1''';
+        // select * from users where name = '''赵观澜'' or ''1'' = ''1''';
         List<CommonPo> list = userDao.findUserByName8(null);
         Iterator<CommonPo> iterator = list.iterator();
         System.out.println("根据用户名称模糊查询到的users表的record如下：");

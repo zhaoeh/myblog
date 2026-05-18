@@ -707,7 +707,7 @@ public class PersonServiceJunit {
     public void testInsert() {
         Person per = new Person();
         per.setId(12);
-        per.setName("赵二虎");
+        per.setName("赵观澜");
         per.setSex("男");
         per.setAge(25);
         per.setBirthday(new Date());

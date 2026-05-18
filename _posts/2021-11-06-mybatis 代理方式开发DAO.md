@@ -56,7 +56,7 @@ import java.util.List;
  * mybatis的原始方式开发 dao 接口没法显式接收多个输入参数；但是使用代理开发方式可以显式接收多个输入参数（需要使用@Param()注解标注各个参数的别名）。
  *
  * @类名称： UserDaoProxy
- * @作者： zhaoerhu
+ * @作者： zhaoguanlan
  * @创建时间： 2019-4-3
  * @修改时间： 2019-4-3上午11:22:03
  * @备注：尊重每一行代码！
@@ -353,7 +353,7 @@ import java.util.List;
  * 如果是一个List<Pojo>或者List<Map<String,Object>>则默认调用selectList()接口。
  *
  * @类名称： UserDaoProxyJunitRun
- * @作者： zhaoerhu
+ * @作者： zhaoguanlan
  * @创建时间： 2019-4-3
  * @修改时间： 2019-4-3上午10:49:06
  * @备注：尊重每一行代码！
@@ -378,7 +378,7 @@ public class UserDaoProxyRun {
      *
      * @params: []
      * @return: void
-     * @author: zhaoerhu
+     * @author: zhaoguanlan
      * @date: 2019/7/20 17:47
      */
     @Test
@@ -390,7 +390,7 @@ public class UserDaoProxyRun {
         UserCustomVo userCustom = new UserCustomVo();
         // 由于这里使用动态sql，如果不设置某个值，条件不会拼接在sql中
         userCustom.setSex("男");
-        userCustom.setName("赵二虎");
+        userCustom.setName("赵观澜");
         // 传入多个id
         List<Integer> ids = new ArrayList<Integer>();
         ids.add(1);
@@ -400,7 +400,7 @@ public class UserDaoProxyRun {
         userQueryVo.setIds(ids);
         userQueryVo.setUserCustom(userCustom);
         // 调用userMapper的方法，传递两个参数：一个简单类型，一个pojo类型。
-        List<UserCustomVo> list = userMapper.findUserListProxy("zhaoerhu", userQueryVo);
+        List<UserCustomVo> list = userMapper.findUserListProxy("zhaoguanlan", userQueryVo);
         //采用标准输出iterator输出list集合
         Iterator<UserCustomVo> iterator = list.iterator();
         while (iterator.hasNext()) {
@@ -413,7 +413,7 @@ public class UserDaoProxyRun {
      *
      * @params: []
      * @return: void
-     * @author: zhaoerhu
+     * @author: zhaoguanlan
      * @date: 2019/7/20 17:47
      */
     @Test
@@ -437,7 +437,7 @@ public class UserDaoProxyRun {
      *
      * @params: []
      * @return: void
-     * @author: zhaoerhu
+     * @author: zhaoguanlan
      * @date: 2019/7/20 17:54
      */
     @Test
@@ -470,7 +470,7 @@ public class UserDaoProxyRun {
      *
      * @params: []
      * @return: void
-     * @author: zhaoerhu
+     * @author: zhaoguanlan
      * @date: 2019/7/20 20:57
      */
     @Test
@@ -479,7 +479,7 @@ public class UserDaoProxyRun {
         // 创建UserMapper对象，mybatis自动生成mapper代理对象
         UserDaoProxy userMapper = sqlSession.getMapper(UserDaoProxy.class);
         // 调用userMapper的方法
-        List<CommonPo> list = userMapper.findUserByNameProxy("赵二虎");
+        List<CommonPo> list = userMapper.findUserByNameProxy("赵观澜");
         sqlSession.close();
         System.out.println(list);
     }
@@ -505,7 +505,7 @@ import java.util.List;
  * mybatis代理方式开发dao接口，不要使用泛型定义接口，直接指定类型。
  *
  * @类名称： OrdersCustomDaoProxy
- * @作者： zhaoerhu
+ * @作者： zhaoguanlan
  * @创建时间： 2019-4-3
  * @修改时间： 2019-4-3上午11:22:36
  * @备注：尊重每一行代码！

@@ -92,7 +92,7 @@ public class LambdaRun {
             public void test() {
                 System.out.println("吃饭");
             }
-        }.eat("赵二虎");
+        }.eat("赵观澜");
     }
 
     @Test

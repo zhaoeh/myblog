@@ -471,7 +471,7 @@ public class StudyGenericMoreRun {
     public static void main(String[] args) {
         // 实例化泛型类的时候指定多个泛型类型，如果不指定，则泛型会被擦除，使用Object接收；
         // 如果指定泛型类型，则在设置内容时一旦类型不符则编译报错。
-        PointDemo05<String, Integer> p = new PointDemo05<String, Integer>("赵二虎", 22);
+        PointDemo05<String, Integer> p = new PointDemo05<String, Integer>("赵观澜", 22);
         System.out.println(p);
 
     }
@@ -792,7 +792,7 @@ public class StudyGenericTongPeiFuRun {
     public static void main(String[] args) {
         // 实例化泛型对象，指定具体泛型类型。
         // 同样在实例化泛型对象时，指定具体泛型类型只需要在new对象的时候指定，接收方因为接收的也是一个引用（实际上=本来就是引用传递的方式之一），所以也符合引用传递，因此接收方也可以使用通配符进行接收。
-        PointDemo06<?, ?> p = new PointDemo06<String, Integer>("赵二虎", 22);
+        PointDemo06<?, ?> p = new PointDemo06<String, Integer>("赵观澜", 22);
 
         // 错误，无法传递。
         //         testFun(p);

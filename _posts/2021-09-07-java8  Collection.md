@@ -53,7 +53,7 @@ public class CollectionAndMapForeachRun {
         System.out.println("======方法引用方式实现Lambda表达式========");
         sourceList.forEach(System.out::println);
         Map<String, String> map = new HashMap<>();
-        map.put("name", "赵二虎");
+        map.put("name", "赵观澜");
         map.forEach((k, v) -> System.out.println("key:" + k + ";value:" + v));
     }
 }

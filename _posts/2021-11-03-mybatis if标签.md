@@ -91,7 +91,7 @@ public class MybatisIfDao {
         SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(inputStream);
         SqlSession sqlSession = sqlSessionFactory.openSession();
         Map<String, Object> testMap = new HashMap<>();
-        testMap.put("name", "赵二虎");
+        testMap.put("name", "赵观澜");
         List<CommonPo> list = sqlSession.selectList("myif.findUserByIdIfMap", testMap);
         Iterator<CommonPo> iterator = list.iterator();
         System.out.println("根据id查询到的ZEH_USER表中的record如下：");

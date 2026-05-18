@@ -728,7 +728,7 @@ import java.net.URLEncoder;
 public class URLEncoderAndURLDecoder {
     public static void main(String args[]) throws UnsupportedEncodingException {
         
-        String keyword = "Eric 赵二虎";
+        String keyword = "Eric 赵观澜";
         String encodeByU8 = URLEncoder.encode(keyword, "UTF-8");
         String decodeByU8 = URLDecoder.decode(encodeByU8, "UTF-8");
         System.out.println("编码后：" + encodeByU8);

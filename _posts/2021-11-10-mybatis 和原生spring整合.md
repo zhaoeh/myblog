@@ -243,7 +243,7 @@ import zeh.mybatis.code00common.po.more.MarshallUser;
  * 重点：整合后dao实现类继承SqlSessionDaoSupport类，能够自动实现sqlSessionFactory对象的注入。(前提是该dao必须交给spring的ioc进行实例化)
  *
  * @类名称： UserDaoImpl
- * @作者： zhaoerhu
+ * @作者： zhaoguanlan
  * @创建时间： 2019-4-13
  * @修改时间： 2019-4-13上午12:13:31
  * @备注：尊重每一行代码！
@@ -316,7 +316,7 @@ import zeh.mybatis.code09mybatisspring.dao.MarshallUserDao;
  * 始spring 3.1就可以在java8上编译。
  *
  * @类名称： UserDaoImplTest
- * @作者： zhaoerhu
+ * @作者： zhaoguanlan
  * @创建时间： 2019-4-13
  * @修改时间： 2019-4-13上午12:14:43
  * @备注：尊重每一行代码！
@@ -850,7 +850,7 @@ import java.util.List;
  * junit测试mapper代理开发方式。
  *
  * @类名称： UserMapperTest
- * @作者： zhaoerhu
+ * @作者： zhaoguanlan
  * @创建时间： 2019-4-13
  * @修改时间： 2019-4-13上午12:25:39
  * @备注：尊重每一行代码！
